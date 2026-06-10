@@ -8,9 +8,16 @@ interface RatingStarsProps {
   onRatingChange?: (rating: number) => void;
   readOnly?: boolean;
   size?: number;
+  maxStars?: number;
 }
 
-const RatingStars: React.FC<RatingStarsProps> = ({ rating, onRatingChange, readOnly = false, size = 24 }) => {
+const RatingStars: React.FC<RatingStarsProps> = ({
+  rating,
+  onRatingChange,
+  readOnly = false,
+  size = 24,
+  maxStars = 5
+}) => {
   const renderStar = (index: number) => {
     const isFilled = index <= rating;
     return (
@@ -27,9 +34,11 @@ const RatingStars: React.FC<RatingStarsProps> = ({ rating, onRatingChange, readO
     );
   };
 
+  const stars = Array.from({ length: maxStars }, (_, i) => i + 1);
+
   return (
     <View style={styles.container}>
-      {[1, 2, 3, 4, 5].map(index => renderStar(index))}
+      {stars.map(index => renderStar(index))}
     </View>
   );
 };
