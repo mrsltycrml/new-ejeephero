@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { detectAnomalies, initAnomalyDetection } from './anomalyDetector';
 
 let locationSubscription: Location.LocationSubscription | null = null;
+let batterySubscription: Battery.Subscription | null = null;
 let currentVehicleId: string | null = null;
 let currentInterval: number = 3000;
 
@@ -34,15 +35,13 @@ export const startTelemetry = async (vehicleId: string) => {
     handleLocationUpdate
   );
 
-  // Monitor battery changes separately to avoid recursive start/stop within location callback
-  const batterySub = Battery.addBatteryLevelListener(({ batteryLevel: newLevel }) => {
+  // Monitor battery changes separately
+  batterySubscription = Battery.addBatteryLevelListener(({ batteryLevel: newLevel }) => {
     const newInterval = (newLevel > 0 && newLevel < 0.2) ? 5000 : 3000;
     if (newInterval !== currentInterval) {
       restartTelemetryWithInterval(newInterval);
     }
   });
-
-  return batterySub;
 };
 
 const handleLocationUpdate = async (location: Location.LocationObject) => {
@@ -86,6 +85,10 @@ export const stopTelemetry = () => {
   if (locationSubscription) {
     locationSubscription.remove();
     locationSubscription = null;
+  }
+  if (batterySubscription) {
+    batterySubscription.remove();
+    batterySubscription = null;
   }
   currentVehicleId = null;
 };

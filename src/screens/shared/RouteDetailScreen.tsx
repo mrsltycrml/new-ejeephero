@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
-import Mapbox from '@rnmapbox/maps';
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -43,25 +43,29 @@ export default function RouteDetailScreen({ route: navRoute }: any) {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.mapContainer}>
-        <Mapbox.MapView style={styles.map} styleURL={Mapbox.StyleURL.Street} scrollEnabled={false} zoomEnabled={false} pitchEnabled={false} rotateEnabled={false}>
-          {terminals.length > 0 && (
-            <>
-              <Mapbox.Camera
-                zoomLevel={12}
-                centerCoordinate={[terminals[0].longitude, terminals[0].latitude]}
-              />
-              {terminals.map(t => (
-                <Mapbox.PointAnnotation
-                  key={t.id}
-                  id={t.id}
-                  coordinate={[t.longitude, t.latitude]}
-                >
-                  <View style={styles.miniMarker} />
-                </Mapbox.PointAnnotation>
-              ))}
-            </>
-          )}
-        </Mapbox.MapView>
+        <MapView
+          style={styles.map}
+          provider={PROVIDER_DEFAULT}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          pitchEnabled={false}
+          rotateEnabled={false}
+          region={terminals.length > 0 ? {
+            latitude: terminals[0].latitude,
+            longitude: terminals[0].longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          } : undefined}
+        >
+          {terminals.map(t => (
+            <Marker
+              key={t.id}
+              coordinate={{ latitude: t.latitude, longitude: t.longitude }}
+            >
+              <View style={styles.miniMarker} />
+            </Marker>
+          ))}
+        </MapView>
       </View>
 
       <View style={styles.details}>

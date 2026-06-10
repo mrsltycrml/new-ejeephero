@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import Mapbox from '@rnmapbox/maps';
+import { Marker } from 'react-native-maps';
 import { colors } from '../../theme/colors';
 
 interface VehicleMarkerProps {
@@ -14,17 +14,19 @@ interface VehicleMarkerProps {
 
 const VehicleMarker: React.FC<VehicleMarkerProps> = ({ vehicle }) => {
   return (
-    <Mapbox.PointAnnotation
+    <Marker
       key={`vehicle-${vehicle.id}`}
-      id={`vehicle-${vehicle.id}`}
-      coordinate={[vehicle.longitude, vehicle.latitude]}
+      coordinate={{ latitude: vehicle.latitude, longitude: vehicle.longitude }}
+      rotation={vehicle.heading}
+      anchor={{ x: 0.5, y: 0.5 }}
+      flat={true}
     >
-      <View style={[styles.markerContainer, { transform: [{ rotate: `${vehicle.heading}deg` }] }]}>
+      <View style={styles.markerContainer}>
         <View style={styles.jeepneyIcon}>
           <View style={styles.windshield} />
         </View>
       </View>
-    </Mapbox.PointAnnotation>
+    </Marker>
   );
 };
 

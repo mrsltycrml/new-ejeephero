@@ -1,29 +1,10 @@
-import Mapbox from '@rnmapbox/maps';
 import { supabase } from '../lib/supabase';
 import { getDb } from '../lib/database';
 
 export const downloadOfflineMap = async (packName: string = 'makati-offline-pack') => {
-  try {
-    const MAKATI_BOUNDS = {
-      ne: [121.06, 14.58],
-      sw: [121.01, 14.54],
-    };
-
-    const options = {
-      name: packName,
-      styleURL: Mapbox.StyleURL.Street,
-      bounds: [MAKATI_BOUNDS.ne, MAKATI_BOUNDS.sw],
-      minZoom: 10,
-      maxZoom: 16,
-    };
-
-    // Note: In a real app, you'd handle progress listeners
-    // @ts-ignore
-    await Mapbox.offlineManager.createPack(options);
-    console.log('Successfully started offline map download');
-  } catch (error) {
-    console.error('Error downloading offline map:', error);
-  }
+  // react-native-maps does not support offline map tile downloads out of the box like Mapbox.
+  // This function is retained for API compatibility but will no longer download Mapbox tiles.
+  console.log('Offline map tiles are not supported with react-native-maps. Operating in online mode for maps.');
 };
 
 export const syncDataToSQLite = async () => {

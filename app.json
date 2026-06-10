@@ -7,28 +7,31 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ejeephero.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to track e-jeepneys and calculate ETAs.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location to track e-jeepneys and calculate ETAs."
+      }
     },
     "android": {
+      "package": "com.ejeephero.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "FOREGROUND_SERVICE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "@rnmapbox/maps",
-        {
-          "RNMapboxMapsImpl": "mapbox",
-          "RNMapboxMapsDownloadToken": "sk.dummy_token"
-        }
-      ],
       "expo-location",
       "expo-notifications"
     ]

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
-import Mapbox from '@rnmapbox/maps';
+import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { useVehicleTracking } from '../../hooks/useVehicleTracking';
 import { colors } from '../../theme/colors';
@@ -9,11 +9,14 @@ import { spacing } from '../../theme/spacing';
 import { supabase } from '../../lib/supabase';
 import { findNearestTerminals } from '../../utils/geo';
 import VehicleMarker from '../../components/map/VehicleMarker';
+import WeatherBanner from '../../components/common/WeatherBanner';
 
-const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '';
-Mapbox.setAccessToken(MAPBOX_TOKEN);
-
-const MAKATI_CENTER: [number, number] = [121.0244, 14.5547];
+const MAKATI_CENTER = {
+  latitude: 14.5547,
+  longitude: 121.0244,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
+};
 
 export default function HomeScreen() {
   const { location, loading, error } = useUserLocation();
@@ -42,48 +45,34 @@ export default function HomeScreen() {
     }
   }, [location, terminals]);
 
-  const routeLine = selectedRoute ? {
-    type: 'Feature' as const,
-    properties: {},
-    geometry: {
-      type: 'LineString' as const,
-      coordinates: terminals
-        .filter(t => t.route_id === selectedRoute)
-        .sort((a, b) => a.sequence_order - b.sequence_order)
-        .map(t => [t.longitude, t.latitude])
-    }
-  } : null;
+  const routePath = selectedRoute ? terminals
+    .filter(t => t.route_id === selectedRoute)
+    .sort((a, b) => a.sequence_order - b.sequence_order)
+    .map(t => ({ latitude: t.latitude, longitude: t.longitude })) : [];
 
   return (
     <View style={styles.container}>
-      <Mapbox.MapView style={styles.map} styleURL={Mapbox.StyleURL.Street}>
-        <Mapbox.Camera
-          zoomLevel={14}
-          centerCoordinate={
-            location
-              ? [location.coords.longitude, location.coords.latitude]
-              : MAKATI_CENTER
-          }
-          animationMode="flyTo"
-          animationDuration={2000}
-        />
-
-        <Mapbox.UserLocation />
-
+      <MapView
+        style={styles.map}
+        provider={PROVIDER_DEFAULT}
+        initialRegion={
+          location ? {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+          } : MAKATI_CENTER
+        }
+        showsUserLocation={true}
+        showsMyLocationButton={true}
+      >
         {/* Route Path */}
-        {routeLine && routeLine.geometry.coordinates.length > 1 && (
-          <Mapbox.ShapeSource id="routeSource" shape={routeLine}>
-            <Mapbox.LineLayer
-              id="routeFill"
-              style={{
-                lineColor: routes.find(r => r.id === selectedRoute)?.color_code || colors.primary,
-                lineWidth: 5,
-                lineOpacity: 0.8,
-                lineJoin: 'round',
-                lineCap: 'round',
-              }}
-            />
-          </Mapbox.ShapeSource>
+        {routePath.length > 1 && (
+          <Polyline
+            coordinates={routePath}
+            strokeColor={routes.find(r => r.id === selectedRoute)?.color_code || colors.primary}
+            strokeWidth={5}
+          />
         )}
 
         {/* Vehicle Markers */}
@@ -93,20 +82,21 @@ export default function HomeScreen() {
 
         {/* Terminals */}
         {terminals.map(t => (
-          <Mapbox.PointAnnotation
+          <Marker
             key={`terminal-${t.id}`}
-            id={`terminal-${t.id}`}
-            coordinate={[t.longitude, t.latitude]}
-            onSelected={() => setSelectedRoute(t.route_id)}
+            coordinate={{ latitude: t.latitude, longitude: t.longitude }}
+            onPress={() => setSelectedRoute(t.route_id)}
           >
             <View style={styles.terminalMarker} />
-          </Mapbox.PointAnnotation>
+          </Marker>
         ))}
-      </Mapbox.MapView>
+      </MapView>
+
+      <WeatherBanner />
 
       <View style={styles.bottomSheet}>
         <Text style={styles.sheetTitle}>
-          {selectedRoute ? `Route: ${routes.find(r => r.id === selectedRoute)?.name}` : 'Nearest Terminals'}
+          {selectedRoute ? `Ruta: ${routes.find(r => r.id === selectedRoute)?.name}` : 'Pinakamalapit na Terminal'}
         </Text>
 
         {loading && <ActivityIndicator size="small" color={colors.primary} />}
@@ -120,8 +110,10 @@ export default function HomeScreen() {
 
         {selectedRoute && (
           <View style={styles.routeStats}>
-            <Text style={styles.bodyText}>Active E-Jeeps: {vehicles.length}</Text>
-            <Text style={styles.linkText} onPress={() => setSelectedRoute(null)}>Clear Filter</Text>
+            <Text style={styles.bodyText}>Aktibong E-Jeeps: {vehicles.length}</Text>
+            <TouchableOpacity onPress={() => setSelectedRoute(null)}>
+              <Text style={styles.linkText}>I-clear ang Filter</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>

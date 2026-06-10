@@ -7,9 +7,10 @@ interface RatingStarsProps {
   rating: number;
   onRatingChange?: (rating: number) => void;
   readOnly?: boolean;
+  size?: number;
 }
 
-export const RatingStars: React.FC<RatingStarsProps> = ({ rating, onRatingChange, readOnly = false }) => {
+const RatingStars: React.FC<RatingStarsProps> = ({ rating, onRatingChange, readOnly = false, size = 24 }) => {
   const renderStar = (index: number) => {
     const isFilled = index <= rating;
     return (
@@ -19,7 +20,7 @@ export const RatingStars: React.FC<RatingStarsProps> = ({ rating, onRatingChange
         onPress={() => onRatingChange?.(index)}
         style={styles.starContainer}
       >
-        <Text style={[styles.star, { color: isFilled ? colors.warning : colors.border }]}>
+        <Text style={[styles.star, { color: isFilled ? colors.warning : colors.border, fontSize: size }]}>
           ★
         </Text>
       </TouchableOpacity>
@@ -45,3 +46,5 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
 });
+
+export default RatingStars;
