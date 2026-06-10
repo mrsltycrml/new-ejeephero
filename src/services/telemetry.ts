@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import * as Battery from 'expo-battery';
 import { supabase } from '../lib/supabase';
-import { detectAnomalies, initAnomalyDetection } from './anomalyDetector';
+import { detectAnomalies, initAnomalyDetection, stopAnomalyDetection } from './anomalyDetector';
 
 let locationSubscription: Location.LocationSubscription | null = null;
 let batterySubscription: Battery.Subscription | null = null;
@@ -35,7 +35,6 @@ export const startTelemetry = async (vehicleId: string) => {
     handleLocationUpdate
   );
 
-  // Monitor battery changes separately
   batterySubscription = Battery.addBatteryLevelListener(({ batteryLevel: newLevel }) => {
     const newInterval = (newLevel > 0 && newLevel < 0.2) ? 5000 : 3000;
     if (newInterval !== currentInterval) {
@@ -90,5 +89,6 @@ export const stopTelemetry = () => {
     batterySubscription.remove();
     batterySubscription = null;
   }
+  stopAnomalyDetection();
   currentVehicleId = null;
 };

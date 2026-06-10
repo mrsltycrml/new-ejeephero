@@ -4,18 +4,18 @@ import { getDistance } from '../utils/geo';
 
 let lastLocation: any = null;
 let lastGForce: number = 0;
-let crashDetectionActive = false;
+let accelerometerSubscription: any = null;
 let terminalsCache: any[] = [];
 let vehicleRouteCache: Record<string, string> = {};
 
 export const initAnomalyDetection = async () => {
-  if (crashDetectionActive) return;
+  if (accelerometerSubscription) return;
   
   const { data } = await supabase.from('terminals').select('latitude, longitude, route_id');
   terminalsCache = data || [];
 
   Accelerometer.setUpdateInterval(100);
-  Accelerometer.addListener(({ x, y, z }) => {
+  accelerometerSubscription = Accelerometer.addListener(({ x, y, z }) => {
     const gForce = Math.sqrt(x*x + y*y + z*z);
     lastGForce = gForce;
 
@@ -23,8 +23,13 @@ export const initAnomalyDetection = async () => {
       checkCrashConfidence();
     }
   });
+};
 
-  crashDetectionActive = true;
+export const stopAnomalyDetection = () => {
+  if (accelerometerSubscription) {
+    accelerometerSubscription.remove();
+    accelerometerSubscription = null;
+  }
 };
 
 const checkCrashConfidence = async () => {

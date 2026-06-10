@@ -39,15 +39,27 @@ export default function SOSButton() {
         .eq('is_active', true)
         .single();
 
-      const { error } = await supabase.from('sos_events').insert({
+      const sosData = {
         user_id: user?.id,
         vehicle_id: vehicle?.id,
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         triggered_at: new Date().toISOString()
-      });
+      };
+
+      const { error } = await supabase.from('sos_events').insert(sosData);
 
       if (!error) {
+        // Trigger Edge Function
+        await supabase.functions.invoke('sos-notify', {
+          body: {
+            vehicleId: vehicle?.id,
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            driverId: user?.id
+          }
+        });
+
         Alert.alert('SOS Naisend!', 'Napadala na ang iyong lokasyon sa mga emergency contacts.');
       }
     } catch (error) {
