@@ -1,124 +1,138 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Switch } from 'react-native';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { supabase } from '../../lib/supabase';
 import { startTelemetry, stopTelemetry } from '../../services/telemetry';
-import { useBattery } from '../../hooks/useBattery';
 
 export default function DashboardScreen() {
   const [routes, setRoutes] = useState<any[]>([]);
-  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
-  const [vehicleId, setVehicleId] = useState<string | null>(null);
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [isShiftActive, setIsShiftActive] = useState(false);
-  
-  const { batteryLevel, isLowPowerMode } = useBattery();
+  const [loading, setLoading] = useState(true);
+  const [vehicle, setVehicle] = useState<any>(null);
 
   useEffect(() => {
-    fetchRoutes();
-    setupDriverVehicle();
+    fetchInitialData();
   }, []);
 
-  const fetchRoutes = async () => {
-    const { data } = await supabase.from('routes').select('*');
-    if (data) setRoutes(data);
-  };
+  const fetchInitialData = async () => {
+    const { data: routesData } = await supabase.from('routes').select('*');
+    setRoutes(routesData || []);
 
-  const setupDriverVehicle = async () => {
-    // In a real app, this ensures the driver has a vehicle assigned
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: vehicleData } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('driver_id', user.id)
+        .single();
 
-    const { data } = await supabase
-      .from('vehicles')
-      .select('id, route_id')
-      .eq('driver_id', userData.user.id)
-      .single();
+      if (vehicleData) {
+        setVehicle(vehicleData);
+        setIsShiftActive(vehicleData.is_active);
+        setSelectedRouteId(vehicleData.route_id);
 
-    if (data) {
-      setVehicleId(data.id);
-      if (data.route_id) setSelectedRoute(data.route_id);
+        if (vehicleData.is_active) {
+          startTelemetry(vehicleData.id);
+        }
+      }
     }
+    setLoading(false);
   };
 
   const toggleShift = async () => {
-    if (!selectedRoute) {
-      Alert.alert('Error', 'Pumili muna ng ruta bago magsimula ng pasada.');
-      return;
-    }
-    if (!vehicleId) {
-      Alert.alert('Error', 'Wala kang nakatalagang sasakyan.');
+    if (!selectedRouteId) {
+      Alert.alert('Patalastas', 'Mangyaring pumili muna ng ruta.');
       return;
     }
 
-    if (isShiftActive) {
-      // End Shift
-      await stopTelemetry(vehicleId);
-      setIsShiftActive(false);
-    } else {
-      // Start Shift
-      // Assign vehicle to route if needed
-      await supabase.from('vehicles').update({ route_id: selectedRoute }).eq('id', vehicleId);
-      
-      const started = await startTelemetry(vehicleId, isLowPowerMode);
-      if (started) {
-        setIsShiftActive(true);
+    const newStatus = !isShiftActive;
+
+    const { error } = await supabase
+      .from('vehicles')
+      .update({
+        is_active: newStatus,
+        route_id: selectedRouteId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', vehicle.id);
+
+    if (!error) {
+      setIsShiftActive(newStatus);
+      if (newStatus) {
+        startTelemetry(vehicle.id);
       } else {
-        Alert.alert('Error', 'Hindi masimulan ang GPS tracking.');
+        stopTelemetry();
       }
+    } else {
+      Alert.alert('Error', 'Hindi mabago ang status ng pasada.');
     }
   };
 
+  const renderRouteItem = ({ item }: { item: any }) => {
+    const isSelected = selectedRouteId === item.id;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.routeButton,
+          { borderLeftColor: item.color_code },
+          isSelected && styles.selectedRoute
+        ]}
+        onPress={() => !isShiftActive && setSelectedRouteId(item.id)}
+        disabled={isShiftActive}
+      >
+        <Text style={[styles.routeName, isSelected && styles.selectedRouteText]}>{item.name}</Text>
+        <Text style={styles.routeHours}>{item.operating_hours}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) return null;
+
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Dashboard</Text>
-      
-      <View style={styles.statusCard}>
-        <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>Baterya ng Device:</Text>
-          <Text style={[styles.statusValue, isLowPowerMode && { color: colors.sos }]}>
-            {Math.round(batteryLevel * 100)}%
-          </Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Dashboard ng Driver</Text>
+        <View style={styles.statusBadge}>
+          <View style={[styles.statusDot, { backgroundColor: isShiftActive ? colors.active : colors.textSecondary }]} />
+          <Text style={styles.statusText}>{isShiftActive ? 'On Duty' : 'Off Duty'}</Text>
         </View>
-        <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>Telemetry Rate:</Text>
-          <Text style={styles.statusValue}>
-            {isShiftActive ? (isLowPowerMode ? 'Every 5s (Eco)' : 'Every 3s (Fast)') : 'Off'}
+      </View>
+
+      <View style={styles.shiftCard}>
+        <Text style={styles.label}>PASADA STATUS</Text>
+        <View style={styles.row}>
+          <Text style={styles.shiftTitle}>
+            {isShiftActive ? 'Kasalukuyang pumapasada' : 'Simulan ang iyong pasada'}
           </Text>
+          <Switch
+            value={isShiftActive}
+            onValueChange={toggleShift}
+            trackColor={{ false: colors.border, true: colors.activeLight }}
+            thumbColor={isShiftActive ? colors.active : '#f4f3f4'}
+          />
         </View>
+        <TouchableOpacity
+          style={[styles.masterButton, isShiftActive ? styles.buttonStop : styles.buttonStart]}
+          onPress={toggleShift}
+        >
+          <Text style={styles.masterButtonText}>
+            {isShiftActive ? 'TAPUSIN ANG PASADA' : 'MAGSIMULA NG PASADA'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.sectionTitle}>Pumili ng Ruta</Text>
-      <View style={styles.routesGrid}>
-        {routes.map(route => (
-          <TouchableOpacity
-            key={route.id}
-            style={[
-              styles.routeButton,
-              { borderLeftColor: route.color_code },
-              selectedRoute === route.id && styles.routeButtonSelected
-            ]}
-            onPress={() => setSelectedRoute(route.id)}
-            disabled={isShiftActive}
-          >
-            <Text style={styles.routeButtonText}>{route.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity
-        style={[
-          styles.masterToggle,
-          isShiftActive ? styles.masterToggleActive : styles.masterToggleInactive
-        ]}
-        onPress={toggleShift}
-      >
-        <Text style={styles.masterToggleText}>
-          {isShiftActive ? 'Tapusin ang Pasada' : 'Magsimula ng Pasada'}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+      <FlatList
+        data={routes}
+        renderItem={renderRouteItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContainer}
+        numColumns={1}
+      />
+    </View>
   );
 }
 
@@ -128,80 +142,113 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: spacing.md,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    marginTop: spacing.md,
+  },
   title: {
     ...typography.h2,
     color: colors.primary,
-    marginBottom: spacing.md,
   },
-  statusCard: {
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'white',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
     borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  statusRow: {
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    ...typography.caption,
+    color: colors.text,
+  },
+  shiftCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  label: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
-  statusLabel: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  statusValue: {
-    ...typography.bodyBold,
+  shiftTitle: {
+    ...typography.h4,
     color: colors.text,
+    flex: 1,
+  },
+  masterButton: {
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+  },
+  buttonStart: {
+    backgroundColor: colors.active,
+  },
+  buttonStop: {
+    backgroundColor: colors.textSecondary,
+  },
+  masterButtonText: {
+    ...typography.bodyBold,
+    color: 'white',
+    fontSize: 16,
   },
   sectionTitle: {
     ...typography.h3,
     color: colors.text,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
-  routesGrid: {
-    flexDirection: 'column',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
+  listContainer: {
+    paddingBottom: spacing.xl,
   },
   routeButton: {
     backgroundColor: 'white',
     padding: spacing.md,
-    borderRadius: 8,
+    borderRadius: 12,
+    marginBottom: spacing.sm,
     borderLeftWidth: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-    minHeight: 48, // 48px touch target
-    justifyContent: 'center',
-  },
-  routeButtonSelected: {
-    backgroundColor: '#E8F0FE',
     borderWidth: 1,
+    borderColor: colors.border,
+  },
+  selectedRoute: {
+    backgroundColor: '#E6F4FE',
     borderColor: colors.primary,
   },
-  routeButtonText: {
+  routeName: {
     ...typography.bodyBold,
     color: colors.text,
   },
-  masterToggle: {
-    padding: spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    minHeight: 64,
-    justifyContent: 'center',
+  selectedRouteText: {
+    color: colors.primary,
   },
-  masterToggleInactive: {
-    backgroundColor: colors.active,
-  },
-  masterToggleActive: {
-    backgroundColor: colors.textSecondary,
-  },
-  masterToggleText: {
-    ...typography.h3,
-    color: 'white',
+  routeHours: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
   }
 });

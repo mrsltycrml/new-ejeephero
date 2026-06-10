@@ -1,80 +1,91 @@
 import * as Location from 'expo-location';
+import * as Battery from 'expo-battery';
 import { supabase } from '../lib/supabase';
+import { detectAnomalies, initAnomalyDetection } from './anomalyDetector';
 
-let positionSubscriber: Location.LocationSubscription | null = null;
-let telemetryInterval: NodeJS.Timeout | null = null;
-let latestLocation: Location.LocationObject | null = null;
+let locationSubscription: Location.LocationSubscription | null = null;
+let currentVehicleId: string | null = null;
+let currentInterval: number = 3000;
 
-export const startTelemetry = async (vehicleId: string, isLowBattery: boolean = false) => {
-  try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') throw new Error('Location permission denied');
-
-    // 1. Start watching location
-    positionSubscriber = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 1000,
-        distanceInterval: 1,
-      },
-      (location) => {
-        latestLocation = location;
-      }
-    );
-
-    // 2. Setup periodic broadcast (throttled by battery)
-    const intervalMs = isLowBattery ? 5000 : 3000;
-    
-    telemetryInterval = setInterval(async () => {
-      if (!latestLocation) return;
-      
-      const { latitude, longitude, speed, heading } = latestLocation.coords;
-      
-      // Fire and forget to Supabase
-      supabase.from('vehicle_positions').insert({
-        vehicle_id: vehicleId,
-        latitude,
-        longitude,
-        speed: (speed || 0) * 3.6, // convert m/s to km/h
-        heading: heading || 0
-      }).then(({ error }) => {
-        if (error) console.error('Telemetry broadcast failed:', error);
-      });
-      
-    }, intervalMs);
-
-    // 3. Mark vehicle active
-    await supabase
-      .from('vehicles')
-      .update({ is_active: true, updated_at: new Date().toISOString() })
-      .eq('id', vehicleId);
-      
-    console.log(`Telemetry started. Interval: ${intervalMs}ms`);
-    return true;
-  } catch (error) {
-    console.error('Error starting telemetry:', error);
-    return false;
+export const startTelemetry = async (vehicleId: string) => {
+  if (locationSubscription) {
+    stopTelemetry();
   }
+
+  currentVehicleId = vehicleId;
+
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== 'granted') {
+    console.error('Location permission not granted');
+    return;
+  }
+
+  initAnomalyDetection();
+
+  const batteryLevel = await Battery.getBatteryLevelAsync();
+  currentInterval = (batteryLevel > 0 && batteryLevel < 0.2) ? 5000 : 3000;
+
+  locationSubscription = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.High,
+      timeInterval: currentInterval,
+      distanceInterval: 5,
+    },
+    handleLocationUpdate
+  );
+
+  // Monitor battery changes separately to avoid recursive start/stop within location callback
+  const batterySub = Battery.addBatteryLevelListener(({ batteryLevel: newLevel }) => {
+    const newInterval = (newLevel > 0 && newLevel < 0.2) ? 5000 : 3000;
+    if (newInterval !== currentInterval) {
+      restartTelemetryWithInterval(newInterval);
+    }
+  });
+
+  return batterySub;
 };
 
-export const stopTelemetry = async (vehicleId: string) => {
-  if (positionSubscriber) {
-    positionSubscriber.remove();
-    positionSubscriber = null;
-  }
-  
-  if (telemetryInterval) {
-    clearInterval(telemetryInterval);
-    telemetryInterval = null;
-  }
-  
-  latestLocation = null;
+const handleLocationUpdate = async (location: Location.LocationObject) => {
+  if (!currentVehicleId) return;
 
-  // Mark vehicle inactive
-  await supabase
-    .from('vehicles')
-    .update({ is_active: false, updated_at: new Date().toISOString() })
-    .eq('id', vehicleId);
-    
-  console.log('Telemetry stopped');
+  const { latitude, longitude, speed, heading } = location.coords;
+
+  const { error } = await supabase.from('vehicle_positions').insert({
+    vehicle_id: currentVehicleId,
+    latitude,
+    longitude,
+    speed: speed || 0,
+    heading: heading || 0,
+    timestamp: new Date(location.timestamp).toISOString()
+  });
+
+  if (error) console.error('Error pushing telemetry:', error);
+
+  detectAnomalies(currentVehicleId, location);
+};
+
+const restartTelemetryWithInterval = async (interval: number) => {
+  if (!currentVehicleId) return;
+  
+  currentInterval = interval;
+  if (locationSubscription) {
+    locationSubscription.remove();
+  }
+
+  locationSubscription = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.High,
+      timeInterval: currentInterval,
+      distanceInterval: 5,
+    },
+    handleLocationUpdate
+  );
+};
+
+export const stopTelemetry = () => {
+  if (locationSubscription) {
+    locationSubscription.remove();
+    locationSubscription = null;
+  }
+  currentVehicleId = null;
 };

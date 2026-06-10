@@ -20,13 +20,11 @@ export const sendMessageToHeroBot = async (
     // 2. Build system prompt with context
     const systemPrompt = `You are HeroBot, a navigational assistant for Makati City e-jeepney commuters. 
 You answer in English, Tagalog, or Taglish depending on how the user writes. 
-You only answer questions about Makati e-jeepney routes, terminals, navigation, and fares. 
+You only answer questions about Makati e-jeepney routes, terminals, and navigation.
 Use landmark names familiar to Makati commuters.
-Base fare is ₱15 for the first 4km, +₱2.20 per km after.
-
-CURRENT ROUTE DATA:
+Reference this route data:
+ROUTES:
 ${JSON.stringify(routes, null, 2)}
-
 TERMINALS:
 ${JSON.stringify(terminals, null, 2)}`;
 
@@ -36,7 +34,6 @@ ${JSON.stringify(terminals, null, 2)}`;
       content: msg.content
     }));
     
-    // Add current message
     messages.push({ role: 'user', content: message });
 
     // 4. Call Anthropic API
@@ -48,7 +45,7 @@ ${JSON.stringify(terminals, null, 2)}`;
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 1024,
         system: systemPrompt,
         messages: messages,

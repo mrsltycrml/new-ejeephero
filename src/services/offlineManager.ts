@@ -1,10 +1,29 @@
+import Mapbox from '@rnmapbox/maps';
 import { supabase } from '../lib/supabase';
 import { getDb } from '../lib/database';
 
 export const downloadOfflineMap = async (packName: string = 'makati-offline-pack') => {
-  // react-native-maps does not support offline map tile downloads out of the box.
-  // This function is retained for API compatibility but will no longer download Mapbox tiles.
-  console.log('Offline map tiles are not supported with react-native-maps. Operating in online mode for maps.');
+  try {
+    const MAKATI_BOUNDS = {
+      ne: [121.06, 14.58],
+      sw: [121.01, 14.54],
+    };
+
+    const options = {
+      name: packName,
+      styleURL: Mapbox.StyleURL.Street,
+      bounds: [MAKATI_BOUNDS.ne, MAKATI_BOUNDS.sw],
+      minZoom: 10,
+      maxZoom: 16,
+    };
+
+    // Note: In a real app, you'd handle progress listeners
+    // @ts-ignore
+    await Mapbox.offlineManager.createPack(options);
+    console.log('Successfully started offline map download');
+  } catch (error) {
+    console.error('Error downloading offline map:', error);
+  }
 };
 
 export const syncDataToSQLite = async () => {
@@ -16,14 +35,10 @@ export const syncDataToSQLite = async () => {
     const { data: terminals } = await supabase.from('terminals').select('*');
     
     if (routes && routes.length > 0) {
-      // Begin transaction
       await db.execAsync('BEGIN TRANSACTION;');
-      
-      // Clear old data
       await db.execAsync('DELETE FROM routes;');
       await db.execAsync('DELETE FROM terminals;');
       
-      // Insert new routes
       for (const r of routes) {
         await db.runAsync(
           'INSERT INTO routes (id, name, description, operating_hours, color_code) VALUES (?, ?, ?, ?, ?)',
@@ -31,7 +46,6 @@ export const syncDataToSQLite = async () => {
         );
       }
       
-      // Insert new terminals
       if (terminals && terminals.length > 0) {
         for (const t of terminals) {
           await db.runAsync(
@@ -42,17 +56,14 @@ export const syncDataToSQLite = async () => {
       }
       
       await db.execAsync('COMMIT;');
-      console.log('Successfully synced routes and terminals to SQLite');
+      console.log('Successfully synced data to SQLite');
     }
   } catch (error) {
     console.error('Error syncing to SQLite:', error);
-    // If error, try to rollback
     try {
       const db = await getDb();
       await db.execAsync('ROLLBACK;');
-    } catch (e) {
-      // Ignore rollback error
-    }
+    } catch (e) {}
   }
 };
 

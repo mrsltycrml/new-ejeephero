@@ -1,80 +1,83 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
+import Mapbox from '@rnmapbox/maps';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { supabase } from '../../lib/supabase';
 import { getOfflineData } from '../../services/offlineManager';
+import useConnectivity from '../../hooks/useConnectivity';
 
-export default function RouteDetailScreen({ route }: any) {
-  const { routeId } = route.params;
-  const [routeInfo, setRouteInfo] = useState<any>(null);
+export default function RouteDetailScreen({ route: navRoute }: any) {
+  const { route } = navRoute.params;
   const [terminals, setTerminals] = useState<any[]>([]);
+  const { isConnected } = useConnectivity();
 
   useEffect(() => {
-    const loadData = async () => {
-      const data = await getOfflineData();
-      const r = data.routes.find((r: any) => r.id === routeId);
-      const t = data.terminals.filter((t: any) => t.route_id === routeId);
-      setRouteInfo(r);
-      setTerminals(t);
-    };
-    loadData();
-  }, [routeId]);
+    fetchTerminals();
+  }, []);
 
-  if (!routeInfo) return <View style={styles.container} />;
+  const fetchTerminals = async () => {
+    if (isConnected) {
+      const { data } = await supabase
+        .from('terminals')
+        .select('*')
+        .eq('route_id', route.id)
+        .order('sequence_order', { ascending: true });
+      if (data) setTerminals(data);
+    } else {
+      const { terminals: offlineTerms } = await getOfflineData();
+      setTerminals(offlineTerms.filter((t: any) => t.route_id === route.id));
+    }
+  };
 
-  const coordinates = terminals.map(t => ({ latitude: t.latitude, longitude: t.longitude }));
+  const renderTerminal = ({ item }: { item: any }) => (
+    <View style={styles.terminalItem}>
+      <View style={styles.sequenceBadge}>
+        <Text style={styles.sequenceText}>{item.sequence_order}</Text>
+      </View>
+      <Text style={styles.terminalName}>{item.name}</Text>
+    </View>
+  );
 
   return (
     <ScrollView style={styles.container}>
-      {terminals.length > 0 && (
-        <View style={styles.mapContainer}>
-          <MapView 
-            style={styles.map} 
-            scrollEnabled={false} 
-            zoomEnabled={false}
-            initialRegion={{
-              latitude: terminals[0].latitude,
-              longitude: terminals[0].longitude,
-              latitudeDelta: 0.03,
-              longitudeDelta: 0.03,
-            }}
-          >
-            <Polyline
-              coordinates={coordinates}
-              strokeColor={routeInfo.color_code || colors.primary}
-              strokeWidth={4}
-            />
-            {terminals.map(t => (
-              <Marker
-                key={`term-${t.id}`}
-                coordinate={{ latitude: t.latitude, longitude: t.longitude }}
-              >
-                <View style={[styles.marker, { backgroundColor: routeInfo.color_code || colors.primary }]} />
-              </Marker>
-            ))}
-          </MapView>
-        </View>
-      )}
+      <View style={styles.mapContainer}>
+        <Mapbox.MapView style={styles.map} styleURL={Mapbox.StyleURL.Street} scrollEnabled={false} zoomEnabled={false} pitchEnabled={false} rotateEnabled={false}>
+          {terminals.length > 0 && (
+            <>
+              <Mapbox.Camera
+                zoomLevel={12}
+                centerCoordinate={[terminals[0].longitude, terminals[0].latitude]}
+              />
+              {terminals.map(t => (
+                <Mapbox.PointAnnotation
+                  key={t.id}
+                  id={t.id}
+                  coordinate={[t.longitude, t.latitude]}
+                >
+                  <View style={styles.miniMarker} />
+                </Mapbox.PointAnnotation>
+              ))}
+            </>
+          )}
+        </Mapbox.MapView>
+      </View>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>{routeInfo.name}</Text>
-        <Text style={styles.hours}>🕒 {routeInfo.operating_hours}</Text>
-        <Text style={styles.description}>{routeInfo.description}</Text>
+      <View style={styles.details}>
+        <Text style={styles.routeName}>{route.name}</Text>
+        <Text style={styles.routeHours}>Operating Hours: {route.operating_hours}</Text>
+        <Text style={styles.routeDesc}>{route.description}</Text>
 
-        <Text style={styles.sectionTitle}>Terminals / Stops</Text>
-        <View style={styles.timeline}>
-          {terminals.map((t, index) => (
-            <View key={t.id} style={styles.terminalRow}>
-              <View style={styles.timelineIndicator}>
-                <View style={[styles.timelineDot, { backgroundColor: routeInfo.color_code }]} />
-                {index < terminals.length - 1 && <View style={styles.timelineLine} />}
-              </View>
-              <Text style={styles.terminalName}>{t.name}</Text>
-            </View>
-          ))}
-        </View>
+        <View style={styles.divider} />
+
+        <Text style={styles.sectionTitle}>Listahan ng mga Terminal</Text>
+        <FlatList
+          data={terminals}
+          renderItem={renderTerminal}
+          keyExtractor={item => item.id}
+          scrollEnabled={false}
+        />
       </View>
     </ScrollView>
   );
@@ -86,71 +89,72 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   mapContainer: {
-    height: 250,
-    width: '100%',
+    height: 200,
+    backgroundColor: colors.surface,
   },
   map: {
     flex: 1,
   },
-  marker: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
+  miniMarker: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+    borderWidth: 1,
     borderColor: 'white',
   },
-  content: {
+  details: {
     padding: spacing.lg,
   },
-  title: {
+  routeName: {
     ...typography.h2,
-    color: colors.text,
+    color: colors.primary,
     marginBottom: spacing.xs,
   },
-  hours: {
-    ...typography.bodyBold,
-    color: colors.primary,
-    marginBottom: spacing.sm,
-  },
-  description: {
-    ...typography.body,
+  routeHours: {
+    ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  routeDesc: {
+    ...typography.body,
+    color: colors.text,
+    lineHeight: 22,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.lg,
   },
   sectionTitle: {
     ...typography.h3,
     color: colors.text,
     marginBottom: spacing.md,
   },
-  timeline: {
-    marginLeft: spacing.sm,
-  },
-  terminalRow: {
+  terminalItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  timelineIndicator: {
     alignItems: 'center',
-    width: 20,
-    marginRight: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface,
   },
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    zIndex: 1,
+  sequenceBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
   },
-  timelineLine: {
-    width: 2,
-    height: 40,
-    backgroundColor: colors.border,
-    position: 'absolute',
-    top: 12,
+  sequenceText: {
+    ...typography.caption,
+    color: 'white',
+    fontWeight: 'bold',
   },
   terminalName: {
-    ...typography.bodyBold,
+    ...typography.body,
     color: colors.text,
-    marginTop: -2,
+    flex: 1,
   }
 });

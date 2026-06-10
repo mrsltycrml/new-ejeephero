@@ -1,0 +1,16 @@
+
+> ejeephero@1.0.0 web
+> expo start --web
+
+env: load .env
+env: export EXPO_PUBLIC_ANTHROPIC_API_KEY EXPO_PUBLIC_MAPBOX_TOKEN EXPO_PUBLIC_OPENWEATHER_API_KEY EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_URL
+Starting project at /app
+CommandError: It looks like you're trying to use web support but don't have the required
+dependencies installed.
+
+Install react-dom@19.2.3, react-native-web@^0.21.2 by running:
+
+npx expo install react-dom react-native-web
+
+If you're not using web, please ensure you remove the "web" string from the
+platforms array in the project Expo config.

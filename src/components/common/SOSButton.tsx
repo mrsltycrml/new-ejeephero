@@ -1,77 +1,94 @@
-import React, { useEffect, useRef } from 'react';
-import { TouchableOpacity, Text, StyleSheet, Animated, Easing } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import React, { useState, useRef } from 'react';
+import { TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
+import { supabase } from '../../lib/supabase';
+import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
 
-interface SOSButtonProps {
-  onPress: () => void;
-}
+export default function SOSButton() {
+  const [isActive, setIsActive] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
-export const SOSButton: React.FC<SOSButtonProps> = ({ onPress }) => {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const triggerSOS = async () => {
+    setIsActive(true);
 
-  useEffect(() => {
-    const startPulse = () => {
+    // Pulse animation
+    Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        })
-      ]).start(() => startPulse());
-    };
-    startPulse();
-  }, [pulseAnim]);
+        Animated.timing(scaleAnim, { toValue: 1.2, duration: 500, useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ])
+    ).start();
 
-  const handlePress = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    onPress();
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Error', 'Kailangan ng GPS access para sa SOS.');
+        stopSOS();
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Get active vehicle if any
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('driver_id', user?.id)
+        .eq('is_active', true)
+        .single();
+
+      const { error } = await supabase.from('sos_events').insert({
+        user_id: user?.id,
+        vehicle_id: vehicle?.id,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        triggered_at: new Date().toISOString()
+      });
+
+      if (!error) {
+        Alert.alert('SOS Naisend!', 'Napadala na ang iyong lokasyon sa mga emergency contacts.');
+      }
+    } catch (error) {
+      console.error('SOS Trigger Error:', error);
+    }
+  };
+
+  const stopSOS = () => {
+    setIsActive(false);
+    scaleAnim.setValue(1);
+    scaleAnim.stopAnimation();
   };
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ scale: pulseAnim }] }]}>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
-        style={styles.button}
-        onPress={handlePress}
-        activeOpacity={0.8}
+        style={[styles.button, isActive && styles.activeButton]}
+        onPress={isActive ? stopSOS : triggerSOS}
+        activeOpacity={0.7}
       >
-        <Text style={styles.text}>SOS</Text>
+        <Ionicons name="alert-circle" size={32} color="white" />
       </TouchableOpacity>
     </Animated.View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    bottom: spacing.xxl,
-    right: spacing.md,
-    zIndex: 1000,
-    elevation: 5,
-  },
   button: {
     backgroundColor: colors.sos,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.sos,
+    elevation: 8,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  text: {
-    ...typography.h3,
-    color: colors.textInverse,
-  },
+  activeButton: {
+    backgroundColor: colors.sosLight,
+  }
 });

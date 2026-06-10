@@ -11,7 +11,7 @@ interface RouteCardProps {
   onPress?: () => void;
 }
 
-export const RouteCard: React.FC<RouteCardProps> = ({ routeName, destination, routeColor, onPress }) => {
+const RouteCard: React.FC<RouteCardProps> = ({ routeName, destination, routeColor, onPress }) => {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={[styles.container, { borderLeftColor: routeColor }]}>
       <View style={styles.content}>
@@ -24,16 +24,16 @@ export const RouteCard: React.FC<RouteCardProps> = ({ routeName, destination, ro
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
+    backgroundColor: 'white',
+    borderRadius: 12,
     borderLeftWidth: 6,
     padding: spacing.md,
     marginVertical: spacing.sm,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   content: {
     flexDirection: 'column',
@@ -48,3 +48,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+
+export default RouteCard;

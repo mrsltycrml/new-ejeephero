@@ -1,30 +1,30 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Marker } from 'react-native-maps';
+import Mapbox from '@rnmapbox/maps';
 import { colors } from '../../theme/colors';
 
 interface VehicleMarkerProps {
-  id: string;
-  latitude: number;
-  longitude: number;
-  heading: number;
+  vehicle: {
+    id: string;
+    latitude: number;
+    longitude: number;
+    heading: number;
+  };
 }
 
-export const VehicleMarker: React.FC<VehicleMarkerProps> = ({ id, latitude, longitude, heading }) => {
+const VehicleMarker: React.FC<VehicleMarkerProps> = ({ vehicle }) => {
   return (
-    <Marker
-      key={`vehicle-${id}`}
-      coordinate={{ latitude, longitude }}
-      rotation={heading}
-      anchor={{ x: 0.5, y: 0.5 }}
+    <Mapbox.PointAnnotation
+      key={`vehicle-${vehicle.id}`}
+      id={`vehicle-${vehicle.id}`}
+      coordinate={[vehicle.longitude, vehicle.latitude]}
     >
-      <View style={styles.markerContainer}>
+      <View style={[styles.markerContainer, { transform: [{ rotate: `${vehicle.heading}deg` }] }]}>
         <View style={styles.jeepneyIcon}>
-          {/* Simple representation of a jeepney pointing forward */}
           <View style={styles.windshield} />
         </View>
       </View>
-    </Marker>
+    </Mapbox.PointAnnotation>
   );
 };
 
@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
   jeepneyIcon: {
     width: 20,
     height: 36,
-    backgroundColor: colors.routes.circuit, // Default color, can be passed as prop
+    backgroundColor: colors.active,
     borderRadius: 4,
     borderWidth: 2,
     borderColor: 'white',
@@ -52,3 +52,5 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   }
 });
+
+export default VehicleMarker;

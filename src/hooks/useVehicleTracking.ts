@@ -9,45 +9,75 @@ export interface VehiclePosition {
   speed: number;
   heading: number;
   timestamp: string;
+  route_id?: string;
 }
 
 export const useVehicleTracking = (routeId?: string) => {
   const [vehicles, setVehicles] = useState<Record<string, VehiclePosition>>({});
 
   useEffect(() => {
-    // Initial fetch of active vehicles on the route
     const fetchInitialPositions = async () => {
-      let query = supabase.from('vehicle_positions').select('*');
-      
-      // Note: We should ideally join with vehicles to filter by route_id, 
-      // but for simplicity in realtime updates we'll just track all or filter later.
-      // If we had a direct route_id on vehicle_positions it would be easier.
-      
-      const { data } = await query.order('timestamp', { ascending: false }).limit(50);
-      if (data) {
-        const initial: Record<string, VehiclePosition> = {};
-        data.forEach(pos => {
-          if (!initial[pos.vehicle_id] || new Date(pos.timestamp) > new Date(initial[pos.vehicle_id].timestamp)) {
-            initial[pos.vehicle_id] = pos;
+      // Get all active vehicles
+      const { data: activeVehicles } = await supabase
+        .from('vehicles')
+        .select('id, route_id')
+        .eq('is_active', true);
+
+      if (!activeVehicles) return;
+
+      const vehicleIds = activeVehicles
+        .filter(v => !routeId || v.route_id === routeId)
+        .map(v => v.id);
+
+      if (vehicleIds.length === 0) {
+        setVehicles({});
+        return;
+      }
+
+      // Get latest position for these vehicles
+      const { data: positions } = await supabase
+        .from('vehicle_positions')
+        .select('*')
+        .in('vehicle_id', vehicleIds)
+        .order('timestamp', { ascending: false });
+
+      if (positions) {
+        const latest: Record<string, VehiclePosition> = {};
+        positions.forEach(pos => {
+          if (!latest[pos.vehicle_id] || new Date(pos.timestamp) > new Date(latest[pos.vehicle_id].timestamp)) {
+            latest[pos.vehicle_id] = {
+              ...pos,
+              route_id: activeVehicles.find(v => v.id === pos.vehicle_id)?.route_id
+            };
           }
         });
-        setVehicles(initial);
+        setVehicles(latest);
       }
     };
 
     fetchInitialPositions();
 
     // Subscribe to realtime updates
-    const channel = supabase.channel('public:vehicle_positions')
+    const channel = supabase.channel('vehicle_tracking')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'vehicle_positions' },
-        (payload) => {
+        async (payload) => {
           const newPos = payload.new as VehiclePosition;
-          setVehicles(prev => ({
-            ...prev,
-            [newPos.vehicle_id]: newPos
-          }));
+
+          // Check if vehicle belongs to the tracked route
+          const { data: vehicle } = await supabase
+            .from('vehicles')
+            .select('route_id, is_active')
+            .eq('id', newPos.vehicle_id)
+            .single();
+
+          if (vehicle?.is_active && (!routeId || vehicle.route_id === routeId)) {
+            setVehicles(prev => ({
+              ...prev,
+              [newPos.vehicle_id]: { ...newPos, route_id: vehicle.route_id }
+            }));
+          }
         }
       )
       .subscribe();

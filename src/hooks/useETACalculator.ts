@@ -1,29 +1,35 @@
 import { useState, useEffect } from 'react';
-import { calculateETA } from '../utils/geo';
+import { getDistance } from '../utils/geo';
 
-export const useETACalculator = (distanceKm: number, currentSpeedKmh: number) => {
-  const [eta, setEta] = useState<number>(0);
-  const [isRecalculating, setIsRecalculating] = useState(false);
-  const [expectedSpeed, setExpectedSpeed] = useState(15); // Default expected 15km/h
+export const useETACalculator = (
+  userLat: number | null,
+  userLon: number | null,
+  vehicleLat: number | undefined,
+  vehicleLon: number | undefined,
+  currentSpeed: number | undefined
+) => {
+  const [eta, setEta] = useState<number | null>(null); // in minutes
+  const [isDelayed, setIsDelayed] = useState(false);
 
   useEffect(() => {
-    setIsRecalculating(true);
-    
-    // If speed drops >30% below expected, update the ETA calculation basis
-    const effectiveSpeed = currentSpeedKmh < (expectedSpeed * 0.7) 
-      ? Math.max(currentSpeedKmh, 5) // Don't estimate with less than 5km/h
-      : expectedSpeed;
+    if (userLat && userLon && vehicleLat && vehicleLon) {
+      const distance = getDistance(userLat, userLon, vehicleLat, vehicleLon);
       
-    const calculatedEta = calculateETA(distanceKm, effectiveSpeed);
-    
-    // Simulate slight calculation delay
-    const timer = setTimeout(() => {
-      setEta(calculatedEta);
-      setIsRecalculating(false);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [distanceKm, currentSpeedKmh, expectedSpeed]);
+      // Assume average e-jeep speed in Makati is 20 km/h (approx 0.33 km/min)
+      const avgSpeed = 20;
+      const speedToUse = (currentSpeed && currentSpeed > 5) ? currentSpeed : avgSpeed;
 
-  return { eta, isRecalculating };
+      const calculatedEta = (distance / speedToUse) * 60;
+      setEta(calculatedEta);
+
+      // Recalculate when speed drops >30% below expected (avgSpeed)
+      if (currentSpeed && currentSpeed < avgSpeed * 0.7) {
+        setIsDelayed(true);
+      } else {
+        setIsDelayed(false);
+      }
+    }
+  }, [userLat, userLon, vehicleLat, vehicleLon, currentSpeed]);
+
+  return { eta, isDelayed };
 };

@@ -1,50 +1,84 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { spacing } from '../../theme/spacing';
+import { fetchMakatiWeather, WeatherData } from '../../services/weather';
+import { Ionicons } from '@expo/vector-icons';
 
-interface WeatherBannerProps {
-  message: string;
-}
+export default function WeatherBanner() {
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-export const WeatherBanner: React.FC<WeatherBannerProps> = ({ message }) => {
-  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    checkWeather();
+    const interval = setInterval(checkWeather, 15 * 60 * 1000); // Check every 15 mins
+    return () => clearInterval(interval);
+  }, []);
 
-  if (!visible) return null;
+  const checkWeather = async () => {
+    const data = await fetchMakatiWeather();
+    setWeather(data);
+    if (data.isAdverse) {
+      setIsVisible(true);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+    } else if (isVisible) {
+      dismiss();
+    }
+  };
+
+  const dismiss = () => {
+    Animated.timing(fadeAnim, { toValue: 0, duration: 500, useNativeDriver: true }).start(() => {
+      setIsVisible(false);
+    });
+  };
+
+  if (!isVisible || !weather || !weather.alertMessage) return null;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>{message}</Text>
-      <TouchableOpacity onPress={() => setVisible(false)} style={styles.closeButton}>
-        <Text style={styles.closeText}>✕</Text>
-      </TouchableOpacity>
-    </View>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <View style={styles.content}>
+        <Ionicons name="warning" size={24} color="white" />
+        <View style={styles.textContainer}>
+          <Text style={styles.title}>Weather Advisory</Text>
+          <Text style={styles.body}>{weather.alertMessage}</Text>
+        </View>
+        <TouchableOpacity onPress={dismiss}>
+          <Ionicons name="close-circle" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.warning,
+    margin: spacing.md,
+    borderRadius: 12,
     padding: spacing.md,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  content: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 8,
-    marginHorizontal: spacing.md,
-    marginVertical: spacing.sm,
   },
-  text: {
-    ...typography.bodyBold,
-    color: colors.text,
+  textContainer: {
     flex: 1,
+    marginHorizontal: spacing.sm,
   },
-  closeButton: {
-    padding: spacing.xs,
-    marginLeft: spacing.md,
+  title: {
+    ...typography.bodyBold,
+    color: 'white',
   },
-  closeText: {
-    ...typography.h3,
-    color: colors.text,
-  },
+  body: {
+    ...typography.caption,
+    color: 'white',
+    fontSize: 12,
+  }
 });

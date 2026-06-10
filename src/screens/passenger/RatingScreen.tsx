@@ -1,104 +1,111 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
-import { RatingStars } from '../../components/common/RatingStars';
 import { supabase } from '../../lib/supabase';
+import RatingStars from '../../components/common/RatingStars';
 
 export default function RatingScreen({ route, navigation }: any) {
-  const tripId = route?.params?.tripId;
-  const [stars, setStars] = useState(0);
+  const { tripId } = route.params;
+  const [stars, setStars] = useState(5);
   const [comment, setComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (stars === 0) {
-      Alert.alert('Required', 'Please select a star rating.');
+    setSubmitting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Get driver_id from trip
+    const { data: trip } = await supabase
+      .from('trips')
+      .select('vehicle_id, vehicles(driver_id)')
+      .eq('id', tripId)
+      .single();
+
+    if (!trip) {
+      Alert.alert('Error', 'Hindi mahanap ang trip details.');
+      setSubmitting(false);
       return;
     }
 
-    setIsSubmitting(true);
+    const { error } = await supabase.from('ratings').insert({
+      trip_id: tripId,
+      passenger_id: user?.id,
+      driver_id: (trip.vehicles as any).driver_id,
+      stars,
+      comment
+    });
 
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      
-      // In a real flow, driver_id is fetched from the trip record
-      const mockDriverId = '00000000-0000-0000-0000-000000000000';
-
-      const { error } = await supabase.from('ratings').insert({
-        trip_id: tripId || null, // remove null in prod
-        passenger_id: userData?.user?.id || mockDriverId,
-        driver_id: mockDriverId,
-        stars,
-        comment
-      });
-
-      if (error) throw error;
-
-      Alert.alert('Success', 'Thank you for your feedback!', [
-        { text: 'OK', onPress: () => navigation.navigate('Home') }
-      ]);
-    } catch (error) {
+    if (!error) {
+      Alert.alert('Salamat!', 'Naipadala na ang iyong rating.');
+      navigation.popToTop();
+      navigation.navigate('Home');
+    } else {
+      Alert.alert('Error', 'Hindi maipadala ang rating. Pakisubukang muli.');
       console.error(error);
-      Alert.alert('Error', 'Could not submit rating. Please try again later.');
-    } finally {
-      setIsSubmitting(false);
     }
+    setSubmitting(false);
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>How was your ride?</Text>
-      <Text style={styles.subtitle}>Your feedback helps improve e-Sakay services.</Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.content}>
+        <Text style={styles.title}>Kamusta ang iyong pasada?</Text>
+        <Text style={styles.subtitle}>I-rate ang iyong biyahe para matulungan kaming mapabuti ang aming serbisyo.</Text>
 
-      <View style={styles.starsContainer}>
-        <RatingStars initialRating={stars} onRatingChange={setStars} size={40} />
+        <View style={styles.starsContainer}>
+          <RatingStars rating={stars} maxStars={5} onRatingChange={setStars} size={40} />
+          <Text style={styles.ratingText}>
+            {stars === 5 ? 'Napakaganda!' : stars === 4 ? 'Maganda' : stars === 3 ? 'Ayos lang' : stars === 2 ? 'Kulang' : 'Hindi maganda'}
+          </Text>
+        </View>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Mag-iwan ng komento (optional)"
+          multiline
+          numberOfLines={4}
+          value={comment}
+          onChangeText={setComment}
+          textAlignVertical="top"
+        />
+
+        <TouchableOpacity
+          style={[styles.button, submitting && styles.buttonDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting}
+        >
+          <Text style={styles.buttonText}>Isumite ang Rating</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.skipButton} onPress={() => navigation.popToTop()}>
+          <Text style={styles.skipText}>Laktawan muna</Text>
+        </TouchableOpacity>
       </View>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Add a comment (optional)..."
-        placeholderTextColor={colors.textSecondary}
-        multiline
-        numberOfLines={4}
-        value={comment}
-        onChangeText={setComment}
-        textAlignVertical="top"
-      />
-
-      <TouchableOpacity 
-        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
-        onPress={handleSubmit}
-        disabled={isSubmitting}
-      >
-        <Text style={styles.submitButtonText}>
-          {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
-        </Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.skipButton} 
-        onPress={() => navigation.navigate('Home')}
-      >
-        <Text style={styles.skipButtonText}>Skip for now</Text>
-      </TouchableOpacity>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
+    backgroundColor: 'white',
+  },
+  content: {
+    flex: 1,
+    padding: spacing.xl,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     ...typography.h2,
-    color: colors.text,
-    textAlign: 'center',
+    color: colors.primary,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   subtitle: {
     ...typography.body,
@@ -110,36 +117,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
+  ratingText: {
+    ...typography.bodyBold,
+    color: colors.accent,
+    marginTop: spacing.sm,
+  },
   input: {
-    backgroundColor: 'white',
+    width: '100%',
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 12,
     padding: spacing.md,
     ...typography.body,
-    color: colors.text,
-    minHeight: 120,
-    borderWidth: 1,
-    borderColor: colors.border,
     marginBottom: spacing.xl,
+    backgroundColor: colors.surface,
   },
-  submitButton: {
+  button: {
     backgroundColor: colors.primary,
-    padding: spacing.md,
-    borderRadius: 8,
+    width: '100%',
+    paddingVertical: spacing.md,
+    borderRadius: 12,
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  submitButtonDisabled: {
-    opacity: 0.7,
+  buttonDisabled: {
+    backgroundColor: colors.textSecondary,
   },
-  submitButtonText: {
+  buttonText: {
     ...typography.bodyBold,
-    color: colors.textInverse,
+    color: 'white',
   },
   skipButton: {
     padding: spacing.md,
-    alignItems: 'center',
   },
-  skipButtonText: {
+  skipText: {
     ...typography.body,
     color: colors.textSecondary,
   }

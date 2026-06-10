@@ -1,57 +1,34 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
-import { isWithinRadius } from '../utils/geo';
-import { LocationObject } from 'expo-location';
-
-// Configure notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+import { getDistance } from '../utils/geo';
 
 export const useStopProximityAlert = (
-  userLocation: LocationObject | null,
-  targetTerminalLat: number | null,
-  targetTerminalLon: number | null,
-  isActive: boolean = false
+  userLat: number | null,
+  userLon: number | null,
+  targetLat: number | null,
+  targetLon: number | null,
+  enabled: boolean = false
 ) => {
-  const hasAlerted = useRef(false);
-
   useEffect(() => {
-    // Reset alert flag if target changes or becomes inactive
-    if (!isActive || !targetTerminalLat || !targetTerminalLon) {
-      hasAlerted.current = false;
-      return;
-    }
+    if (!enabled || !userLat || !userLon || !targetLat || !targetLon) return;
 
-    if (userLocation && !hasAlerted.current) {
-      const withinRadius = isWithinRadius(
-        userLocation.coords.latitude,
-        userLocation.coords.longitude,
-        targetTerminalLat,
-        targetTerminalLon,
-        300 // 300 meters threshold
-      );
+    const distance = getDistance(userLat, userLon, targetLat, targetLon);
+    const PROXIMITY_THRESHOLD = 0.3; // 300 meters
 
-      if (withinRadius) {
-        hasAlerted.current = true;
-        
-        // Trigger Haptics
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        
-        // Trigger local notification
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: "Approaching Stop! 🛑",
-            body: "You are within 300 meters of your alighting terminal. Get ready!",
-          },
-          trigger: null, // trigger immediately
-        });
-      }
+    if (distance <= PROXIMITY_THRESHOLD) {
+      // Trigger Notification
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Malapit na Tayo!",
+          body: "You are within 300m of your alighting terminal. Please prepare to get off.",
+          sound: true,
+        },
+        trigger: null, // immediate
+      });
+
+      // Trigger Haptics
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [userLocation, targetTerminalLat, targetTerminalLon, isActive]);
+  }, [userLat, userLon, targetLat, targetLon, enabled]);
 };

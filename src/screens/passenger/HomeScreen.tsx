@@ -1,25 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import Mapbox from '@rnmapbox/maps';
 import { useUserLocation } from '../../hooks/useUserLocation';
+import { useVehicleTracking } from '../../hooks/useVehicleTracking';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import { supabase } from '../../lib/supabase';
 import { findNearestTerminals } from '../../utils/geo';
+import VehicleMarker from '../../components/map/VehicleMarker';
 
-const MAKATI_CENTER = {
-  latitude: 14.5547,
-  longitude: 121.0244,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
-};
+const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '';
+Mapbox.setAccessToken(MAPBOX_TOKEN);
+
+const MAKATI_CENTER: [number, number] = [121.0244, 14.5547];
 
 export default function HomeScreen() {
   const { location, loading, error } = useUserLocation();
   const [routes, setRoutes] = useState<any[]>([]);
   const [terminals, setTerminals] = useState<any[]>([]);
   const [nearestTerminals, setNearestTerminals] = useState<any[]>([]);
+  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+
+  const vehicles = useVehicleTracking(selectedRoute || undefined);
 
   useEffect(() => {
     const fetchRoutesAndTerminals = async () => {
@@ -39,44 +42,88 @@ export default function HomeScreen() {
     }
   }, [location, terminals]);
 
+  const routeLine = selectedRoute ? {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: {
+      type: 'LineString' as const,
+      coordinates: terminals
+        .filter(t => t.route_id === selectedRoute)
+        .sort((a, b) => a.sequence_order - b.sequence_order)
+        .map(t => [t.longitude, t.latitude])
+    }
+  } : null;
+
   return (
     <View style={styles.container}>
-      <MapView 
-        style={styles.map} 
-        provider={PROVIDER_DEFAULT} // Uses Apple Maps on iOS, Google Maps on Android
-        initialRegion={
-          location ? {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          } : MAKATI_CENTER
-        }
-        showsUserLocation={true}
-        showsMyLocationButton={true}
-      >
+      <Mapbox.MapView style={styles.map} styleURL={Mapbox.StyleURL.Street}>
+        <Mapbox.Camera
+          zoomLevel={14}
+          centerCoordinate={
+            location
+              ? [location.coords.longitude, location.coords.latitude]
+              : MAKATI_CENTER
+          }
+          animationMode="flyTo"
+          animationDuration={2000}
+        />
+
+        <Mapbox.UserLocation />
+
+        {/* Route Path */}
+        {routeLine && routeLine.geometry.coordinates.length > 1 && (
+          <Mapbox.ShapeSource id="routeSource" shape={routeLine}>
+            <Mapbox.LineLayer
+              id="routeFill"
+              style={{
+                lineColor: routes.find(r => r.id === selectedRoute)?.color_code || colors.primary,
+                lineWidth: 5,
+                lineOpacity: 0.8,
+                lineJoin: 'round',
+                lineCap: 'round',
+              }}
+            />
+          </Mapbox.ShapeSource>
+        )}
+
+        {/* Vehicle Markers */}
+        {vehicles.map(v => (
+          <VehicleMarker key={v.id} vehicle={v} />
+        ))}
+
         {/* Terminals */}
         {terminals.map(t => (
-          <Marker
+          <Mapbox.PointAnnotation
             key={`terminal-${t.id}`}
-            coordinate={{ latitude: t.latitude, longitude: t.longitude }}
-            title={t.name}
+            id={`terminal-${t.id}`}
+            coordinate={[t.longitude, t.latitude]}
+            onSelected={() => setSelectedRoute(t.route_id)}
           >
             <View style={styles.terminalMarker} />
-          </Marker>
+          </Mapbox.PointAnnotation>
         ))}
-      </MapView>
+      </Mapbox.MapView>
 
       <View style={styles.bottomSheet}>
-        <Text style={styles.sheetTitle}>Nearest Terminals</Text>
+        <Text style={styles.sheetTitle}>
+          {selectedRoute ? `Route: ${routes.find(r => r.id === selectedRoute)?.name}` : 'Nearest Terminals'}
+        </Text>
+
         {loading && <ActivityIndicator size="small" color={colors.primary} />}
-        {error && <Text style={styles.errorText}>{error}</Text>}
-        {!loading && !error && nearestTerminals.map(t => (
+
+        {!selectedRoute && nearestTerminals.map(t => (
           <View key={t.id} style={styles.terminalItem}>
             <Text style={styles.terminalName}>{t.name}</Text>
             <Text style={styles.terminalDistance}>{(t.distanceKm).toFixed(2)} km away</Text>
           </View>
         ))}
+
+        {selectedRoute && (
+          <View style={styles.routeStats}>
+            <Text style={styles.bodyText}>Active E-Jeeps: {vehicles.length}</Text>
+            <Text style={styles.linkText} onPress={() => setSelectedRoute(null)}>Clear Filter</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -103,15 +150,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.surface,
+    backgroundColor: 'white',
     padding: spacing.lg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
   },
   sheetTitle: {
     ...typography.h3,
@@ -133,8 +180,17 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
   },
-  errorText: {
-    color: colors.sos,
+  routeStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  bodyText: {
     ...typography.body,
+    color: colors.text,
+  },
+  linkText: {
+    ...typography.bodyBold,
+    color: colors.accent,
   }
 });
