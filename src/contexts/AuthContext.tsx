@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 type ProfileStatus = 'pending' | 'approved' | 'rejected' | null;
 
@@ -62,12 +62,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setRole(null);
+      setStatus(null);
+      setIsAdmin(false);
+      setFullNameState('');
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {
         await fetchProfile(currentUser.id);
       }
+      setLoading(false);
+    }).catch((error) => {
+      console.error('Supabase session error:', error);
+      setUser(null);
       setLoading(false);
     });
 
