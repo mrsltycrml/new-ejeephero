@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator, Modal } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { useTranslation } from 'react-i18next';
+import { changeLanguage } from '../../locales/i18n';
 
 export default function ProfileScreen() {
   const { user, role, status, isAdmin, fullName, signOut, refreshProfile } = useAuth();
+  const { i18n, t } = useTranslation();
 
   // Edit Name State
   const [isEditingName, setIsEditingName] = useState(false);
@@ -19,14 +22,17 @@ export default function ProfileScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
+  // Language Selector State
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+
   const handleLogout = () => {
     Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
+      t('profile.logout'),
+      t('profile.confirmLogout'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('profile.no'), style: 'cancel' },
         {
-          text: 'Log Out',
+          text: t('profile.yes'),
           style: 'destructive',
           onPress: async () => {
             await signOut();
@@ -34,6 +40,16 @@ export default function ProfileScreen() {
         },
       ]
     );
+  };
+
+  const handleChangeLanguage = async (lang: string) => {
+    try {
+      await changeLanguage(lang);
+      setShowLanguageSelector(false);
+      Alert.alert(t('common.success'), `${lang === 'en' ? 'English' : 'Tagalog'} selected!`);
+    } catch (err) {
+      Alert.alert(t('common.error'), 'Failed to change language');
+    }
   };
 
   const handleSaveName = async () => {
@@ -238,7 +254,7 @@ export default function ProfileScreen() {
         style={styles.collapseHeader}
         onPress={() => setShowPasswordSection(!showPasswordSection)}
       >
-        <Text style={styles.sectionTitle}>Security Settings</Text>
+        <Text style={styles.sectionTitle}>{t('profile.accountSettings')}</Text>
         <Ionicons
           name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
           size={20}
@@ -284,6 +300,80 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Language Settings */}
+      <TouchableOpacity
+        style={styles.languageCard}
+        onPress={() => setShowLanguageSelector(true)}
+      >
+        <View style={styles.languageIconBg}>
+          <Ionicons name="globe-outline" size={22} color={Colors.primaryRed} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.languageLabel}>{t('profile.language')}</Text>
+          <Text style={styles.languageValue}>
+            {i18n.language === 'en' ? t('profile.english') : t('profile.tagalog')}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.subtleGray} />
+      </TouchableOpacity>
+
+      {/* Language Selector Modal */}
+      <Modal
+        visible={showLanguageSelector}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLanguageSelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.languageModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('profile.selectLanguage')}</Text>
+              <TouchableOpacity onPress={() => setShowLanguageSelector(false)}>
+                <Ionicons name="close" size={24} color={Colors.darkText} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.languageOptions}>
+              <TouchableOpacity
+                style={[
+                  styles.languageOption,
+                  i18n.language === 'en' && styles.languageOptionActive
+                ]}
+                onPress={() => handleChangeLanguage('en')}
+              >
+                <Ionicons 
+                  name={i18n.language === 'en' ? 'radio-button-on' : 'radio-button-off'} 
+                  size={24} 
+                  color={i18n.language === 'en' ? Colors.primaryRed : Colors.subtleGray}
+                  style={{ marginRight: 12 }}
+                />
+                <Text style={[styles.languageOptionText, i18n.language === 'en' && styles.languageOptionTextActive]}>
+                  {t('profile.english')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.languageOption,
+                  i18n.language === 'fil' && styles.languageOptionActive
+                ]}
+                onPress={() => handleChangeLanguage('fil')}
+              >
+                <Ionicons 
+                  name={i18n.language === 'fil' ? 'radio-button-on' : 'radio-button-off'} 
+                  size={24} 
+                  color={i18n.language === 'fil' ? Colors.primaryRed : Colors.subtleGray}
+                  style={{ marginRight: 12 }}
+                />
+                <Text style={[styles.languageOptionText, i18n.language === 'fil' && styles.languageOptionTextActive]}>
+                  {t('profile.tagalog')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* App Info */}
       <View style={styles.appInfoCard}>
@@ -526,6 +616,93 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#888',
     marginTop: 2,
+  },
+  languageCard: {
+    backgroundColor: Colors.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8DFD3',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  languageIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#FFF0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  languageLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.subtleGray,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  languageValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.darkText,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  languageModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingBottom: 30,
+    paddingHorizontal: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: Colors.darkText,
+  },
+  languageOptions: {
+    gap: 12,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: Colors.offWhite,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  languageOptionActive: {
+    backgroundColor: '#FFF5F5',
+    borderColor: Colors.primaryRed,
+  },
+  languageOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.darkText,
+  },
+  languageOptionTextActive: {
+    color: Colors.primaryRed,
+    fontWeight: '700',
   },
   logoutButton: {
     backgroundColor: Colors.accentRed,

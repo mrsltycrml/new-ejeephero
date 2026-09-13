@@ -8,11 +8,16 @@ import { LocationProvider } from './src/contexts/LocationContext';
 import { NetworkProvider } from './src/contexts/NetworkContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { initDB } from './src/lib/database';
+import { initializeLanguage } from './src/locales/i18n';
 import WeatherBanner from './src/components/WeatherBanner';
 
 export default function App() {
   useEffect(() => {
-    initDB().catch(console.error);
+    const init = async () => {
+      await initDB();
+      await initializeLanguage();
+    };
+    init().catch(console.error);
   }, []);
 
   return (

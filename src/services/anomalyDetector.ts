@@ -1,6 +1,13 @@
 import { Accelerometer } from 'expo-sensors';
 import { supabase } from '../lib/supabase';
-import * as Notifications from 'expo-notifications';
+
+// Conditionally import notifications - skip in Expo Go (SDK 53+)
+let Notifications: any = null;
+try {
+  Notifications = require('expo-notifications');
+} catch (error) {
+  console.warn('Notifications not available in this environment (Expo Go SDK 53+)');
+}
 
 let accelerometerSubscription: any = null;
 
@@ -42,14 +49,20 @@ const triggerAnomaly = async (vehicleId: string, type: string, gForce: number) =
     longitude: pos?.longitude
   });
 
-  // Local notification to warn driver
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "⚠️ Anomaly Detected!",
-      body: "High G-Force event detected. Is everything okay? Tap SOS if you need help.",
-      sound: true,
-      priority: Notifications.AndroidNotificationPriority.MAX,
-    },
-    trigger: null,
-  });
+  // Local notification to warn driver (if notifications are available)
+  if (Notifications) {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "⚠️ Anomaly Detected!",
+          body: "High G-Force event detected. Is everything okay? Tap SOS if you need help.",
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.MAX,
+        },
+        trigger: null,
+      });
+    } catch (error) {
+      console.error('Failed to schedule notification:', error);
+    }
+  }
 };
