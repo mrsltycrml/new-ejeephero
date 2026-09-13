@@ -338,7 +338,7 @@ export default function DirectoryScreen() {
                     styles.passengerTypeButtonText,
                     passengerType === type && styles.passengerTypeButtonTextActive
                   ]}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                    {t(`directory.${type}`)}
                   </Text>
                 </TouchableOpacity>
               ))}
