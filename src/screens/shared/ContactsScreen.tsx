@@ -5,7 +5,8 @@ import {
   Platform, Keyboard, TouchableWithoutFeedback, ScrollView
 } from 'react-native';
 import * as Contacts from 'expo-contacts/legacy';
-import { supabase } from '../../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/theme';
@@ -24,10 +25,21 @@ export default function ContactsScreen() {
 
   useEffect(() => {
     const fetchContact = async () => {
-      if (!user?.id) {
+      // 1. Check local storage first
+      try {
+        const local = await AsyncStorage.getItem('@ejeephero_emergency_contact');
+        if (local) {
+          const parsed = JSON.parse(local);
+          setCurrentContact(parsed);
+          if (parsed.preset_message) setPresetMessage(parsed.preset_message);
+        }
+      } catch (e) {}
+
+      if (!user?.id || !isSupabaseConfigured) {
         setLoading(false);
         return;
       }
+
       try {
         const { data, error } = await supabase
           .from('emergency_contacts')
@@ -42,8 +54,7 @@ export default function ContactsScreen() {
         if (data) {
           setCurrentContact(data);
           if (data.preset_message) setPresetMessage(data.preset_message);
-        } else {
-          setCurrentContact(null);
+          await AsyncStorage.setItem('@ejeephero_emergency_contact', JSON.stringify(data));
         }
       } catch (err) {
         console.error('Exception fetching contact:', err);
@@ -76,37 +87,32 @@ export default function ContactsScreen() {
 
   const saveSelectedContact = async (contact: Contacts.Contact) => {
     const phoneNumber = contact.phoneNumbers?.[0]?.number;
-    if (!phoneNumber || !user?.id) return;
+    if (!phoneNumber) return;
 
     setSaving(true);
     setShowPicker(false);
 
-    try {
-      const { data, error } = await supabase.from('emergency_contacts').upsert(
-        {
-          user_id: user.id,
-          contact_name: contact.name,
-          phone_number: phoneNumber,
-          preset_message: presetMessage,
-        },
-        { onConflict: 'user_id' }
-      );
+    const contactPayload = {
+      user_id: user?.id || 'guest-user',
+      contact_name: contact.name,
+      phone_number: phoneNumber,
+      preset_message: presetMessage,
+    };
 
-      if (error) {
-        console.error('Save error:', error);
-        Alert.alert('Error', error.message || 'Failed to save emergency contact');
-      } else {
-        setCurrentContact({
-          user_id: user.id,
-          contact_name: contact.name,
-          phone_number: phoneNumber,
-          preset_message: presetMessage,
-        });
-        Alert.alert('Success!', `${contact.name} set as your emergency contact.`);
+    try {
+      await AsyncStorage.setItem('@ejeephero_emergency_contact', JSON.stringify(contactPayload));
+      
+      if (user?.id && user.id !== 'guest-user-id') {
+        await supabase.from('emergency_contacts').upsert(contactPayload, { onConflict: 'user_id' });
       }
-    } catch (err) {
-      console.error('Exception:', err);
-      Alert.alert('Error', 'An unexpected error occurred');
+
+      setCurrentContact(contactPayload);
+      Alert.alert('Success!', `${contact.name} set as your emergency contact.`);
+    } catch (err: any) {
+      console.error('Save error:', err);
+      // Even if remote errors, local save succeeded
+      setCurrentContact(contactPayload);
+      Alert.alert('Success!', `${contact.name} set as your emergency contact (Local).`);
     } finally {
       setSaving(false);
     }
@@ -118,16 +124,17 @@ export default function ContactsScreen() {
       return;
     }
     setSaving(true);
-    const { error } = await supabase
-      .from('emergency_contacts')
-      .update({ preset_message: presetMessage })
-      .eq('user_id', user?.id);
-
-    setSaving(false);
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
+    const updated = { ...currentContact, preset_message: presetMessage };
+    try {
+      await AsyncStorage.setItem('@ejeephero_emergency_contact', JSON.stringify(updated));
+      if (user?.id && user.id !== 'guest-user-id') {
+        await supabase.from('emergency_contacts').update({ preset_message: presetMessage }).eq('user_id', user.id);
+      }
       Alert.alert('Saved', 'Preset message updated.');
+    } catch (e: any) {
+      Alert.alert('Saved', 'Preset message saved locally.');
+    } finally {
+      setSaving(false);
     }
   };
 

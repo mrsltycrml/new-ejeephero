@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -26,6 +26,10 @@ export default function AdminDashboardScreen() {
   const [activeTab, setActiveTab] = useState<FilterTab>('pending');
 
   const fetchProfiles = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -191,6 +195,20 @@ export default function AdminDashboardScreen() {
       </View>
     );
   }
+
+  if (!isSupabaseConfigured) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 30 }]}>
+        <Ionicons name="cloud-offline-outline" size={60} color={Colors.subtleGray} />
+        <Text style={{ fontSize: 18, fontWeight: '800', color: Colors.darkText, marginTop: 16, textAlign: 'center' }}>
+          Demo Mode
+        </Text>
+        <Text style={{ fontSize: 14, color: '#888', marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+          Admin portal requires Supabase configuration. Configure your .env credentials to manage real user accounts.
+        </Text>
+      </View>
+    );
+ }
 
   return (
     <View style={styles.container}>

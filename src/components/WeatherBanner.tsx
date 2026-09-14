@@ -9,20 +9,48 @@ export default function WeatherBanner() {
 
   useEffect(() => {
     const fetchWeather = async () => {
-      try {
-        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=14.5547&lon=121.0244&appid=${process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY}&units=metric`);
-        const data = await res.json();
-        
-        const temp = data.main.temp;
-        const condition = data.weather[0].main.toLowerCase();
+      const apiKey = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
+      if (!apiKey) return;
 
-        // Trigger advisory on rain, storm, clouds, or extreme heat
-        if (temp > 38 || condition.includes('rain') || condition.includes('thunderstorm') || condition.includes('cloud')) {
-          setWeather({ temp, condition: data.weather[0].description });
+      try {
+        const res = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?lat=14.5547&lon=121.0244&appid=${apiKey}&units=metric`
+        );
+        const data = await res.json();
+
+        if (!data || !data.main || !data.weather) return;
+
+        const temp = data.main.temp;
+        const mainCondition = (data.weather[0]?.main || '').toLowerCase();
+        const description = (data.weather[0]?.description || '').toLowerCase();
+
+        // ONLY trigger advisory on genuine severe weather hazards:
+        // - Heavy Rain / Flood risks
+        // - Thunderstorm / Lightning hazards
+        // - Extreme Heat Index > 38°C
+        // - Severe Gale / Typhoon
+        // Note: Do NOT trigger on normal tropical clouds ("scattered clouds", "few clouds")
+        const isHazard =
+          temp > 38 ||
+          mainCondition.includes('rain') ||
+          mainCondition.includes('thunderstorm') ||
+          mainCondition.includes('squall') ||
+          mainCondition.includes('tornado') ||
+          description.includes('heavy rain') ||
+          description.includes('storm');
+
+        if (isHazard) {
+          setWeather({
+            temp,
+            condition: data.weather[0].description,
+            isExtremeHeat: temp > 38,
+          });
           setVisible(true);
+        } else {
+          setVisible(false);
         }
       } catch (error) {
-        console.error('Weather fetch error:', error);
+        // Silent fail on network error
       }
     };
 
@@ -35,9 +63,14 @@ export default function WeatherBanner() {
 
   return (
     <View style={styles.banner}>
-      <Ionicons name="warning" size={20} color={Colors.primaryRed} style={{ marginRight: 8 }} />
+      <Ionicons
+        name={weather.isExtremeHeat ? 'flame' : 'rainy'}
+        size={20}
+        color={Colors.primaryRed}
+        style={{ marginRight: 8 }}
+      />
       <Text style={styles.text}>
-        Weather Advisory: {weather.condition} ({Math.round(weather.temp)}°C)
+        Commuter Alert: {weather.condition} ({Math.round(weather.temp)}°C)
       </Text>
       <TouchableOpacity onPress={() => setVisible(false)} style={styles.dismissBtn}>
         <Text style={styles.dismiss}>Dismiss</Text>
@@ -48,38 +81,35 @@ export default function WeatherBanner() {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: Colors.primaryYellow,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    backgroundColor: '#FFF8E1',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: Colors.primaryRed,
+    borderColor: '#FFA000',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    elevation: 4,
-    marginHorizontal: 12,
-    marginTop: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   text: {
     color: Colors.darkText,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
     flex: 1,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   dismissBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
   },
   dismiss: {
     color: Colors.primaryRed,
     fontWeight: 'bold',
-    fontSize: 13,
-    textDecorationLine: 'underline',
-  }
+    fontSize: 12,
+  },
 });

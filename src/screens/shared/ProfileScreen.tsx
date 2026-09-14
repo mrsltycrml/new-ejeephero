@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../../locales/i18n';
 
 export default function ProfileScreen() {
-  const { user, role, status, isAdmin, fullName, signOut, refreshProfile } = useAuth();
+  const { user, role, status, isAdmin, fullName, signOut, refreshProfile, isGuest } = useAuth();
   const { i18n, t } = useTranslation();
 
   // Edit Name State
@@ -53,6 +53,10 @@ export default function ProfileScreen() {
   };
 
   const handleSaveName = async () => {
+    if (isGuest) {
+      Alert.alert('Guest Mode', 'Profile editing is not available in guest mode. Please create an account.');
+      return;
+    }
     if (!newName.trim()) {
       Alert.alert('Validation Error', 'Full Name cannot be empty.');
       return;
@@ -80,6 +84,10 @@ export default function ProfileScreen() {
   };
 
   const handleUpdatePassword = async () => {
+    if (isGuest) {
+      Alert.alert('Guest Mode', 'Password change is not available in guest mode.');
+      return;
+    }
     if (!newPassword || !confirmPassword) {
       Alert.alert('Required Fields', 'Please fill in both password fields.');
       return;
@@ -118,6 +126,17 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Guest Mode Notice */}
+      {isGuest && (
+        <View style={styles.guestNoticeCard}>
+          <Ionicons name="person-circle-outline" size={22} color="#FF9800" style={{ marginRight: 10 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.guestNoticeTitle}>Guest Mode Active</Text>
+            <Text style={styles.guestNoticeText}>Profile editing and password changes require a registered account. Log out and register to unlock full features.</Text>
+          </View>
+        </View>
+      )}
+
       {/* Avatar Card */}
       <View style={styles.avatarCard}>
         <View style={styles.avatarCircle}>
@@ -149,7 +168,7 @@ export default function ProfileScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>Full Name</Text>
-            {isEditingName ? (
+            {isEditingName && !isGuest ? (
               <View style={styles.editInputContainer}>
                 <TextInput
                   style={styles.editInput}
@@ -178,12 +197,14 @@ export default function ProfileScreen() {
             ) : (
               <View style={styles.displayRow}>
                 <Text style={styles.infoValue}>{fullName || 'Not Set'}</Text>
-                <TouchableOpacity
-                  onPress={() => { setIsEditingName(true); setNewName(fullName); }}
-                  style={styles.editBtn}
-                >
-                  <Ionicons name="pencil" size={16} color={Colors.primaryRed} />
-                </TouchableOpacity>
+                {!isGuest && (
+                  <TouchableOpacity
+                    onPress={() => { setIsEditingName(true); setNewName(fullName); }}
+                    style={styles.editBtn}
+                  >
+                    <Ionicons name="pencil" size={16} color={Colors.primaryRed} />
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
@@ -250,17 +271,19 @@ export default function ProfileScreen() {
       </View>
 
       {/* Security settings / Change Password */}
-      <TouchableOpacity
-        style={styles.collapseHeader}
-        onPress={() => setShowPasswordSection(!showPasswordSection)}
-      >
-        <Text style={styles.sectionTitle}>{t('profile.accountSettings')}</Text>
-        <Ionicons
-          name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
-          size={20}
-          color={Colors.darkText}
-        />
-      </TouchableOpacity>
+      {!isGuest && (
+        <TouchableOpacity
+          style={styles.collapseHeader}
+          onPress={() => setShowPasswordSection(!showPasswordSection)}
+        >
+          <Text style={styles.sectionTitle}>{t('profile.accountSettings')}</Text>
+          <Ionicons
+            name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color={Colors.darkText}
+          />
+        </TouchableOpacity>
+      )}
 
       {showPasswordSection && (
         <View style={styles.infoCard}>
@@ -380,6 +403,9 @@ export default function ProfileScreen() {
         <Text style={styles.appInfoTitle}>EjeepHero</Text>
         <Text style={styles.appInfoVersion}>Version 1.0.0</Text>
         <Text style={styles.appInfoDesc}>Philippine e-Jeepney Transit Tracker</Text>
+        {isGuest && (
+          <Text style={[styles.appInfoDesc, { color: '#FF9800', marginTop: 4, fontWeight: '600' }]}>🔒 Guest Mode</Text>
+        )}
       </View>
 
       {/* Logout Button */}
@@ -399,6 +425,27 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 40,
+  },
+  guestNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#FFB300',
+  },
+  guestNoticeTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#E65100',
+    marginBottom: 3,
+  },
+  guestNoticeText: {
+    fontSize: 12,
+    color: '#795548',
+    lineHeight: 17,
   },
   avatarCard: {
     backgroundColor: Colors.primaryRed,

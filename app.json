@@ -11,8 +11,10 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "EjeepHero needs your location to track your ride and show your position on the map.",
         "NSLocationAlwaysUsageDescription": "EjeepHero needs your location to provide accurate ETAs and proximity alerts even when the app is in the background.",
-        "NSMotionUsageDescription": "EjeepHero needs accelerometer access to detect potential anomalies or crashes."
-      }
+        "NSMotionUsageDescription": "EjeepHero needs accelerometer access to detect potential anomalies or crashes.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.mrsltycrml.ejeephero"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,8 +28,13 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
-        "VIBRATE"
-      ]
+        "VIBRATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ],
+      "package": "com.mrsltycrml.ejeephero"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -49,6 +56,11 @@
       "expo-sqlite",
       "expo-font",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5b2ac721-6a0d-4fc2-b767-44635d065cd7"
+      }
+    }
   }
 }

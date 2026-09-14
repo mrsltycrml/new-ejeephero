@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Animated } from 'react-native';
 import * as Location from 'expo-location';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { startAnomalyDetection, stopAnomalyDetection } from '../../services/anomalyDetector';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import SOSButton from '../../components/SOSButton';
+import { MAKATI_PRIMARY_ROUTE } from '../../services/offlineTransitService';
 
 export default function DashboardScreen() {
   const { user } = useAuth();
@@ -20,6 +21,11 @@ export default function DashboardScreen() {
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      // Use demo route when offline / no Supabase config
+      setRoutes([{ id: MAKATI_PRIMARY_ROUTE.id, name: MAKATI_PRIMARY_ROUTE.name, color_code: MAKATI_PRIMARY_ROUTE.color_code, operating_hours: MAKATI_PRIMARY_ROUTE.operating_hours }]);
+      return;
+    }
     supabase.from('routes').select('*').then(({ data }) => {
       if (data) setRoutes(data);
     });
