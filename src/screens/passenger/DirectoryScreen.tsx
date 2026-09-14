@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, FlatList, ActivityIndicator, Keyboard
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { useLocation } from '../../contexts/LocationContext';
 import { Colors } from '../../constants/theme';
@@ -25,15 +26,23 @@ type Terminal = {
   latitude: number;
   longitude: number;
   sequence_order: number;
+  regular_fare?: number;
+  student_fare?: number;
+  elderly_fare?: number;
+  disabled_fare?: number;
   routes?: Route;
 };
 
+type PassengerType = 'regular' | 'student' | 'elderly' | 'disabled';
+
 export default function DirectoryScreen() {
+  const { t } = useTranslation();
   const { location } = useLocation();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [terminals, setTerminals] = useState<Terminal[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'browse' | 'planner'>('browse');
+  const [passengerType, setPassengerType] = useState<PassengerType>('regular');
 
   // Browse Routes state
   const [expandedRoute, setExpandedRoute] = useState<string | null>(null);
@@ -77,16 +86,30 @@ export default function DirectoryScreen() {
 
   const getFromText = () => {
     if (fromSelection === 'gps') {
-      return '📍 Current GPS Location';
+      return '📍 ' + t('directory.currentLocation');
     }
     const term = terminals.find(t => t.id === fromSelection);
-    return term ? term.name : 'Select origin point...';
+    return term ? term.name : t('directory.selectOrigin');
   };
 
   const getToText = () => {
-    if (!toSelection) return 'Select destination point...';
+    if (!toSelection) return t('directory.selectDestination');
     const term = terminals.find(t => t.id === toSelection);
-    return term ? term.name : 'Select destination point...';
+    return term ? term.name : t('directory.selectDestination');
+  };
+
+  // Get appropriate fare based on passenger type
+  const getFareForTerminal = (terminal: Terminal): number => {
+    switch (passengerType) {
+      case 'student':
+        return terminal.student_fare ?? terminal.regular_fare ?? 0;
+      case 'elderly':
+        return terminal.elderly_fare ?? terminal.regular_fare ?? 0;
+      case 'disabled':
+        return terminal.disabled_fare ?? terminal.regular_fare ?? 0;
+      default:
+        return terminal.regular_fare ?? 0;
+    }
   };
 
   const getRouteTerminals = (routeId: string) => {
@@ -105,11 +128,11 @@ export default function DirectoryScreen() {
     // Get origin coordinates
     if (fromSelection === 'gps') {
       if (!location) {
-        return { error: 'GPS coordinates not available yet. Please select a terminal or enable location.' };
+        return { error: t('directory.gpsNotAvailable') };
       }
       originLat = location.coords.latitude;
       originLon = location.coords.longitude;
-      originName = 'Current Location';
+      originName = t('directory.currentLocation');
       isCurrentGPS = true;
     } else {
       const term = terminals.find(t => t.id === fromSelection);
@@ -158,14 +181,8 @@ export default function DirectoryScreen() {
     // Apply road winding factor
     const roadDistance = jeepDistance * 1.4;
 
-    // Estimate Fare (₱13 base for first 4km, ₱1.80/km thereafter)
-    const baseFare = destRoute.base_fare || 13;
-    const perKmRate = destRoute.per_km_rate || 1.80;
-    let fare = baseFare;
-    if (roadDistance > 4) {
-      fare += (roadDistance - 4) * perKmRate;
-    }
-    const estimatedFare = Math.ceil(fare);
+    // Use fare from destination terminal based on passenger type
+    const estimatedFare = Math.ceil(getFareForTerminal(destTerminal));
 
     // Estimate travel time (15 km/h avg speed)
     const travelTime = Math.ceil((roadDistance / 15) * 60);
@@ -181,8 +198,9 @@ export default function DirectoryScreen() {
       jeepDistance: roadDistance,
       estimatedFare,
       travelTime,
-      baseFare,
-      perKmRate
+      baseFare: destRoute.base_fare,
+      perKmRate: destRoute.per_km_rate,
+      passengerType
     };
   };
 
@@ -227,22 +245,22 @@ export default function DirectoryScreen() {
           onPress={() => setActiveTab('browse')}
         >
           <Ionicons name="list" size={18} color={activeTab === 'browse' ? Colors.white : Colors.darkText} />
-          <Text style={[styles.tabButtonText, activeTab === 'browse' && styles.tabButtonTextActive]}>Browse Routes</Text>
+          <Text style={[styles.tabButtonText, activeTab === 'browse' && styles.tabButtonTextActive]}>{t('directory.browseRoutes')}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tabButton, activeTab === 'planner' && styles.tabButtonActive]}
           onPress={() => setActiveTab('planner')}
         >
           <Ionicons name="navigate" size={18} color={activeTab === 'planner' ? Colors.white : Colors.darkText} />
-          <Text style={[styles.tabButtonText, activeTab === 'planner' && styles.tabButtonTextActive]}>Trip Planner</Text>
+          <Text style={[styles.tabButtonText, activeTab === 'planner' && styles.tabButtonTextActive]}>{t('directory.tripPlanner')}</Text>
         </TouchableOpacity>
       </View>
 
       {activeTab === 'browse' ? (
         /* ─── BROWSE ROUTES TAB ─── */
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.sectionTitle}>Jeepney Routes & Fares</Text>
-          <Text style={styles.sectionDesc}>Tap on any route to view its list of terminals in sequential order.</Text>
+          <Text style={styles.sectionTitle}>{t('directory.jeepneyRoutesFares')}</Text>
+          <Text style={styles.sectionDesc}>{t('directory.browseRoutesDesc')}</Text>
 
           {routes.map(route => {
             const isExpanded = expandedRoute === route.id;
@@ -279,7 +297,7 @@ export default function DirectoryScreen() {
                   <View style={styles.expandedContent}>
                     <Text style={styles.routeDesc}>{route.description}</Text>
                     
-                    <Text style={styles.stopsHeader}>SEQUENCE OF STOPS</Text>
+                    <Text style={styles.stopsHeader}>{t('directory.sequenceOfStops')}</Text>
                     {routeTerminals.map((stop, idx) => (
                       <View key={stop.id} style={styles.stopRow}>
                         <View style={styles.stopTimeline}>
@@ -300,12 +318,36 @@ export default function DirectoryScreen() {
       ) : (
         /* ─── TRIP PLANNER TAB ─── */
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.sectionTitle}>Plan Your Trip</Text>
-          <Text style={styles.sectionDesc}>Select where you are and where you want to go. We'll find the closest terminal and calculate fares.</Text>
+          <Text style={styles.sectionTitle}>{t('directory.planYourTrip')}</Text>
+          <Text style={styles.sectionDesc}>{t('directory.planTripDesc')}</Text>
+
+          {/* Passenger Type Selector */}
+          <View style={styles.passengerTypeCard}>
+            <Text style={styles.passengerTypeLabel}>{t('directory.passengerType')}</Text>
+            <View style={styles.passengerTypeButtons}>
+              {(['regular', 'student', 'elderly', 'disabled'] as PassengerType[]).map(type => (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.passengerTypeButton,
+                    passengerType === type && styles.passengerTypeButtonActive
+                  ]}
+                  onPress={() => setPassengerType(type)}
+                >
+                  <Text style={[
+                    styles.passengerTypeButtonText,
+                    passengerType === type && styles.passengerTypeButtonTextActive
+                  ]}>
+                    {t(`directory.${type}`)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
           <View style={styles.plannerCard}>
             {/* Origin Select */}
-            <Text style={styles.pickerLabel}>FROM</Text>
+            <Text style={styles.pickerLabel}>{t('directory.from')}</Text>
             <TouchableOpacity 
               style={styles.pickerSelector}
               onPress={() => handleOpenPicker('from')}
@@ -329,7 +371,7 @@ export default function DirectoryScreen() {
             </View>
 
             {/* Destination Select */}
-            <Text style={styles.pickerLabel}>TO (DESTINATION)</Text>
+            <Text style={styles.pickerLabel}>{t('directory.toDestination')}</Text>
             <TouchableOpacity 
               style={styles.pickerSelector}
               onPress={() => handleOpenPicker('to')}
@@ -352,7 +394,7 @@ export default function DirectoryScreen() {
             <View style={styles.resultCard}>
               <View style={styles.resultHeader}>
                 <View style={[styles.routeBadge, { backgroundColor: tripResult.routeColor || Colors.primaryRed }]}>
-                  <Text style={styles.routeBadgeText}>Recommended Route</Text>
+                  <Text style={styles.routeBadgeText}>{t('directory.recommendedRoute')}</Text>
                 </View>
                 <Text style={styles.resultRouteName}>{tripResult.routeName}</Text>
               </View>
@@ -363,11 +405,11 @@ export default function DirectoryScreen() {
               <View style={styles.boardingSection}>
                 <Ionicons name="walk" size={24} color={Colors.primaryYellow} />
                 <View style={styles.boardingDetails}>
-                  <Text style={styles.boardingLabel}>NEAREST BOARDING TERMINAL</Text>
+                  <Text style={styles.boardingLabel}>{t('directory.nearestBoardingTerminal')}</Text>
                   <Text style={styles.boardingTerminalName}>{tripResult.boardingTerminalName}</Text>
                   {tripResult.isCurrentGPS && (
                     <Text style={styles.boardingDistance}>
-                      Approx. {Math.round(tripResult.boardingWalkDistance)} meters from your location
+                      {t('directory.approxDistance', { distance: Math.round(tripResult.boardingWalkDistance) })}
                     </Text>
                   )}
                 </View>
@@ -378,14 +420,14 @@ export default function DirectoryScreen() {
               {/* Estimate metrics */}
               <View style={styles.metricsRow}>
                 <View style={styles.metricItem}>
-                  <Text style={styles.metricLabel}>ESTIMATED FARE</Text>
+                  <Text style={styles.metricLabel}>{t('directory.estimatedFareLabel', { passengerType: tripResult.passengerType?.toUpperCase() })}</Text>
                   <Text style={styles.metricValue}>₱{tripResult.estimatedFare}</Text>
                   <Text style={styles.metricSub}>₱{tripResult.baseFare} base + ₱{tripResult.perKmRate}/km</Text>
                 </View>
                 <View style={[styles.metricItem, { borderLeftWidth: 1, borderColor: '#E8DFD3' }]}>
-                  <Text style={styles.metricLabel}>EST. TRAVEL TIME</Text>
+                  <Text style={styles.metricLabel}>{t('directory.estTravelTime')}</Text>
                   <Text style={styles.metricValue}>~{tripResult.travelTime} mins</Text>
-                  <Text style={styles.metricSub}>Jeep distance: {tripResult.jeepDistance.toFixed(1)} km</Text>
+                  <Text style={styles.metricSub}>{t('directory.jeepDistance', { distance: tripResult.jeepDistance.toFixed(1) })}</Text>
                 </View>
               </View>
 
@@ -393,17 +435,17 @@ export default function DirectoryScreen() {
               <View style={styles.guidanceFlow}>
                 <View style={styles.guidanceStep}>
                   <Ionicons name="pin" size={16} color={Colors.primaryRed} />
-                  <Text style={styles.guidanceText}>Start at <Text style={{ fontWeight: 'bold' }}>{tripResult.originName}</Text></Text>
+                  <Text style={styles.guidanceText}>{t('directory.startAt')} <Text style={{ fontWeight: 'bold' }}>{tripResult.originName}</Text></Text>
                 </View>
                 <View style={styles.guidanceConnector} />
                 <View style={styles.guidanceStep}>
                   <Ionicons name="bus" size={16} color={Colors.primaryYellow} />
-                  <Text style={styles.guidanceText}>Board at <Text style={{ fontWeight: 'bold' }}>{tripResult.boardingTerminalName}</Text></Text>
+                  <Text style={styles.guidanceText}>{t('directory.boardAt')} <Text style={{ fontWeight: 'bold' }}>{tripResult.boardingTerminalName}</Text></Text>
                 </View>
                 <View style={styles.guidanceConnector} />
                 <View style={styles.guidanceStep}>
                   <Ionicons name="flag" size={16} color={Colors.primaryRed} />
-                  <Text style={styles.guidanceText}>Arrive at <Text style={{ fontWeight: 'bold' }}>{tripResult.destName}</Text></Text>
+                  <Text style={styles.guidanceText}>{t('directory.arriveAt')} <Text style={{ fontWeight: 'bold' }}>{tripResult.destName}</Text></Text>
                 </View>
               </View>
             </View>
@@ -918,5 +960,48 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#888',
     marginTop: 2,
+  },
+
+  // ── Passenger Type Selector ──
+  passengerTypeCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E8DFD3',
+  },
+  passengerTypeLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.subtleGray,
+    letterSpacing: 0.8,
+    marginBottom: 12,
+  },
+  passengerTypeButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  passengerTypeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.offWhite,
+    borderWidth: 2,
+    borderColor: '#E8DFD3',
+    alignItems: 'center',
+  },
+  passengerTypeButtonActive: {
+    backgroundColor: Colors.primaryRed,
+    borderColor: Colors.primaryRed,
+  },
+  passengerTypeButtonText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: Colors.subtleGray,
+  },
+  passengerTypeButtonTextActive: {
+    color: Colors.white,
   },
 });

@@ -26,15 +26,55 @@ export default function SOSButton() {
   useEffect(() => {
     const fetchContact = async () => {
       if (!user?.id) return;
-      const { data } = await supabase
-        .from('emergency_contacts')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      if (data) setContact(data);
+      try {
+        const { data, error } = await supabase
+          .from('emergency_contacts')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+          console.error('Error fetching emergency contact:', error);
+          return;
+        }
+        
+        if (data) {
+          setContact(data);
+        } else {
+          setContact(null);
+        }
+      } catch (err) {
+        console.error('Exception fetching emergency contact:', err);
+      }
     };
+
     fetchContact();
-  }, [user?.id, modalVisible]);
+
+    // Subscribe to real-time updates
+    const subscription = supabase
+      .channel(`emergency_contacts:user_id=eq.${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'emergency_contacts',
+          filter: `user_id=eq.${user?.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            setContact(null);
+          } else {
+            setContact(payload.new);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;

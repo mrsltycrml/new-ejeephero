@@ -4,7 +4,7 @@ import {
   ActivityIndicator, FlatList, TextInput, KeyboardAvoidingView,
   Platform, Keyboard, TouchableWithoutFeedback, ScrollView
 } from 'react-native';
-import * as Contacts from 'expo-contacts';
+import * as Contacts from 'expo-contacts/legacy';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,21 +24,35 @@ export default function ContactsScreen() {
 
   useEffect(() => {
     const fetchContact = async () => {
-      if (!user?.id) return;
-      const { data } = await supabase
-        .from('emergency_contacts')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (data) {
-        setCurrentContact(data);
-        if (data.preset_message) setPresetMessage(data.preset_message);
+      if (!user?.id) {
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+      try {
+        const { data, error } = await supabase
+          .from('emergency_contacts')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Fetch error:', error);
+        }
+
+        if (data) {
+          setCurrentContact(data);
+          if (data.preset_message) setPresetMessage(data.preset_message);
+        } else {
+          setCurrentContact(null);
+        }
+      } catch (err) {
+        console.error('Exception fetching contact:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchContact();
-  }, []);
+  }, [user?.id]);
 
   const loadPhoneContacts = async () => {
     const { status } = await Contacts.requestPermissionsAsync();
@@ -62,32 +76,40 @@ export default function ContactsScreen() {
 
   const saveSelectedContact = async (contact: Contacts.Contact) => {
     const phoneNumber = contact.phoneNumbers?.[0]?.number;
-    if (!phoneNumber) return;
+    if (!phoneNumber || !user?.id) return;
 
     setSaving(true);
     setShowPicker(false);
 
-    const { error } = await supabase.from('emergency_contacts').upsert(
-      {
-        user_id: user?.id,
-        contact_name: contact.name,
-        phone_number: phoneNumber,
-        preset_message: presetMessage,
-      },
-      { onConflict: 'user_id' }
-    );
+    try {
+      const { data, error } = await supabase.from('emergency_contacts').upsert(
+        {
+          user_id: user.id,
+          contact_name: contact.name,
+          phone_number: phoneNumber,
+          preset_message: presetMessage,
+        },
+        { onConflict: 'user_id' }
+      );
 
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
-      setCurrentContact({
-        contact_name: contact.name,
-        phone_number: phoneNumber,
-        preset_message: presetMessage,
-      });
-      Alert.alert('Saved', `${contact.name} set as your emergency contact.`);
+      if (error) {
+        console.error('Save error:', error);
+        Alert.alert('Error', error.message || 'Failed to save emergency contact');
+      } else {
+        setCurrentContact({
+          user_id: user.id,
+          contact_name: contact.name,
+          phone_number: phoneNumber,
+          preset_message: presetMessage,
+        });
+        Alert.alert('Success!', `${contact.name} set as your emergency contact.`);
+      }
+    } catch (err) {
+      console.error('Exception:', err);
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const savePresetMessage = async () => {
