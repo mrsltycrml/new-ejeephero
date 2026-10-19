@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
-type ProfileStatus = 'pending' | 'approved' | 'rejected' | null;
+type ProfileStatus = 'pending' | 'approved' | 'rejected' | 'suspended' | null;
 
 type AuthContextType = {
   user: User | null;
@@ -101,7 +101,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) throw error;
     setUser(null);
     setRole(null);
     setStatus(null);

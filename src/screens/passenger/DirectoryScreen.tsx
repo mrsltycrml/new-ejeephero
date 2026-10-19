@@ -8,6 +8,8 @@ import { supabase } from '../../lib/supabase';
 import { useLocation } from '../../contexts/LocationContext';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { calculateConfiguredFare, findWalkAndSaveSuggestion, routeDistanceKm } from '../../services/fareCalculator';
+import { MAKATI_OFFICIAL_TERMINALS, MAKATI_PRIMARY_ROUTE } from '../../services/offlineTransitService';
 
 type Route = {
   id: string;
@@ -35,6 +37,14 @@ type Terminal = {
 
 type PassengerType = 'regular' | 'student' | 'elderly' | 'disabled';
 
+const normalizeConfiguredRouteFare = (route: Route): Route => (
+  route.id === MAKATI_PRIMARY_ROUTE.id
+    && route.base_fare === 14
+    && route.per_km_rate === 1.5
+    ? { ...route, base_fare: MAKATI_PRIMARY_ROUTE.base_fare, per_km_rate: MAKATI_PRIMARY_ROUTE.per_km_rate }
+    : route
+);
+
 export default function DirectoryScreen() {
   const { t } = useTranslation();
   const { location } = useLocation();
@@ -59,11 +69,24 @@ export default function DirectoryScreen() {
       try {
         const { data: routesData } = await supabase.from('routes').select('*').order('name');
         const { data: terminalsData } = await supabase.from('terminals').select('*, routes(*)').order('sequence_order');
-        
-        if (routesData) setRoutes(routesData);
-        if (terminalsData) setTerminals(terminalsData);
+
+        const fallbackRoute: Route = MAKATI_PRIMARY_ROUTE;
+        const fallbackTerminals: Terminal[] = MAKATI_OFFICIAL_TERMINALS.map((terminal) => ({
+          ...terminal,
+          routes: fallbackRoute,
+        }));
+        setRoutes(routesData?.length ? routesData.map(normalizeConfiguredRouteFare) : [fallbackRoute]);
+        setTerminals(terminalsData?.length
+          ? terminalsData.map((terminal: Terminal) => ({
+              ...terminal,
+              routes: terminal.routes ? normalizeConfiguredRouteFare(terminal.routes) : terminal.routes,
+            }))
+          : fallbackTerminals);
       } catch (err) {
         console.error('Error fetching directory data:', err);
+        const fallbackRoute: Route = MAKATI_PRIMARY_ROUTE;
+        setRoutes([fallbackRoute]);
+        setTerminals(MAKATI_OFFICIAL_TERMINALS.map((terminal) => ({ ...terminal, routes: fallbackRoute })));
       } finally {
         setLoading(false);
       }
@@ -86,7 +109,7 @@ export default function DirectoryScreen() {
 
   const getFromText = () => {
     if (fromSelection === 'gps') {
-      return '📍 ' + t('directory.currentLocation');
+      return t('directory.currentLocation');
     }
     const term = terminals.find(t => t.id === fromSelection);
     return term ? term.name : t('directory.selectOrigin');
@@ -152,8 +175,11 @@ export default function DirectoryScreen() {
 
     if (!destRoute) return null;
 
-    // Find nearest boarding terminal on the destination's route
-    const routeTerminals = getRouteTerminals(destRoute.id);
+    // Board at the closest stop before the selected destination.
+    const routeTerminals = getRouteTerminals(destRoute.id)
+      .filter((terminal) => terminal.sequence_order < destTerminal.sequence_order)
+      .sort((a, b) => a.sequence_order - b.sequence_order);
+    if (!routeTerminals.length) return { error: 'Choose a destination after the boarding stop.' };
     let nearestBoardingTerminal = routeTerminals[0];
     let minDistanceToBoarding = haversine(
       originLat,
@@ -170,19 +196,23 @@ export default function DirectoryScreen() {
       }
     }
 
-    // Calculate distance of the jeep journey (boarding terminal -> destination terminal)
-    const jeepDistance = haversine(
-      nearestBoardingTerminal.latitude,
-      nearestBoardingTerminal.longitude,
-      destLat,
-      destLon
-    );
-
-    // Apply road winding factor
-    const roadDistance = jeepDistance * 1.4;
-
-    // Use fare from destination terminal based on passenger type
-    const estimatedFare = Math.ceil(getFareForTerminal(destTerminal));
+    // Sum the route's stop-to-stop distances and apply its configured fare.
+    const boardingIndex = routeTerminals.findIndex((stop) => stop.id === nearestBoardingTerminal.id);
+    const fareStops = [...routeTerminals, destTerminal];
+    const destinationIndex = fareStops.findIndex((stop) => stop.id === destTerminal.id);
+    const routeSlice = fareStops.slice(boardingIndex, destinationIndex + 1);
+    const roadDistance = routeDistanceKm(routeSlice);
+    const fareType = passengerType === 'elderly' ? 'senior' : passengerType === 'disabled' ? 'pwd' : passengerType;
+    const estimatedFare = calculateConfiguredFare(roadDistance, destRoute, fareType);
+    const walkAndSave = isCurrentGPS
+      ? findWalkAndSaveSuggestion({
+          origin: { latitude: originLat, longitude: originLon },
+          destination: destTerminal,
+          stops: fareStops,
+          route: destRoute,
+          passengerType: fareType,
+        })
+      : null;
 
     // Estimate travel time (15 km/h avg speed)
     const travelTime = Math.ceil((roadDistance / 15) * 60);
@@ -200,6 +230,7 @@ export default function DirectoryScreen() {
       travelTime,
       baseFare: destRoute.base_fare,
       perKmRate: destRoute.per_km_rate,
+      walkAndSave,
       passengerType
     };
   };
@@ -320,6 +351,11 @@ export default function DirectoryScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <Text style={styles.sectionTitle}>{t('directory.planYourTrip')}</Text>
           <Text style={styles.sectionDesc}>{t('directory.planTripDesc')}</Text>
+          <View style={{ backgroundColor: '#FFF8E7', borderColor: '#F3D58A', borderWidth: 1, borderRadius: 12, padding: 11, marginBottom: 12 }}>
+            <Text style={{ color: '#684B05', fontSize: 12, lineHeight: 17 }}>
+              Estimates use the selected route’s stored fare rate, apply 20% discounts for students, seniors, and PWDs, and round to the nearest ₱0.25. The current modern PUJ guide is ₱17 for the first 4 km, then ₱2.40 per km. Confirm the posted fare matrix before boarding.
+            </Text>
+          </View>
 
           {/* Passenger Type Selector */}
           <View style={styles.passengerTypeCard}>
@@ -430,6 +466,20 @@ export default function DirectoryScreen() {
                   <Text style={styles.metricSub}>{t('directory.jeepDistance', { distance: tripResult.jeepDistance.toFixed(1) })}</Text>
                 </View>
               </View>
+
+              {tripResult.walkAndSave && tripResult.walkAndSave.savings > 0 && (
+                <View style={{ backgroundColor: '#E8F5E9', borderRadius: 12, padding: 12, marginTop: 12, borderWidth: 1, borderColor: '#A5D6A7' }}>
+                  <Text style={{ color: '#1B5E20', fontWeight: '800', fontSize: 14 }}>
+                    Walk {tripResult.walkAndSave.walkingTimeMinutes} min to {tripResult.walkAndSave.stop.name} and save ₱{tripResult.walkAndSave.savings.toFixed(2)}
+                  </Text>
+                  <Text style={{ color: '#2E7D32', marginTop: 4, fontSize: 13 }}>
+                    Estimated fare: ₱{tripResult.walkAndSave.currentFare.toFixed(2)} → ₱{tripResult.walkAndSave.suggestedFare.toFixed(2)}
+                  </Text>
+                  <Text style={{ color: '#53665A', marginTop: 4, fontSize: 11 }}>
+                    Walking time uses an average pace. This estimate depends on the route’s configured rate; confirm the posted fare with the operator.
+                  </Text>
+                </View>
+              )}
 
               {/* Simple Guidance Flow */}
               <View style={styles.guidanceFlow}>

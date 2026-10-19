@@ -1,5 +1,5 @@
 {
-  "name": "temp-app",
+  "name": "ejeephero",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
@@ -35,6 +35,7 @@
     "react-native-screens": "~4.26.0",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "^0.21.2",
+    "react-native-webview": "13.16.1",
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
@@ -46,7 +47,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "node --experimental-strip-types --test tests/fareCalculator.test.ts"
   },
   "private": true
 }

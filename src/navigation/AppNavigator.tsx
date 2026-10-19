@@ -21,6 +21,7 @@ import NotificationsScreen from '../screens/driver/NotificationsScreen';
 
 // Admin Screens
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import SupervisorDashboardScreen from '../screens/admin/SupervisorDashboardScreen';
 
 // Shared
 import WeatherScreen from '../screens/shared/WeatherScreen';
@@ -31,22 +32,26 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const commonScreenOptions = {
-  tabBarActiveTintColor: Colors.primaryRed,
+  tabBarActiveTintColor: Colors.navy,
   tabBarInactiveTintColor: Colors.tabInactive,
   tabBarStyle: {
     backgroundColor: Colors.white,
     borderTopWidth: 1,
-    borderTopColor: '#EEEEEF',
-    paddingBottom: 5,
-    height: 60,
+    borderTopColor: Colors.border,
+    paddingTop: 7,
+    paddingBottom: 6,
+    height: 68,
+    elevation: 0,
   },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: '600' as const },
+  tabBarIconStyle: { marginTop: 0 },
   headerStyle: {
-    backgroundColor: Colors.primaryRed,
+    backgroundColor: Colors.navy,
   },
   headerTintColor: Colors.white,
   headerTitleStyle: {
-    fontWeight: 'bold' as const,
-    fontSize: 20,
+    fontWeight: '700' as const,
+    fontSize: 18,
   },
 };
 
@@ -122,6 +127,11 @@ const DriverTabs = () => (
 
 const AdminTabs = () => (
   <Tab.Navigator screenOptions={commonScreenOptions}>
+    <Tab.Screen
+      name="Fleet"
+      component={SupervisorDashboardScreen}
+      options={{ tabBarIcon: ({ color }) => <Ionicons name="speedometer" size={24} color={color} /> }}
+    />
     <Tab.Screen 
       name="Users" 
       component={AdminDashboardScreen} 

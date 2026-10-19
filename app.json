@@ -8,13 +8,14 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.ejeephero.mobile",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "EjeepHero needs your location to track your ride and show your position on the map.",
-        "NSLocationAlwaysUsageDescription": "EjeepHero needs your location to provide accurate ETAs and proximity alerts even when the app is in the background.",
         "NSMotionUsageDescription": "EjeepHero needs accelerometer access to detect potential anomalies or crashes."
       }
     },
     "android": {
+      "package": "com.ejeephero.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#1F4E79",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -25,8 +26,8 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "VIBRATE"
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -36,7 +37,15 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow EjeepHero to use your location."
+          "locationWhenInUsePermission": "Allow EjeepHero to show your location and share an active e-jeep shift."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#C41E3A",
+          "defaultChannel": "general"
         }
       ],
       [

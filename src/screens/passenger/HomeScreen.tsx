@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  View, StyleSheet, Text, TouchableOpacity, ScrollView,
+  View, StyleSheet, Text, TouchableOpacity, ScrollView, Alert,
   Animated, Platform
 } from 'react-native';
 import LeafletMap, { LeafletMapRef } from '../../components/LeafletMap';
@@ -23,7 +23,6 @@ import {
 import {
   evaluateGeofence,
   GeofenceEvaluationResult,
-  OFFICIAL_BAY_RADIUS_METERS,
 } from '../../services/geofencingService';
 import {
   densityRouting,
@@ -50,11 +49,12 @@ export default function PassengerHomeScreen() {
   const [routes, setRoutes] = useState<RouteData[]>([MAKATI_PRIMARY_ROUTE]);
   const [terminals, setTerminals] = useState<TerminalData[]>(MAKATI_OFFICIAL_TERMINALS);
   const [vehicles, setVehicles] = useState<VehicleData[]>(INITIAL_VEHICLES);
-  const [dataLatencyMs, setDataLatencyMs] = useState<number>(18);
-  const [isDataCached, setIsDataCached] = useState<boolean>(true);
+  const [dataLatencyMs, setDataLatencyMs] = useState<number>(0);
+  const [isDataCached, setIsDataCached] = useState<boolean>(false);
 
   // Geofencing State (SO2)
   const [geofenceResult, setGeofenceResult] = useState<GeofenceEvaluationResult | null>(null);
+  const lastGeofenceState = useRef<boolean | null>(null);
 
   // Safe Stop & DBSCAN Density Routing State (SO5)
   const [safeNightMode, setSafeNightMode] = useState(false);
@@ -95,23 +95,12 @@ export default function PassengerHomeScreen() {
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'vehicle_positions' },
-          payload => {
-            const newV = payload.new;
-            setVehicles(current => {
-              const updated = current.map(v => {
-                if (v.vehicle_id === newV.vehicle_id || v.id === newV.vehicle_id) {
-                  return {
-                    ...v,
-                    latitude: newV.latitude,
-                    longitude: newV.longitude,
-                    speed: newV.speed || v.speed,
-                  };
-                }
-                return v;
-              });
-              return densityRouting.updateVehicleCapacities(updated);
-            });
-          }
+          () => offlineTransit.getVehicles().then((latest) => setVehicles(latest))
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'vehicles' },
+          () => offlineTransit.getVehicles().then((latest) => setVehicles(latest))
         )
         .subscribe();
 
@@ -136,16 +125,35 @@ export default function PassengerHomeScreen() {
 
   // ─── 3. SO2 & SO5: Live Geofence & Safe-Routing Evaluation ───
   useEffect(() => {
-    const lat = location?.coords.latitude || 14.5547;
-    const lon = location?.coords.longitude || 121.0244;
+    const coords = location?.coords;
+    if (coords) {
+      const geo = evaluateGeofence(coords.latitude, coords.longitude, terminals);
+      setGeofenceResult(geo);
 
-    // SO2: Geofence check
-    const geo = evaluateGeofence(lat, lon, terminals);
-    setGeofenceResult(geo);
+      // Notify once on the first reliable outside-zone fix and on later transitions.
+      // This marks areas outside the configured stop map; it does not determine legal liability.
+      if ((coords.accuracy ?? Infinity) <= 30 && lastGeofenceState.current !== geo.isInsideLegalZone) {
+        if (!geo.isInsideLegalZone) {
+          Alert.alert(
+            'Outside a mapped loading bay',
+            `You may be waiting outside a designated loading bay. The closest mapped bay is ${geo.distanceToNearestMeters} m away at ${geo.nearestZone.name}. e-Sakay supports Makati’s transport modernization and designated loading rules. Please wait and board at marked stops. GPS accuracy is ±${Math.round(coords.accuracy!)} m.`,
+          );
+        }
+        lastGeofenceState.current = geo.isInsideLegalZone;
+      }
 
-    // SO5: Late-Night Safe-Stop Routing
-    const safeRoute = densityRouting.calculateLateNightSafeRoute(lat, lon, terminals, safeNightMode);
-    setSafeRoutingResult(safeRoute);
+      const safeRoute = densityRouting.calculateLateNightSafeRoute(
+        coords.latitude,
+        coords.longitude,
+        terminals,
+        safeNightMode,
+      );
+      setSafeRoutingResult(safeRoute);
+    } else {
+      setGeofenceResult(null);
+      setSafeRoutingResult(null);
+      lastGeofenceState.current = null;
+    }
 
     // Recompute densities
     const profiles = densityRouting.evaluateStopDensities(terminals);
@@ -153,7 +161,8 @@ export default function PassengerHomeScreen() {
   }, [location, terminals, safeNightMode]);
 
   // Nearest vehicle for SOS vehicle metadata binding (SO4)
-  const activeVehicle = selectedVehicle || vehicles[0];
+  // Only include vehicle identifiers the passenger explicitly selected on the map.
+  const activeVehicle = selectedVehicle;
 
   return (
     <View style={styles.container}>
@@ -239,13 +248,17 @@ export default function PassengerHomeScreen() {
                 { color: geofenceResult.isInsideLegalZone ? '#2E7D32' : '#C62828' }
               ]}>
                 {geofenceResult.isInsideLegalZone
-                  ? 'LEGAL BOARDING ZONE'
-                  : 'WARNING: NO LOADING AREA'}
+                ? 'DESIGNATED BAY NEARBY'
+                  : 'OUTSIDE MAPPED LOADING BAY'}
               </Text>
               <Text style={styles.geofenceSub} numberOfLines={2}>
                 {geofenceResult.isInsideLegalZone
                   ? geofenceResult.currentZone?.name
-                  : `Please walk ${geofenceResult.distanceToNearestMeters}m to designated bay: ${geofenceResult.nearestZone?.name}`}
+                  : `Walk ${geofenceResult.distanceToNearestMeters} m to the closest mapped bay: ${geofenceResult.nearestZone?.name}`}
+              </Text>
+              <Text style={styles.geofenceSub}>
+                e-Sakay supports Makati’s transport modernization and strict loading rules. Wait and board at designated stops; location and stop data can be approximate.
+                {location?.coords.accuracy != null ? ` GPS accuracy ±${Math.round(location.coords.accuracy)}m.` : ''}
               </Text>
             </View>
             {!geofenceResult.isInsideLegalZone && (
@@ -284,7 +297,7 @@ export default function PassengerHomeScreen() {
                 SO5: Safe-Stop Navigational Guide
               </Text>
               <Text style={styles.safeCardSub}>
-                DBSCAN Density-Aware Nighttime Rerouting (&lt;5s)
+                Based on configured lighting and CCTV records; crowd counts are unavailable.
               </Text>
             </View>
             <TouchableOpacity onPress={() => setSafeNightMode(false)}>
@@ -294,7 +307,7 @@ export default function PassengerHomeScreen() {
 
           <View style={styles.safeDetailsRow}>
             <View style={styles.safeMetricBox}>
-              <Text style={styles.safeMetricLabel}>TARGET STOP</Text>
+              <Text style={styles.safeMetricLabel}>{safeRoutingResult.hasVerifiedSafeStop ? 'CONFIGURED SAFE STOP' : 'STOP DATA UNVERIFIED'}</Text>
               <Text style={styles.safeMetricValue} numberOfLines={1}>
                 {safeRoutingResult.recommendedSafeStop.name}
               </Text>
@@ -308,7 +321,7 @@ export default function PassengerHomeScreen() {
           </View>
 
           <Text style={styles.safeReasonText}>
-            💡 {safeRoutingResult.safetyReason}
+            {safeRoutingResult.safetyReason}
           </Text>
         </View>
       )}
@@ -334,8 +347,9 @@ export default function PassengerHomeScreen() {
       {/* ─── FLOATING SOS BUTTON (SO4 Integrated with Vehicle Metadata) ─── */}
       <View style={styles.sosOverlay}>
         <SOSButton
-          activeVehiclePlate={activeVehicle.plate_number}
-          activeVehicleBody={activeVehicle.body_number}
+          activeVehicleId={activeVehicle?.id}
+          activeVehiclePlate={activeVehicle?.plate_number}
+          activeVehicleBody={activeVehicle?.body_number}
         />
       </View>
     </View>

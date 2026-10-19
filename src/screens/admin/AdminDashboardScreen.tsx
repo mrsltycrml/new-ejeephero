@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  Alert, ActivityIndicator, RefreshControl,
+  Alert, ActivityIndicator, RefreshControl, Platform,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
@@ -24,6 +24,9 @@ export default function AdminDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<FilterTab>('pending');
+  const [actionError, setActionError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [updatingProfileId, setUpdatingProfileId] = useState<string | null>(null);
 
   const fetchProfiles = useCallback(async () => {
     const { data, error } = await supabase
@@ -48,59 +51,68 @@ export default function AdminDashboardScreen() {
   };
 
   const updateProfile = async (profileId: string, updates: Partial<Profile>) => {
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', profileId);
+    setActionError('');
+    setActionMessage('');
+    setUpdatingProfileId(profileId);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', profileId)
+        .select('id')
+        .maybeSingle();
 
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
+      if (error) throw error;
+      if (!data) {
+        throw new Error('No profile was updated. Check that this signed-in account has admin access and the Supabase profile-update policy is installed.');
+      }
+      setActionMessage(updates.status === 'approved' ? 'Account approved.' : updates.status === 'rejected' ? 'Account status updated.' : 'Account role updated.');
       await fetchProfiles();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'The account update failed. Please try again.');
+    } finally {
+      setUpdatingProfileId(null);
     }
   };
 
+  const confirmAction = (title: string, message: string, confirmLabel: string, action: () => Promise<void>, destructive = false) => {
+    const runAction = () => { void action(); };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) runAction();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: confirmLabel, style: destructive ? 'destructive' : 'default', onPress: runAction },
+    ]);
+  };
+
   const handleApprove = (profile: Profile) => {
-    Alert.alert(
+    confirmAction(
       'Approve User',
       `Approve ${profile.email} as ${profile.role}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          onPress: () => updateProfile(profile.id, { status: 'approved' }),
-        },
-      ]
+      'Approve',
+      () => updateProfile(profile.id, { status: 'approved' }),
     );
   };
 
   const handleReject = (profile: Profile) => {
-    Alert.alert(
+    confirmAction(
       'Reject User',
       `Reject ${profile.email}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: () => updateProfile(profile.id, { status: 'rejected' }),
-        },
-      ]
+      'Reject',
+      () => updateProfile(profile.id, { status: 'rejected' }),
+      true,
     );
   };
 
   const handleToggleRole = (profile: Profile) => {
     const newRole = profile.role === 'passenger' ? 'driver' : 'passenger';
-    Alert.alert(
+    confirmAction(
       'Change Role',
       `Change ${profile.email} from ${profile.role} to ${newRole}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: `Set as ${newRole}`,
-          onPress: () => updateProfile(profile.id, { role: newRole }),
-        },
-      ]
+      `Set as ${newRole}`,
+      () => updateProfile(profile.id, { role: newRole }),
     );
   };
 
@@ -137,11 +149,12 @@ export default function AdminDashboardScreen() {
           {isPending ? (
             <>
               <TouchableOpacity
-                style={[styles.actionBtn, styles.approveBtn]}
+                disabled={updatingProfileId === item.id}
+                style={[styles.actionBtn, styles.approveBtn, updatingProfileId === item.id && styles.actionDisabled]}
                 onPress={() => handleApprove(item)}
               >
-                <Ionicons name="checkmark-circle" size={18} color={Colors.white} />
-                <Text style={styles.actionBtnText}>Approve</Text>
+                {updatingProfileId === item.id ? <ActivityIndicator size="small" color={Colors.white} /> : <Ionicons name="checkmark-circle" size={18} color={Colors.white} />}
+                <Text style={styles.actionBtnText}>{updatingProfileId === item.id ? 'Saving…' : 'Approve'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionBtn, styles.rejectBtn]}
@@ -214,6 +227,9 @@ export default function AdminDashboardScreen() {
         ))}
       </View>
 
+      {!!actionError && <Text accessibilityRole="alert" style={styles.actionError}>{actionError}</Text>}
+      {!!actionMessage && <Text style={styles.actionMessage}>{actionMessage}</Text>}
+
       <FlatList
         data={filteredProfiles}
         renderItem={renderProfile}
@@ -269,6 +285,9 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: Colors.white,
   },
+  actionError: { marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 8, color: '#8B1E1E', backgroundColor: '#FDECEC' },
+  actionMessage: { marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 8, color: '#1B5E20', backgroundColor: '#E8F5E9' },
+  actionDisabled: { opacity: 0.65 },
   badge: {
     backgroundColor: Colors.primaryYellow,
     width: 22,

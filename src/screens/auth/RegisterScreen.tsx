@@ -32,7 +32,7 @@ export default function RegisterScreen({ navigation }: any) {
     } else {
       Alert.alert(
         'Registration Submitted',
-        'Your account is pending admin approval. You will be notified once approved.',
+        'Check your inbox and confirm your email. After confirmation, your account will remain pending until an administrator approves it.',
         [{ text: 'OK' }]
       );
     }
@@ -172,23 +172,23 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: Colors.white,
-    borderRadius: 20,
+    borderRadius: 14,
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 1,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#F0E6D8',
+    borderColor: Colors.border,
   },
   input: {
-    backgroundColor: Colors.offWhite,
+    backgroundColor: '#FAFBFC',
     borderWidth: 1,
-    borderColor: '#E8DFD3',
-    padding: 16,
-    borderRadius: 12,
+    borderColor: Colors.border,
+    padding: 14,
+    borderRadius: 9,
     marginBottom: 16,
     fontSize: 16,
     color: Colors.darkText,
@@ -220,14 +220,14 @@ const styles = StyleSheet.create({
     borderColor: '#E8DFD3',
   },
   roleActivePassenger: {
-    backgroundColor: Colors.primaryYellow,
+    backgroundColor: Colors.navy,
     borderWidth: 1,
-    borderColor: Colors.primaryYellow,
+    borderColor: Colors.navy,
   },
   roleActiveDriver: {
-    backgroundColor: Colors.primaryRed,
+    backgroundColor: Colors.navy,
     borderWidth: 1,
-    borderColor: Colors.primaryRed,
+    borderColor: Colors.navy,
   },
   roleText: {
     fontSize: 15,
@@ -257,23 +257,18 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   button: {
-    backgroundColor: Colors.primaryRed,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: Colors.navy,
+    padding: 15,
+    borderRadius: 9,
     alignItems: 'center',
     marginTop: 8,
     borderWidth: 1,
-    borderColor: Colors.primaryRed,
-    shadowColor: Colors.primaryRed,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: Colors.navy,
   },
   buttonText: {
     color: Colors.white,
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
   },
   linkButton: {
     padding: 10,
@@ -284,7 +279,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   linkAction: {
-    color: Colors.primaryRed,
+    color: Colors.navy,
     fontWeight: 'bold',
   },
 });

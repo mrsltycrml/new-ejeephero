@@ -7,16 +7,16 @@ import { Ionicons } from '@expo/vector-icons';
 type Message = { role: 'user' | 'assistant'; content: string };
 
 const SUGGESTIONS = [
-  '🗺️ Makati Loop Route',
-  '💵 How much is the fare?',
-  '📍 Where is the nearest terminal?',
-  '🕒 What are the operating hours?',
-  '⚡ Are e-Jeepneys active now?'
+  'Makati Loop route',
+  'Fare information',
+  'Nearest terminal',
+  'Operating hours',
+  'Active e-jeepneys'
 ];
 
 export default function HeroBotScreen() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Kumusta! I am HeroBot, your e-Jeepney AI assistant. 🚌\n\nAsk me about routes, terminals, or fares in Makati!' }
+    { role: 'assistant', content: 'Hello. I can help with e-jeepney routes, terminals, fares, and service hours in Makati.' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,20 +36,10 @@ export default function HeroBotScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not logged in');
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/herobot-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          message: userMsg.content,
-          history: messages.slice(1) // exclude initial greeting
-        })
+      const { data, error } = await supabase.functions.invoke('herobot-chat', {
+        body: { message: userMsg.content, history: messages.slice(1) },
       });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'API Error');
+      if (error) throw error;
       if (!data.reply) throw new Error('No reply received from HeroBot.');
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
@@ -72,7 +62,7 @@ export default function HeroBotScreen() {
           <View key={i} style={[styles.bubbleContainer, msg.role === 'user' ? styles.userBubbleContainer : styles.botBubbleContainer]}>
             {msg.role === 'assistant' && (
               <View style={styles.botIcon}>
-                <Text style={styles.botIconText}>🤖</Text>
+                <Ionicons name="chatbubble-ellipses" size={15} color={Colors.navy} />
               </View>
             )}
             <View style={[
@@ -88,7 +78,7 @@ export default function HeroBotScreen() {
         {loading && (
           <View style={styles.loadingBubble}>
             <ActivityIndicator size="small" color={Colors.primaryRed} />
-            <Text style={styles.loadingText}>HeroBot is thinking...</Text>
+            <Text style={styles.loadingText}>Preparing response…</Text>
           </View>
         )}
       </ScrollView>
@@ -142,39 +132,33 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: Colors.primaryYellow,
+    backgroundColor: Colors.mutedBackground,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 1,
     elevation: 1,
   },
-  botIconText: { fontSize: 14 },
   bubble: { 
     paddingHorizontal: 16, 
     paddingVertical: 12, 
-    borderRadius: 18, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, 
-    shadowRadius: 2, 
-    elevation: 1 
+    borderRadius: 12,
   },
   userBubble: { 
-    backgroundColor: Colors.primaryRed, 
+    backgroundColor: Colors.navy, 
     borderBottomRightRadius: 2, 
     borderWidth: 1,
-    borderColor: Colors.primaryRed
+    borderColor: Colors.navy
   },
   botBubble: { 
     backgroundColor: Colors.white, 
-    borderBottomLeftRadius: 2,
+    borderBottomLeftRadius: 3,
     borderWidth: 1,
-    borderColor: '#E8DFD3'
+    borderColor: Colors.border
   },
   userText: { color: Colors.white, fontSize: 15, lineHeight: 20, fontWeight: '500' },
   botText: { color: Colors.darkText, fontSize: 15, lineHeight: 20 },
@@ -187,7 +171,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E8DFD3',
+    borderColor: Colors.border,
     marginLeft: 36,
     gap: 8,
   },
@@ -201,7 +185,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: Colors.white, 
     borderTopWidth: 1, 
-    borderColor: '#E8DFD3',
+    borderColor: Colors.border,
     alignItems: 'center',
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
   },
@@ -234,7 +218,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderColor: '#F0E6D8',
+    borderColor: Colors.border,
   },
   suggestionsContainer: {
     paddingHorizontal: 16,

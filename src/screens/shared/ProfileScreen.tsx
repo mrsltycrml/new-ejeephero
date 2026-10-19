@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator, Modal, Platform } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +25,24 @@ export default function ProfileScreen() {
   // Language Selector State
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
 
+  const performLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      if (Platform.OS === 'web') window.alert(`Could not log out: ${message}`);
+      else Alert.alert(t('common.error'), `Could not log out: ${message}`);
+    }
+  };
+
   const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${t('profile.logout')}\n\n${t('profile.confirmLogout')}`)) {
+        void performLogout();
+      }
+      return;
+    }
+
     Alert.alert(
       t('profile.logout'),
       t('profile.confirmLogout'),
@@ -34,9 +51,7 @@ export default function ProfileScreen() {
         {
           text: t('profile.yes'),
           style: 'destructive',
-          onPress: async () => {
-            await signOut();
-          },
+          onPress: () => { void performLogout(); },
         },
       ]
     );

@@ -23,6 +23,7 @@ export interface TerminalData {
   student_fare: number;
   elderly_fare: number;
   disabled_fare: number;
+  geofence_radius_meters?: number;
   is_esakay_hub?: boolean;
   landmark_photo?: string;
   landmark_desc?: string;
@@ -44,6 +45,7 @@ export interface VehicleData {
   max_capacity: number;
   is_full: boolean;
   status: 'Maluwag' | 'Sakto' | 'Puno';
+  isSpeeding?: boolean;
 }
 
 // ─── STATIC MAKATI E-JEEPNEY TRANSIT DATASET (SO1 & SO2 Ground Truth) ───
@@ -53,8 +55,8 @@ export const MAKATI_PRIMARY_ROUTE: RouteData = {
   description: 'Modernized & Electric PJU Route connecting MRT Buendia Hub to Mandaluyong City Hall via Jupiter St, Makati Ave, Estrella-Pantaleon Bridge, and Boni Ave',
   color_code: '#C41E3A',
   operating_hours: '06:00 AM - 10:00 PM',
-  base_fare: 14.00,
-  per_km_rate: 1.50,
+  base_fare: 17.00,
+  per_km_rate: 2.40,
   coordinates: [
     {
         "latitude": 14.557635,
@@ -1789,58 +1791,13 @@ export const MAKATI_OFFICIAL_TERMINALS: TerminalData[] = [
 ];
 
 // Active fleet with real plate numbers & capacity status (SO4 & SO5)
-export const INITIAL_VEHICLES: VehicleData[] = [
-  {
-    id: 'veh-01',
-    vehicle_id: 'veh-01',
-    plate_number: 'NAE-4019',
-    body_number: 'EJ-01',
-    route_id: '550e8400-e29b-41d4-a716-446655440000',
-    latitude: 14.561344,
-    longitude: 121.029301,
-    speed: 22,
-    heading: 45,
-    passenger_count: 14,
-    max_capacity: 22,
-    is_full: false,
-    status: 'Maluwag',
-  },
-  {
-    id: 'veh-02',
-    vehicle_id: 'veh-02',
-    plate_number: 'NBF-8932',
-    body_number: 'EJ-04',
-    route_id: '550e8400-e29b-41d4-a716-446655440000',
-    latitude: 14.56405,
-    longitude: 121.038606,
-    speed: 18,
-    heading: 50,
-    passenger_count: 22,
-    max_capacity: 22,
-    is_full: true,
-    status: 'Puno',
-  },
-  {
-    id: 'veh-03',
-    vehicle_id: 'veh-03',
-    plate_number: 'NCB-1154',
-    body_number: 'EJ-07',
-    route_id: '550e8400-e29b-41d4-a716-446655440000',
-    latitude: 14.55515,
-    longitude: 121.034648,
-    speed: 12,
-    heading: 60,
-    passenger_count: 18,
-    max_capacity: 22,
-    is_full: false,
-    status: 'Sakto',
-  },
-];
+// Never ship invented vehicle coordinates or plate numbers as if they were live fleet data.
+export const INITIAL_VEHICLES: VehicleData[] = [];
 
 const STORAGE_KEYS = {
   ROUTES: '@ejeephero_routes_cache_v4',
   TERMINALS: '@ejeephero_terminals_cache_v4',
-  VEHICLES: '@ejeephero_vehicles_cache_v4',
+  VEHICLES: '@ejeephero_vehicles_cache_v5',
   LAST_SYNC: '@ejeephero_last_sync_v4',
 };
 
@@ -1945,16 +1902,69 @@ export class OfflineTransitService {
   }
 
   /**
-   * Get cached or simulated vehicles with capacity stats
+   * Get active vehicles from Supabase; fall back only to previously fetched fleet data.
    */
   public async getVehicles(): Promise<VehicleData[]> {
+    try {
+      const { data: activeVehicles, error: vehiclesError } = await supabase
+        .from('vehicles')
+        .select('id,route_id,body_number,plate_number,passenger_count,max_capacity')
+        .eq('is_active', true);
+      if (vehiclesError) throw vehiclesError;
+
+      if (!activeVehicles?.length) {
+        await AsyncStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify([]));
+        return [];
+      }
+
+      const vehicleIds = activeVehicles.map((vehicle) => vehicle.id);
+      const { data: positions, error: positionsError } = await supabase
+        .from('vehicle_positions')
+        .select('vehicle_id,latitude,longitude,speed,heading,timestamp')
+        .in('vehicle_id', vehicleIds)
+        .order('timestamp', { ascending: false });
+      if (positionsError) throw positionsError;
+
+      const latestPosition = new Map<string, (typeof positions)[number]>();
+      for (const position of positions ?? []) {
+        if (!latestPosition.has(position.vehicle_id)) latestPosition.set(position.vehicle_id, position);
+      }
+
+      const currentVehicles = activeVehicles.flatMap((vehicle) => {
+        const position = latestPosition.get(vehicle.id);
+        if (!position) return [];
+        return [{
+          id: vehicle.id,
+          vehicle_id: vehicle.id,
+          plate_number: vehicle.plate_number ?? '',
+          body_number: vehicle.body_number ?? '',
+          route_id: vehicle.route_id,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          speed: position.speed ?? 0,
+          heading: position.heading ?? 0,
+          passenger_count: vehicle.passenger_count ?? 0,
+          max_capacity: vehicle.max_capacity ?? 22,
+          is_full: (vehicle.passenger_count ?? 0) >= (vehicle.max_capacity ?? 22),
+          status: (vehicle.passenger_count ?? 0) >= (vehicle.max_capacity ?? 22)
+            ? 'Puno' as const
+            : (vehicle.passenger_count ?? 0) >= (vehicle.max_capacity ?? 22) * 0.7
+              ? 'Sakto' as const
+              : 'Maluwag' as const,
+        }];
+      });
+      await AsyncStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(currentVehicles));
+      return currentVehicles;
+    } catch (e) {
+      console.warn('Live vehicle list unavailable; using last successful cache:', e);
+    }
     try {
       const cached = await AsyncStorage.getItem(STORAGE_KEYS.VEHICLES);
       if (cached) {
         return JSON.parse(cached);
       }
     } catch (e) {}
-    return INITIAL_VEHICLES;
+    return [];
   }
 
   public getLastLatency(): number {

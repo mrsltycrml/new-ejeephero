@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
@@ -14,16 +15,29 @@ export default function LoginScreen({ navigation }: any) {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) Alert.alert('Error', error.message);
-    setLoading(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) {
+        const message = error.message.toLowerCase();
+        const guidance = message.includes('email not confirmed')
+          ? 'Confirm your email using the link we sent, then try again.'
+          : message.includes('invalid login credentials')
+            ? 'Check your email and password. If you have not registered yet, create an account first.'
+            : error.message;
+        Alert.alert('Could not log in', guidance);
+      }
+    } catch (error) {
+      Alert.alert('Could not log in', error instanceof Error ? error.message : 'Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
         <View style={styles.jeepneyBadge}>
-          <Text style={styles.jeepneyEmoji}>🚌</Text>
+          <Ionicons name="bus" size={34} color={Colors.white} />
         </View>
         <Text style={styles.title}>Ejeep<Text style={styles.titleHighlight}>Hero</Text></Text>
         <Text style={styles.subtitle}>Philippine e-Jeepney Transit Tracker</Text>
@@ -77,81 +91,67 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   jeepneyBadge: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: Colors.primaryRed,
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: Colors.navy,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.primaryYellow,
+    borderWidth: 0,
     marginBottom: 16,
-    shadowColor: Colors.primaryRed,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 6,
-  },
-  jeepneyEmoji: {
-    fontSize: 36,
+    elevation: 0,
   },
   title: {
-    fontSize: 40,
-    fontWeight: '900',
-    color: Colors.primaryRed,
-    letterSpacing: 1,
+    fontSize: 34,
+    fontWeight: '800',
+    color: Colors.navy,
+    letterSpacing: 0.2,
   },
   titleHighlight: {
-    color: Colors.primaryYellow,
+    color: Colors.primaryRed,
   },
   subtitle: {
     fontSize: 14,
     color: Colors.darkText,
     marginTop: 6,
-    fontWeight: '500',
-    letterSpacing: 0.5,
+    fontWeight: '400',
   },
   formCard: {
     backgroundColor: Colors.white,
-    borderRadius: 20,
+    borderRadius: 14,
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 1,
     marginBottom: 30,
     borderWidth: 1,
-    borderColor: '#F0E6D8',
+    borderColor: Colors.border,
   },
   input: {
-    backgroundColor: Colors.offWhite,
+    backgroundColor: '#FAFBFC',
     borderWidth: 1,
-    borderColor: '#E8DFD3',
-    padding: 16,
-    borderRadius: 12,
+    borderColor: Colors.border,
+    padding: 14,
+    borderRadius: 9,
     marginBottom: 16,
     fontSize: 16,
     color: Colors.darkText,
   },
   button: {
-    backgroundColor: Colors.primaryRed,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: Colors.navy,
+    padding: 15,
+    borderRadius: 9,
     alignItems: 'center',
     marginTop: 8,
     borderWidth: 1,
-    borderColor: Colors.primaryRed,
-    shadowColor: Colors.primaryRed,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: Colors.navy,
   },
   buttonText: {
     color: Colors.white,
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
   },
   linkButton: {
     padding: 10,
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   linkAction: {
-    color: Colors.primaryRed,
+    color: Colors.navy,
     fontWeight: 'bold',
   },
 });

@@ -24,6 +24,7 @@ export interface LateNightSafeRoutingResult {
   isLateNightActive: boolean;
   currentStopSafety: StopSafetyProfile;
   recommendedSafeStop: TerminalData;
+  hasVerifiedSafeStop: boolean;
   distanceToSafeStopMeters: number;
   walkingTimeMinutes: number;
   safetyReason: string;
@@ -87,53 +88,9 @@ export function dbscanClustering(
   return { clusters, noise };
 }
 
-/**
- * Generate simulated active commuters around Makati stops
- * to showcase the live density clustering
- */
+/** No commuter density is fabricated; supply consented, current pings when a backend feed exists. */
 export function getSimulatedCommuterPings(): CommuterPing[] {
-  const pings: CommuterPing[] = [];
-  let id = 1;
-
-  // Cluster 1: MRT Buendia (Busy hub, 12 commuters waiting)
-  for (let i = 0; i < 12; i++) {
-    pings.push({
-      id: `ping-${id++}`,
-      latitude: 14.5547 + (Math.random() - 0.5) * 0.0004,
-      longitude: 121.0244 + (Math.random() - 0.5) * 0.0004,
-      timestamp: Date.now(),
-    });
-  }
-
-  // Cluster 2: Jupiter St / Makati Ave (Moderate, 6 commuters)
-  for (let i = 0; i < 6; i++) {
-    pings.push({
-      id: `ping-${id++}`,
-      latitude: 14.5565 + (Math.random() - 0.5) * 0.0003,
-      longitude: 121.0310 + (Math.random() - 0.5) * 0.0003,
-      timestamp: Date.now(),
-    });
-  }
-
-  // Cluster 3: Maysilo Circle (Busy e-Sakay hub, 9 commuters)
-  for (let i = 0; i < 9; i++) {
-    pings.push({
-      id: `ping-${id++}`,
-      latitude: 14.5750 + (Math.random() - 0.5) * 0.0004,
-      longitude: 121.0590 + (Math.random() - 0.5) * 0.0004,
-      timestamp: Date.now(),
-    });
-  }
-
-  // Isolated stops (City Mandaluyong Science High, only 1 isolated commuter at night)
-  pings.push({
-    id: `ping-${id++}`,
-    latitude: 14.5650 + 0.0001,
-    longitude: 121.0450 + 0.0001,
-    timestamp: Date.now(),
-  });
-
-  return pings;
+  return [];
 }
 
 export class DensityRoutingService {
@@ -153,7 +110,7 @@ export class DensityRoutingService {
    */
   public evaluateStopDensities(
     terminals: TerminalData[] = MAKATI_OFFICIAL_TERMINALS,
-    pings: CommuterPing[] = getSimulatedCommuterPings()
+    pings: CommuterPing[] = []
   ): Map<string, StopSafetyProfile> {
     const profileMap = new Map<string, StopSafetyProfile>();
 
@@ -171,7 +128,7 @@ export class DensityRoutingService {
         densityLevel = 'Moderate';
       }
 
-      const isSafe = count >= 5 || (term.is_well_lit && term.cctv_monitored);
+      const isSafe = Boolean(term.is_well_lit && term.cctv_monitored);
       const score = (count * 10) + (term.is_well_lit ? 20 : 0) + (term.cctv_monitored ? 25 : 0) + (term.is_esakay_hub ? 30 : 0);
 
       profileMap.set(term.id, {
@@ -227,15 +184,16 @@ export class DensityRoutingService {
     };
 
     // If current stop is already high density or well-lit/safe, recommend staying there
-    if (currentProfile.isSafeNightStop && currentProfile.densityLevel === 'High (Safe & Populated)') {
+    if (currentProfile.isSafeNightStop) {
       const latency = Math.round(performance.now() - startTime);
       return {
         isLateNightActive: isNightTime,
         currentStopSafety: currentProfile,
         recommendedSafeStop: nearestTerm,
+        hasVerifiedSafeStop: true,
         distanceToSafeStopMeters: minDistance,
         walkingTimeMinutes: Math.max(1, Math.round(minDistance / 75)), // 75m/min avg walking pace
-        safetyReason: 'This stop is well-lit with high commuter presence ("Safety in Numbers").',
+        safetyReason: 'This stop is marked as well-lit and CCTV monitored in the configured stop data.',
         rerouteCalculationLatencyMs: latency,
       };
     }
@@ -266,9 +224,12 @@ export class DensityRoutingService {
       isLateNightActive: isNightTime,
       currentStopSafety: currentProfile,
       recommendedSafeStop: bestSafeStop,
+      hasVerifiedSafeStop: Boolean(densityProfiles.get(bestSafeStop.id)?.isSafeNightStop),
       distanceToSafeStopMeters: distToSafe,
       walkingTimeMinutes: Math.max(1, Math.round(distToSafe / 75)),
-      safetyReason: `Redirecting from isolated stop to ${bestSafeStop.name} (illuminated hub with CCTV & ${densityProfiles.get(bestSafeStop.id)?.crowdCount || 8}+ commuters).`,
+      safetyReason: densityProfiles.get(bestSafeStop.id)?.isSafeNightStop
+        ? `This stop is marked as well-lit and CCTV monitored in the configured stop data.`
+        : 'No stop with verified lighting and CCTV data is configured. Use a staffed area and contact local emergency services if needed.',
       rerouteCalculationLatencyMs: latency,
     };
   }

@@ -15,29 +15,33 @@ export default function PendingApprovalScreen() {
   };
 
   const isRejected = status === 'rejected';
+  const isSuspended = status === 'suspended';
+  const isBlocked = isRejected || isSuspended;
 
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <View style={[styles.iconCircle, isRejected && styles.iconCircleRejected]}>
+        <View style={[styles.iconCircle, isBlocked && styles.iconCircleRejected]}>
           <Ionicons
-            name={isRejected ? 'close-circle' : 'hourglass'}
+            name={isBlocked ? 'close-circle' : 'hourglass'}
             size={56}
-            color={isRejected ? '#F44336' : Colors.primaryYellow}
+            color={isBlocked ? '#F44336' : Colors.primaryYellow}
           />
         </View>
 
         <Text style={styles.title}>
-          {isRejected ? 'Registration Rejected' : 'Pending Approval'}
+          {isRejected ? 'Registration Rejected' : isSuspended ? 'Account Suspended' : 'Pending Approval'}
         </Text>
 
         <Text style={styles.description}>
           {isRejected
             ? 'Your registration has been rejected by an administrator. Please contact support if you believe this is an error.'
-            : 'Your account is awaiting admin approval. You will be able to access the app once an administrator reviews and approves your registration.'}
+            : isSuspended
+              ? 'Your account has been suspended after supervisor review. Contact the operator or administrator if you believe this is an error.'
+              : 'Your account is awaiting admin approval. You will be able to access the app once an administrator reviews and approves your registration.'}
         </Text>
 
-        {!isRejected && (
+        {!isBlocked && (
           <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh} disabled={refreshing}>
             {refreshing ? (
               <ActivityIndicator color={Colors.white} size="small" />

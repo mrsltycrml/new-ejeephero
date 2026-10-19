@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
 import * as Location from 'expo-location';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,10 +14,9 @@ export default function DashboardScreen() {
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
+  const [bodyNumber, setBodyNumber] = useState('');
+  const [plateNumber, setPlateNumber] = useState('');
   const locationSub = useRef<Location.LocationSubscription | null>(null);
-
-  // Animation for active glow
-  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     supabase.from('routes').select('*').then(({ data }) => {
@@ -33,33 +32,7 @@ export default function DashboardScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    if (isActive) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      glowAnim.setValue(0);
-    }
-  }, [isActive]);
-
   const toggleShift = async () => {
-    if (!selectedRoute) {
-      Alert.alert('Selection Required', 'Please select a jeepney route to start your shift.');
-      return;
-    }
-
     if (isActive) {
       // End Shift
       setIsActive(false);
@@ -69,15 +42,32 @@ export default function DashboardScreen() {
         locationSub.current = null;
       }
       if (vehicleId) {
-        await supabase.from('vehicles').update({ is_active: false }).eq('id', vehicleId);
+        const { error } = await supabase.from('vehicles').update({ is_active: false }).eq('id', vehicleId);
+        if (error) Alert.alert('Could not end shift', error.message);
         setVehicleId(null);
       }
       Location.stopLocationUpdatesAsync('telemetry-task').catch(() => {});
     } else {
+      if (!selectedRoute) {
+        Alert.alert('Selection Required', 'Please select a jeepney route to start your shift.');
+        return;
+      }
+      if (!bodyNumber.trim() || !plateNumber.trim()) {
+        Alert.alert('Vehicle details required', 'Enter the assigned e-jeep body number and plate number before starting a shift.');
+        return;
+      }
+      const { status: permission } = await Location.requestForegroundPermissionsAsync();
+      if (permission !== 'granted') {
+        Alert.alert('Location permission required', 'Allow location access to share the active vehicle location with passengers and supervisors.');
+        return;
+      }
+
       // Start Shift
       const { data, error } = await supabase.from('vehicles').insert({
         driver_id: user?.id,
         route_id: selectedRoute,
+        body_number: bodyNumber.trim(),
+        plate_number: plateNumber.trim(),
         is_active: true
       }).select().single();
 
@@ -109,12 +99,6 @@ export default function DashboardScreen() {
 
   const currentRouteName = routes.find(r => r.id === selectedRoute)?.name || '';
 
-  // Glowing style interpolations
-  const pulseScale = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.08],
-  });
-
   return (
     <View style={styles.container}>
       {!isActive ? (
@@ -145,11 +129,29 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               );
             })}
+            <TextInput
+              style={styles.vehicleInput}
+              placeholder="Assigned body number"
+              placeholderTextColor="#888"
+              value={bodyNumber}
+              onChangeText={setBodyNumber}
+              autoCapitalize="characters"
+              accessibilityLabel="Assigned vehicle body number"
+            />
+            <TextInput
+              style={styles.vehicleInput}
+              placeholder="Assigned plate number"
+              placeholderTextColor="#888"
+              value={plateNumber}
+              onChangeText={setPlateNumber}
+              autoCapitalize="characters"
+              accessibilityLabel="Assigned vehicle plate number"
+            />
           </ScrollView>
         </View>
       ) : (
         <View style={styles.activeContainer}>
-          <Animated.View style={[styles.glowCard, { transform: [{ scale: pulseScale }] }]}>
+          <View style={styles.glowCard}>
             <View style={styles.pulseInnerCircle}>
               <Ionicons name="pulse" size={48} color={Colors.primaryRed} />
             </View>
@@ -162,7 +164,7 @@ export default function DashboardScreen() {
               <Text style={styles.detailsLabel}>CURRENT ROUTE</Text>
               <Text style={styles.detailsValue}>{currentRouteName}</Text>
             </View>
-          </Animated.View>
+          </View>
         </View>
       )}
 
@@ -185,7 +187,7 @@ export default function DashboardScreen() {
 
       {/* Floating SOS Button */}
       <View style={styles.sosOverlay}>
-        <SOSButton />
+        <SOSButton activeVehicleId={vehicleId ?? undefined} activeVehiclePlate={plateNumber || undefined} activeVehicleBody={bodyNumber || undefined} />
       </View>
     </View>
   );
@@ -229,15 +231,15 @@ const styles = StyleSheet.create({
     padding: 16, 
     backgroundColor: Colors.white, 
     marginBottom: 12, 
-    borderRadius: 16, 
+    borderRadius: 10, 
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E8DFD3',
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 1,
   },
   colorIndicator: { 
     width: 12, 
@@ -255,6 +257,17 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 4,
   },
+  vehicleInput: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+    fontSize: 15,
+    color: Colors.darkText,
+  },
   activeContainer: { 
     flex: 1, 
     justifyContent: 'center', 
@@ -262,34 +275,33 @@ const styles = StyleSheet.create({
   },
   glowCard: {
     backgroundColor: Colors.white,
-    borderRadius: 24,
+    borderRadius: 14,
     padding: 30,
     width: '90%',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.primaryYellow,
-    shadowColor: Colors.primaryYellow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 15,
-    elevation: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 1,
   },
   pulseInnerCircle: {
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: '#FFF8F0',
+    backgroundColor: Colors.mutedBackground,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.primaryYellow,
+    borderWidth: 0,
     marginBottom: 20,
   },
   activeText: { 
-    fontSize: 24, 
-    fontWeight: '900', 
-    color: Colors.primaryRed, 
-    letterSpacing: 1,
+    fontSize: 21, 
+    fontWeight: '800', 
+    color: Colors.navy, 
+    letterSpacing: 0.4,
     marginBottom: 8 
   },
   subActiveText: { 
@@ -300,7 +312,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#E8DFD3',
+    backgroundColor: Colors.border,
     width: '100%',
     marginVertical: 20,
   },
@@ -327,7 +339,7 @@ const styles = StyleSheet.create({
   toggleButton: { 
     flexDirection: 'row',
     padding: 16, 
-    borderRadius: 14, 
+    borderRadius: 9, 
     alignItems: 'center', 
     justifyContent: 'center',
     shadowColor: '#000',
@@ -337,7 +349,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   buttonStart: { 
-    backgroundColor: Colors.primaryRed,
+    backgroundColor: Colors.navy,
   },
   buttonStop: { 
     backgroundColor: Colors.darkText,
