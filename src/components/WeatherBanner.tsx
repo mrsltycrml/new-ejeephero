@@ -35,7 +35,7 @@ export default function WeatherBanner() {
 
   return (
     <View style={styles.banner}>
-      <Ionicons name="warning" size={20} color={Colors.primaryRed} style={{ marginRight: 8 }} />
+      <Ionicons name="warning-outline" size={19} color="#745B1D" style={{ marginRight: 8 }} />
       <Text style={styles.text}>
         Weather Advisory: {weather.condition} ({Math.round(weather.temp)}°C)
       </Text>
@@ -48,25 +48,20 @@ export default function WeatherBanner() {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: Colors.primaryYellow,
+    backgroundColor: '#FBF4E5',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 9,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.primaryRed,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#D8C38F',
     marginHorizontal: 12,
     marginTop: 12,
   },
   text: {
-    color: Colors.darkText,
+    color: '#5E4D27',
     fontWeight: '700',
     fontSize: 13,
     flex: 1,
@@ -77,9 +72,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   dismiss: {
-    color: Colors.primaryRed,
+    color: '#745B1D',
     fontWeight: 'bold',
     fontSize: 13,
-    textDecorationLine: 'underline',
   }
 });

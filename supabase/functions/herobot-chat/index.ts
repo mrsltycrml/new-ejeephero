@@ -1,207 +1,85 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
 
-Deno.serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      }
-    });
-  }
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    // Get the authorization header from the request
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing Authorization header');
-    }
+    const authorization = request.headers.get("Authorization");
+    const jwt = authorization?.replace(/^Bearer\s+/i, "");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const deepseekKey = Deno.env.get("DEEPSEEK_API_KEY");
+    if (!jwt || !supabaseUrl || !anonKey) return json({ error: "Sign in is required." }, 401);
+    if (!deepseekKey) return json({ error: "The transit assistant is not configured yet." }, 503);
 
-    // Parse request body
-    const { message } = await req.json();
-    if (!message) {
-      throw new Error('Message is required');
-    }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          apikey: supabaseAnonKey,
-          Authorization: authHeader
-        }
-      }
+    const client = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
     });
+    const { data: { user }, error: authError } = await client.auth.getUser(jwt);
+    if (authError || !user) return json({ error: "Your session is not valid." }, 401);
+    const { data: profile } = await client.from("profiles").select("status").eq("id", user.id).single();
+    if (profile?.status !== "approved") return json({ error: "Your account is awaiting approval." }, 403);
 
-    // Verify user is authenticated
-    const jwt = authHeader.replace(/^Bearer\s+/i, '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
-    if (userError || !user) {
-      throw new Error(`Unauthorized: ${userError?.message || 'User not found in session'}`);
-    }
+    const body = await request.json();
+    const message = typeof body.message === "string" ? body.message.trim().slice(0, 2000) : "";
+    if (!message) return json({ error: "A question is required." }, 400);
+    const history = Array.isArray(body.history)
+      ? body.history.slice(-12).flatMap((item: any) =>
+          (item?.role === "user" || item?.role === "assistant") && typeof item?.content === "string"
+            ? [{ role: item.role, content: item.content.slice(0, 2000) }]
+            : [])
+      : [];
 
-    // Get Botpress credentials
-    const webhookId = Deno.env.get('BOTPRESS_WEBHOOK_ID') ?? '';
-    if (!webhookId) {
-      throw new Error('Missing BOTPRESS_WEBHOOK_ID environment variable');
-    }
+    const [{ data: routes }, { data: stops }] = await Promise.all([
+      client.from("routes").select("id,name,description,operating_hours,base_fare,per_km_rate,base_distance_km,fare_effective_date,fare_source_url").order("name").limit(20),
+      client.from("terminals").select("name,route_id,sequence_order,regular_fare,student_fare,elderly_fare,disabled_fare").order("sequence_order").limit(100),
+    ]);
+    const routeContext = (routes ?? []).map((route: any) => {
+      const routeStops = (stops ?? []).filter((stop: any) => stop.route_id === route.id).map((stop: any) => stop.name).join(" → ");
+      return `Route: ${route.name}; hours: ${route.operating_hours}; configured base fare ₱${route.base_fare}, additional ₱${route.per_km_rate}/km after ${route.base_distance_km ?? 4} km; fare effective date: ${route.fare_effective_date ?? "not provided"}; source: ${route.fare_source_url ?? "not provided"}; stops: ${routeStops || "not listed"}.`;
+    }).join("\n");
 
-    // Fetch user's Botpress session from database
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('botpress_user_key, botpress_conversation_id')
-      .eq('id', user.id)
-      .single();
+    const systemPrompt = [
+      "You are HeroBot, a concise transit assistant for the EjeepHero commuter app.",
+      "Answer questions about the app's routes, stops, configured fares, operating hours, and safe boarding using the provided database context.",
+      "Treat database values as estimates unless a fare effective date and official source are present. Never invent live vehicle positions, official loading zones, schedules, legal rules, or hotline numbers.",
+      "If the context does not contain the answer, say what is missing and direct the user to confirm with the operator. Do not provide unrelated advice.",
+      `Current directory data:\n${routeContext || "No route data is configured yet."}`,
+    ].join("\n\n");
 
-    let userKey = profile?.botpress_user_key;
-    let conversationId = profile?.botpress_conversation_id;
-
-    const botpressBaseUrl = `https://chat.botpress.cloud/${webhookId}`;
-
-    // If session doesn't exist, create it in Botpress and save to DB
-    if (!userKey || !conversationId) {
-      // 1. Create Botpress Chat User
-      const userRes = await fetch(`${botpressBaseUrl}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      });
-      const userData = await userRes.json();
-      if (!userData.user || !userData.key) {
-        throw new Error(`Botpress User Creation failed: ${userData.message || 'Unknown'}`);
-      }
-
-      userKey = userData.key;
-
-      // 2. Create Botpress Conversation
-      const convRes = await fetch(`${botpressBaseUrl}/conversations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-key': userKey
-        },
-        body: JSON.stringify({})
-      });
-      const convData = await convRes.json();
-      if (!convData.conversation) {
-        throw new Error(`Botpress Conversation Creation failed: ${convData.message || 'Unknown'}`);
-      }
-
-      conversationId = convData.conversation.id;
-
-      // 3. Save to Supabase profiles
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          botpress_user_key: userKey,
-          botpress_conversation_id: conversationId
-        })
-        .eq('id', user.id);
-
-      if (updateError) {
-        console.error('Failed to save Botpress session to DB:', updateError.message);
-      }
-    }
-
-    // Fetch real-time routes and terminals from Supabase for context injection
-    let contextText = '';
-    try {
-      const [{ data: routesData }, { data: terminalsData }] = await Promise.all([
-        supabase.from('routes').select('*').order('name'),
-        supabase.from('terminals').select('name, route_id, sequence_order').order('sequence_order')
-      ]);
-
-      if (routesData && terminalsData) {
-        contextText = 'SYSTEM CONTEXT (Makati e-Jeepney Transit Directory Data):\n';
-        routesData.forEach((route: any) => {
-          const stops = terminalsData
-            .filter((t: any) => t.route_id === route.id)
-            .map((t: any) => t.name)
-            .join(' ➔ ');
-          
-          contextText += `\n* Route: "${route.name}"\n  - Description: ${route.description}\n  - Operating Hours: ${route.operating_hours}\n  - Fares: Base fare is ₱${route.base_fare || 13} (first 4km), then ₱${route.per_km_rate || 1.8}/km thereafter.\n  - Stop Sequence: ${stops || 'None'}\n`;
-        });
-        contextText += '\nUse the above data to answer the user\'s transit question accurately. You are ONLY allowed to answer questions related to Makati e-Jeepneys, routes, terminals, fares, operating hours, transit tracking, and transit services. If the user asks an unrelated question (such as general knowledge, programming, cooking, trivia, personal advice, etc.), politely decline to answer, explaining that your only purpose is to help passengers with the Makati e-Jeepney Transit Tracker system. Keep responses concise, well-structured, and helpful in Taglish/English. Use bullet points (-) for lists with a blank line between each item to ensure readability on mobile screen layouts. Avoid long paragraphs and walls of text. Do not use markdown bolding or asterisks in your responses; return plain text only.';
-      }
-    } catch (dbErr) {
-      console.error('Failed to load transit context from database:', dbErr.message);
-    }
-
-    // Decode Botpress User ID from the userKey JWT
-    const payloadBase64 = userKey.split('.')[1];
-    const payloadJson = JSON.parse(atob(payloadBase64));
-    const botpressUserId = payloadJson.id;
-
-    const fullMessage = contextText ? `${contextText}\n\nUser Message: ${message}` : message;
-
-    // Send user message to Botpress
-    const msgRes = await fetch(`${botpressBaseUrl}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-key': userKey
-      },
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${deepseekKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        conversationId,
-        payload: {
-          type: 'text',
-          text: fullMessage
-        }
-      })
+        model: "deepseek-flash",
+        messages: [{ role: "system", content: systemPrompt }, ...history, { role: "user", content: message }],
+        max_tokens: 500,
+        stream: false,
+      }),
     });
-    const msgData = await msgRes.json();
-    if (!msgData.message) {
-      throw new Error(`Botpress Message Send failed: ${msgData.message || 'Unknown'}`);
+    if (!response.ok) {
+      console.error("DeepSeek returned status", response.status);
+      return json({ error: "HeroBot is temporarily unavailable. Please try again." }, 502);
     }
-
-    // Poll for Botpress reply
-    let reply = 'Sorry, the chatbot timed out waiting for a response.';
-    const startTime = Date.now();
-    const timeout = 7500; // 7.5 seconds timeout
-
-    while (Date.now() - startTime < timeout) {
-      const listRes = await fetch(`${botpressBaseUrl}/conversations/${conversationId}/messages`, {
-        method: 'GET',
-        headers: { 'x-user-key': userKey }
-      });
-      const listData = await listRes.json();
-
-      if (listData.messages && listData.messages.length > 0) {
-        // Since messages are ordered newest first, check the latest message
-        const latest = listData.messages[0];
-        if (latest && latest.userId !== botpressUserId) {
-          // If the message is from a different user ID, it is the bot's response
-          reply = (latest.payload?.text || 'Empty response')
-            .replace(/\*/g, '')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-          break;
-        }
-      }
-
-      // Wait 500ms before polling again
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    return new Response(JSON.stringify({ reply }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      }
-    });
-
+    const result = await response.json();
+    const reply = result?.choices?.[0]?.message?.content;
+    if (typeof reply !== "string" || !reply.trim()) return json({ error: "HeroBot returned an empty reply." }, 502);
+    return json({ reply: reply.trim() });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      }
-    });
+    console.error("HeroBot request failed", error);
+    return json({ error: "HeroBot is temporarily unavailable. Please try again." }, 500);
   }
 });

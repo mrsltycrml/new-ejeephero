@@ -7,29 +7,30 @@ import * as SMS from 'expo-sms';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { useLocation } from '../contexts/LocationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/theme';
 
 interface SOSButtonProps {
+  activeVehicleId?: string;
   activeVehiclePlate?: string;
   activeVehicleBody?: string;
 }
 
 export default function SOSButton({
-  activeVehiclePlate = 'NAE-4019',
-  activeVehicleBody = 'EJ-01'
+  activeVehicleId,
+  activeVehiclePlate,
+  activeVehicleBody,
 }: SOSButtonProps) {
-  const { location } = useLocation();
   const { user } = useAuth();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [contact, setContact] = useState<any>(null);
+  const [contacts, setContacts] = useState<any[]>([]);
   const [statusMsg, setStatusMsg] = useState('');
   const [dispatchLatencyMs, setDispatchLatencyMs] = useState<number | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsCoordinates, setGpsCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isDispatching, setIsDispatching] = useState(false);
 
   // Pulse animation for SOS button
@@ -52,9 +53,9 @@ export default function SOSButton({
             .from('emergency_contacts')
             .select('*')
             .eq('user_id', user.id)
-            .single();
-          if (data) {
-            setContact(data);
+            .order('created_at', { ascending: true });
+          if (data?.length) {
+            setContacts(data);
             return;
           }
         }
@@ -62,7 +63,8 @@ export default function SOSButton({
         // Fallback to local storage
         const local = await AsyncStorage.getItem('@ejeephero_emergency_contact');
         if (local) {
-          setContact(JSON.parse(local));
+          const saved = JSON.parse(local);
+          setContacts(Array.isArray(saved) ? saved : [saved]);
         }
       } catch (err) {
         // Silent fail
@@ -72,7 +74,7 @@ export default function SOSButton({
     fetchContact();
   }, [user?.id]);
 
-  // Handle countdown (3s rapid false-alarm cancel window)
+  // Five-second cancellation window before preparing the alert.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (countdown !== null && countdown > 0) {
@@ -92,7 +94,8 @@ export default function SOSButton({
   const handleOneTouchPress = () => {
     Vibration.vibrate([0, 80, 50, 120]);
     setStatusMsg('');
-    setCountdown(3); // 3-second rapid cancel window (balances rapid dispatch vs false alarm prevention)
+    setGpsCoordinates(null);
+    setCountdown(5);
     setModalVisible(true);
   };
 
@@ -109,76 +112,114 @@ export default function SOSButton({
     setCountdown(null);
     setIsDispatching(true);
     const startTime = performance.now();
-    setStatusMsg('Acquiring high-accuracy GPS & dispatching alert...');
+    setStatusMsg('Getting your current location…');
 
-    let currentLat = location?.coords.latitude || 14.5547;
-    let currentLon = location?.coords.longitude || 121.0244;
-    let accuracy = location?.coords.accuracy || 8; // <10m target
+    let currentLocation: Location.LocationObject | null = null;
 
     try {
-      // Attempt high accuracy GPS on-demand
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') throw new Error('Location permission was denied.');
+      // Take a fresh high-accuracy fix at SOS activation rather than relying on the map's last update.
       const highAccLoc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Highest,
       });
-      if (highAccLoc) {
-        currentLat = highAccLoc.coords.latitude;
-        currentLon = highAccLoc.coords.longitude;
-        accuracy = Math.round(highAccLoc.coords.accuracy || 6);
-      }
+      if (highAccLoc) currentLocation = highAccLoc;
     } catch (e) {
-      console.warn('GPS high accuracy fallback to cached:', e);
+      console.warn('Could not get a fresh SOS GPS fix:', e);
+      setStatusMsg('Could not get a fresh GPS fix. Check location permission or call a hotline below.');
     }
 
-    setGpsAccuracy(accuracy);
+    if (!currentLocation?.coords || !user?.id) {
+      setIsDispatching(false);
+      setStatusMsg(!user?.id ? 'Sign in to save and share an SOS alert.' : 'Location is unavailable. Call a hotline below.');
+      return;
+    }
 
-    // Payload with active vehicle metadata (SO4)
+    const currentLat = currentLocation.coords.latitude;
+    const currentLon = currentLocation.coords.longitude;
+    const accuracy = currentLocation.coords.accuracy == null ? null : Math.round(currentLocation.coords.accuracy);
+
+    setGpsAccuracy(accuracy);
+    setGpsCoordinates({ latitude: currentLat, longitude: currentLon });
+
+    // Payload with real GPS and active vehicle metadata (SO3).
     const alertPayload = {
-      user_id: user?.id || 'commuter-guest',
+      user_id: user.id,
       latitude: currentLat,
       longitude: currentLon,
       gps_accuracy_meters: accuracy,
-      vehicle_plate_number: activeVehiclePlate,
-      vehicle_body_number: activeVehicleBody,
+      vehicle_id: activeVehicleId ?? null,
+      vehicle_plate_number: activeVehiclePlate ?? null,
+      vehicle_body_number: activeVehicleBody ?? null,
       timestamp: new Date().toISOString(),
-      status: 'EMERGENCY_DISPATCHED',
+      status: 'ALERT_PREPARED',
     };
 
-    // 1. Dual Channel: Async WebSocket / Supabase Broadcast
-    try {
-      if (isSupabaseConfigured) {
-        await supabase.from('sos_events').insert({
-          user_id: user?.id,
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.functions.invoke('emergency-dispatch', {
+        body: {
           latitude: currentLat,
           longitude: currentLon,
-          vehicle_plate: activeVehiclePlate,
-        });
+          accuracy,
+          vehicle_id: activeVehicleId ?? null,
+          vehicle_plate: activeVehiclePlate ?? null,
+          vehicle_body_number: activeVehicleBody ?? null,
+        },
+      });
+      if (!error && data?.accepted) {
+        const totalLatency = Math.round(performance.now() - startTime);
+        setDispatchLatencyMs(totalLatency);
+        setIsDispatching(false);
+        setStatusMsg(`Alert accepted by the SMS gateway in ${totalLatency}ms. Delivery confirmation may take time.`);
+        try { await AsyncStorage.setItem('@ejeephero_last_sos', JSON.stringify(alertPayload)); } catch (e) {}
+        return;
       }
+      if (data?.error) console.warn('Automated SOS dispatch unavailable:', data.error);
+    }
+
+    // Fallback logs locally and opens a native message that the user must send.
+    try {
+      await supabase.from('sos_events').insert({
+        user_id: user.id,
+        latitude: currentLat,
+        longitude: currentLon,
+        gps_accuracy_meters: accuracy,
+        vehicle_id: activeVehicleId ?? null,
+        vehicle_plate: activeVehiclePlate ?? null,
+        vehicle_body_number: activeVehicleBody ?? null,
+      });
     } catch (err) {
       console.warn('Supabase alert logging offline:', err);
     }
-
-    // Save to local alert history
-    try {
-      await AsyncStorage.setItem('@ejeephero_last_sos', JSON.stringify(alertPayload));
-    } catch (e) {}
-
-    const totalLatency = Math.round(performance.now() - startTime);
-    setDispatchLatencyMs(totalLatency);
+    try { await AsyncStorage.setItem('@ejeephero_last_sos', JSON.stringify(alertPayload)); } catch (e) {}
+    setDispatchLatencyMs(Math.round(performance.now() - startTime));
     setIsDispatching(false);
-    setStatusMsg(`✅ Alert Dispatched in ${totalLatency}ms (Target: <3s)`);
-
-    // 2. Dual Channel: Native SMS Fallback with GPS coordinates & Plate number
+    setStatusMsg('Automated SMS is unavailable. Preparing your message…');
     await triggerSMSFallback(currentLat, currentLon, accuracy);
   };
 
-  const triggerSMSFallback = async (lat: number, lon: number, accuracy: number) => {
-    const isAvailable = await SMS.isAvailableAsync();
-    const recipient = contact?.phone_number || '168'; // Default to Makati C3 if no contact
+  const triggerSMSFallback = async (lat: number, lon: number, accuracy: number | null) => {
+    const recipients = contacts.map((contact) => contact.phone_number).filter(Boolean);
     const mapsLink = `https://maps.google.com/?q=${lat},${lon}`;
-    const message = `🚨 EMERGENCY ALERT from EjeepHero Commuter!\n\nLocation: ${lat.toFixed(6)}, ${lon.toFixed(6)} (±${accuracy}m)\nMaps: ${mapsLink}\nVehicle Plate: ${activeVehiclePlate} (Unit ${activeVehicleBody})\n\nPlease send emergency assistance immediately!`;
+    if (recipients.length === 0) {
+      setStatusMsg('No personal emergency contact is saved. Call a hotline below.');
+      return;
+    }
+    const vehicle = activeVehiclePlate || activeVehicleBody
+      ? `\nVehicle: ${activeVehiclePlate || 'plate unavailable'} (${activeVehicleBody || 'body number unavailable'})`
+      : '\nVehicle details unavailable';
+    const message = `${contacts[0]?.preset_message || 'EMERGENCY! I need help. Please check on me.'}\n\nEjeepHero SOS\nLocation: ${lat.toFixed(6)}, ${lon.toFixed(6)}${accuracy == null ? '' : ` (±${accuracy}m)`}\nMaps: ${mapsLink}${vehicle}`;
 
-    if (isAvailable) {
-      await SMS.sendSMSAsync([recipient], message);
+    try {
+      const isAvailable = await SMS.isAvailableAsync();
+      if (!isAvailable) {
+        setStatusMsg('SMS is unavailable on this device. Call a hotline below.');
+        return;
+      }
+      const result = await SMS.sendSMSAsync(recipients, message);
+      setStatusMsg(result.result === 'sent' ? 'SMS sent from your messaging app.' : 'SMS was not sent. You can call a hotline below.');
+    } catch {
+      setStatusMsg('SMS is unavailable on this device. Call a hotline below.');
     }
   };
 
@@ -187,10 +228,10 @@ export default function SOSButton({
   };
 
   const callPNPMakati = () => {
-    Linking.openURL('tel:0288871798');
+    Linking.openURL('tel:0288876642');
   };
 
-  const callContact = () => {
+  const callContact = (contact: any) => {
     if (contact?.phone_number) {
       Linking.openURL(`tel:${contact.phone_number}`);
     } else {
@@ -222,21 +263,22 @@ export default function SOSButton({
                 <Ionicons name="warning" size={42} color={Colors.primaryRed} />
               </View>
 
-              <Text style={styles.countdownTitle}>DISPATCHING EMERGENCY ALERT</Text>
+            <Text style={styles.countdownTitle}>PREPARING EMERGENCY ALERT</Text>
               <Text style={styles.countdownNumber}>{countdown}</Text>
 
               <View style={styles.metadataCard}>
                 <Text style={styles.metadataLabel}>BOUND VEHICLE METADATA (SO4):</Text>
                 <Text style={styles.metadataValue}>
-                  Plate: <Text style={{ fontWeight: 'bold' }}>{activeVehiclePlate}</Text> • Body: {activeVehicleBody}
+                Plate: <Text style={{ fontWeight: 'bold' }}>{activeVehiclePlate || 'Not selected'}</Text> • Body: {activeVehicleBody || 'Not selected'}
                 </Text>
               </View>
 
               <Text style={styles.countdownDesc}>
-                Broadcasting GPS coordinates (&lt;10m) to emergency responder channels.
+                Cancel within 5 seconds. We’ll send to your saved contact if automatic SMS is configured; otherwise we’ll prepare a message for you to send.
+                {contacts.length ? `\nWill alert ${contacts.length} saved contact${contacts.length === 1 ? '' : 's'}.` : '\nNo personal emergency contact is saved yet.'}
               </Text>
 
-              <TouchableOpacity style={styles.cancelButton} onPress={cancelEmergency}>
+            <TouchableOpacity style={styles.cancelButton} onPress={cancelEmergency}>
                 <Ionicons name="hand-left" size={20} color={Colors.white} style={{ marginRight: 8 }} />
                 <Text style={styles.cancelButtonText}>TAP TO CANCEL (FALSE ALARM)</Text>
               </TouchableOpacity>
@@ -246,7 +288,7 @@ export default function SOSButton({
             <View style={styles.dispatchCard}>
               <View style={styles.dispatchHeader}>
                 <Ionicons name="shield-checkmark" size={32} color={Colors.primaryYellow} />
-                <Text style={styles.dispatchTitle}>EMERGENCY DISPATCH ACTIVE</Text>
+                <Text style={styles.dispatchTitle}>SOS ALERT STATUS</Text>
               </View>
 
               <View style={styles.dispatchBody}>
@@ -262,24 +304,35 @@ export default function SOSButton({
                 <View style={styles.telemetryBox}>
                   <Text style={styles.telemetryTitle}>TRANSMITTED PAYLOAD (SO4):</Text>
                   <Text style={styles.telemetryRow}>
-                    • GPS Accuracy: <Text style={{ fontWeight: 'bold' }}>±{gpsAccuracy || 6} meters</Text> (&lt;10m bound)
+                  • Live GPS: <Text style={{ fontWeight: 'bold' }}>{gpsCoordinates ? `${gpsCoordinates.latitude.toFixed(6)}, ${gpsCoordinates.longitude.toFixed(6)}` : 'Unavailable'}</Text>
                   </Text>
                   <Text style={styles.telemetryRow}>
-                    • Bound Vehicle: <Text style={{ fontWeight: 'bold' }}>{activeVehiclePlate}</Text> ({activeVehicleBody})
+                  • GPS Accuracy: <Text style={{ fontWeight: 'bold' }}>{gpsAccuracy == null ? 'Unavailable' : `±${gpsAccuracy} meters`}</Text>
                   </Text>
                   <Text style={styles.telemetryRow}>
-                    • Dual-Channel: WebSocket + Direct SMS Fallback
+                  • Bound Vehicle: <Text style={{ fontWeight: 'bold' }}>{activeVehiclePlate || 'Unavailable'}</Text> ({activeVehicleBody || 'Unavailable'})
+                  </Text>
+                  <Text style={styles.telemetryRow}>
+                  • If automatic SMS is unavailable, your messaging app needs your confirmation
                   </Text>
                 </View>
 
                 <Text style={styles.hotlineHeader}>DIRECT EMERGENCY HOTLINES:</Text>
+
+                <TouchableOpacity style={styles.hotlineBtnPrimary} onPress={() => Linking.openURL('tel:911')}>
+                  <Ionicons name="call" size={18} color={Colors.white} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.hotlineName}>National Emergency Hotline</Text>
+                    <Text style={styles.hotlineNum}>Dial 911</Text>
+                  </View>
+                </TouchableOpacity>
 
                 {/* Makati C3 Hotline 168 */}
                 <TouchableOpacity style={styles.hotlineBtnPrimary} onPress={callMakatiC3}>
                   <Ionicons name="call" size={18} color={Colors.white} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.hotlineName}>Makati C3 Command Center</Text>
-                    <Text style={styles.hotlineNum}>Dial 168 • Emergency & Rescue</Text>
+                    <Text style={styles.hotlineNum}>Dial 168 • Makati emergency response</Text>
                   </View>
                 </TouchableOpacity>
 
@@ -287,21 +340,21 @@ export default function SOSButton({
                 <TouchableOpacity style={styles.hotlineBtnSecondary} onPress={callPNPMakati}>
                   <Ionicons name="shield" size={18} color={Colors.darkText} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.hotlineNameDark}>PNP Makati Police Station</Text>
-                    <Text style={styles.hotlineNumDark}>(02) 8887-1798 • Crime Reporting</Text>
+                    <Text style={styles.hotlineNameDark}>Makati Police Department</Text>
+                    <Text style={styles.hotlineNumDark}>(02) 8887-6642</Text>
                   </View>
                 </TouchableOpacity>
 
-                {/* Personal Emergency Contact */}
-                {contact && (
-                  <TouchableOpacity style={styles.hotlineBtnContact} onPress={callContact}>
+                {/* Personal Emergency Contacts */}
+                {contacts.map((contact) => (
+                  <TouchableOpacity key={contact.id ?? contact.phone_number} style={styles.hotlineBtnContact} onPress={() => callContact(contact)}>
                     <Ionicons name="person" size={18} color={Colors.primaryRed} />
                     <View style={{ flex: 1, marginLeft: 10 }}>
                       <Text style={styles.hotlineNameRed}>Call {contact.contact_name}</Text>
                       <Text style={styles.hotlineNumDark}>{contact.phone_number}</Text>
                     </View>
                   </TouchableOpacity>
-                )}
+                ))}
 
                 <TouchableOpacity style={styles.dismissBtn} onPress={() => setModalVisible(false)}>
                   <Text style={styles.dismissText}>Dismiss Emergency Panel</Text>

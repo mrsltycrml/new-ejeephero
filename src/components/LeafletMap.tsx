@@ -3,7 +3,7 @@ import { StyleSheet, View, Platform } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { RouteData, TerminalData, VehicleData } from '../services/offlineTransitService';
 import { StopSafetyProfile, LateNightSafeRoutingResult } from '../services/densityRoutingService';
-import { GeofenceEvaluationResult, OFFICIAL_BAY_RADIUS_METERS } from '../services/geofencingService';
+import { GeofenceEvaluationResult, DEFAULT_CONFIGURED_BAY_RADIUS_METERS } from '../services/geofencingService';
 import {
   MAKATI_BOUNDS,
   MAKATI_CENTER,
@@ -102,6 +102,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         name: t.name,
         latitude: t.latitude,
         longitude: t.longitude,
+        geofenceRadiusMeters: t.geofence_radius_meters,
         is_esakay_hub: t.is_esakay_hub,
         isInside: geofenceResult?.currentZone?.id === t.id,
         isRecommended: safeRoutingResult?.recommendedSafeStop?.id === t.id,
@@ -118,10 +119,11 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         passenger_count: v.passenger_count,
         max_capacity: v.max_capacity,
         speed: v.speed,
+        isSpeeding: Boolean(v.isSpeeding),
         isSelected: selectedVehicle?.id === v.id,
       })),
       userLocation: userLocation || null,
-      bayRadius: OFFICIAL_BAY_RADIUS_METERS,
+      bayRadius: DEFAULT_CONFIGURED_BAY_RADIUS_METERS,
       isOffline: Boolean(isOffline),
     };
   }, [
@@ -158,7 +160,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #map { width: 100%; height: 100%; overflow: hidden; background-color: #f4f1ea; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    html, body, #map { width: 100%; height: 100%; overflow: hidden; background-color: #edf1f3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     
     /* Terminal Marker */
     .terminal-marker {
@@ -171,25 +173,26 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       width: 32px;
       height: 32px;
       border-radius: 16px;
-      background-color: #1F4E79;
-      border: 2.5px solid #FFFFFF;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      background-color: #203B53;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 1px 4px rgba(22, 38, 52, 0.28);
       display: flex;
       align-items: center;
       justify-content: center;
       color: #ffffff;
-      font-size: 15px;
+      font-size: 11px;
+      font-weight: 700;
       cursor: pointer;
       transition: transform 0.2s;
     }
     .terminal-pin.selected {
-      background-color: #C41E3A;
-      transform: scale(1.15);
-      border-color: #FFD700;
+      background-color: #A62B36;
+      transform: scale(1.08);
+      border-color: #FFFFFF;
     }
     .terminal-pin.safe-recommended {
-      border-color: #00E676;
-      box-shadow: 0 0 10px rgba(0, 230, 118, 0.7);
+      border-color: #C89A43;
+      box-shadow: 0 0 0 2px rgba(200, 154, 67, 0.25);
     }
     .terminal-badge {
       position: absolute;
@@ -201,7 +204,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       font-weight: bold;
       color: #fff;
       border: 1.5px solid #fff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      box-shadow: 0 1px 3px rgba(22, 38, 52, 0.22);
     }
 
     /* Vehicle Marker */
@@ -218,12 +221,12 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       font-size: 10px;
       font-weight: 700;
       white-space: nowrap;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+      box-shadow: 0 1px 3px rgba(22, 38, 52, 0.18);
       margin-bottom: 2px;
       display: flex;
       align-items: center;
       gap: 4px;
-      border: 1.5px solid #ccc;
+      border: 1px solid #DCE2E8;
     }
     .vehicle-pill .dot {
       width: 7px;
@@ -235,12 +238,14 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       height: 28px;
       border-radius: 14px;
       background: #FFFFFF;
-      border: 2.5px solid #C41E3A;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      border: 2px solid #A62B36;
+      box-shadow: 0 1px 4px rgba(22, 38, 52, 0.22);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
+      font-size: 10px;
+      font-weight: 800;
+      color: #203B53;
     }
 
     /* User Pulse Dot */
@@ -476,7 +481,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           var circleColor = term.isInside ? '#4CAF50' : '#C41E3A';
           var fillColor = term.isInside ? 'rgba(76, 175, 80, 0.25)' : 'rgba(196, 30, 58, 0.12)';
           L.circle([term.latitude, term.longitude], {
-            radius: data.bayRadius || 45,
+            radius: term.geofenceRadiusMeters || data.bayRadius || 45,
             color: circleColor,
             fillColor: fillColor,
             fillOpacity: 0.25,
@@ -485,7 +490,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
 
           // Marker
           var badgeColor = term.profile.densityLevel.indexOf('High') !== -1 ? '#4CAF50' : (term.profile.densityLevel.indexOf('Moderate') !== -1 ? '#FF9800' : '#757575');
-          var iconSymbol = term.is_esakay_hub ? '⚡' : '🚏';
+          var iconSymbol = term.is_esakay_hub ? 'H' : 'S';
           var pinClasses = 'terminal-pin' + (term.isSelected ? ' selected' : '') + (term.isRecommended ? ' safe-recommended' : '');
           
           var html = '<div class="terminal-marker">' +
@@ -513,15 +518,16 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         data.vehicles.forEach(function(veh) {
           var isPuno = veh.status === 'Puno';
           var isSakto = veh.status === 'Sakto';
-          var statusColor = isPuno ? '#F44336' : (isSakto ? '#FF9800' : '#4CAF50');
+          var statusColor = veh.isSpeeding ? '#D32F2F' : (isPuno ? '#F44336' : (isSakto ? '#FF9800' : '#4CAF50'));
+          var vehicleStatusText = veh.isSpeeding ? 'SPEEDING' : veh.status;
 
           var vHtml = '<div class="vehicle-marker-wrapper">' +
             '<div class="vehicle-pill" style="border-color:' + statusColor + '; color:' + statusColor + ';">' +
             '<span class="dot" style="background-color:' + statusColor + ';"></span>' +
-            veh.body_number + ' • ' + veh.status +
+            (veh.body_number || 'Vehicle') + ' • ' + vehicleStatusText +
             '</div>' +
             '<div class="vehicle-icon-circle" style="border-color:' + statusColor + ';">' +
-            '🚐' +
+            'EJ' +
             '</div>' +
             '</div>';
 

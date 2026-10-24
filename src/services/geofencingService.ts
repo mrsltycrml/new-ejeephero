@@ -45,11 +45,8 @@ export function computeBearing(
   return Math.round(bearing);
 }
 
-/**
- * Standard authorized loading bay boundary radius.
- * Official designated waiting sheds in Makati typically have a 40-meter physical boundary.
- */
-export const OFFICIAL_BAY_RADIUS_METERS = 45;
+/** Fallback only. Operators should set the surveyed radius on each terminal before release. */
+export const DEFAULT_CONFIGURED_BAY_RADIUS_METERS = 45;
 
 /**
  * SO2: Spatial geofencing evaluator
@@ -81,7 +78,7 @@ export function evaluateGeofence(
       nearestZone = terminal;
     }
     // Check if user is within the legal loading bay radius
-    if (dist <= OFFICIAL_BAY_RADIUS_METERS) {
+    if (dist <= (terminal.geofence_radius_meters ?? DEFAULT_CONFIGURED_BAY_RADIUS_METERS)) {
       matchedZone = terminal;
     }
   }

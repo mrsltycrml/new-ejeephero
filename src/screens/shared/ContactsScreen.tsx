@@ -12,7 +12,7 @@ import { Colors } from '../../constants/theme';
 
 export default function ContactsScreen() {
   const { user } = useAuth();
-  const [currentContact, setCurrentContact] = useState<any>(null);
+  const [currentContacts, setCurrentContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [contacts, setContacts] = useState<Contacts.Contact[]>([]);
@@ -21,6 +21,14 @@ export default function ContactsScreen() {
   const [presetMessage, setPresetMessage] = useState(
     'EMERGENCY! I need help. Please check on me.'
   );
+
+  const normalizePhilippineNumber = (value: string) => {
+    const compact = value.trim().replace(/[\s()-]/g, '');
+    if (/^\+639\d{9}$/.test(compact)) return compact;
+    if (/^639\d{9}$/.test(compact)) return `+${compact}`;
+    if (/^09\d{9}$/.test(compact)) return `+63${compact.slice(1)}`;
+    return null;
+  };
 
   useEffect(() => {
     const fetchContact = async () => {
@@ -33,18 +41,14 @@ export default function ContactsScreen() {
           .from('emergency_contacts')
           .select('*')
           .eq('user_id', user.id)
-          .single();
+          .order('created_at', { ascending: true });
 
         if (error && error.code !== 'PGRST116') {
           console.error('Fetch error:', error);
         }
 
-        if (data) {
-          setCurrentContact(data);
-          if (data.preset_message) setPresetMessage(data.preset_message);
-        } else {
-          setCurrentContact(null);
-        }
+        setCurrentContacts(data ?? []);
+        if (data?.[0]?.preset_message) setPresetMessage(data[0].preset_message);
       } catch (err) {
         console.error('Exception fetching contact:', err);
       } finally {
@@ -75,8 +79,13 @@ export default function ContactsScreen() {
   };
 
   const saveSelectedContact = async (contact: Contacts.Contact) => {
-    const phoneNumber = contact.phoneNumbers?.[0]?.number;
-    if (!phoneNumber || !user?.id) return;
+    const rawPhoneNumber = contact.phoneNumbers?.[0]?.number;
+    const phoneNumber = rawPhoneNumber ? normalizePhilippineNumber(rawPhoneNumber) : null;
+    if (!phoneNumber) {
+      Alert.alert('Use a Philippine mobile number', 'Choose a contact with a number in 09XXXXXXXXX or +639XXXXXXXXX format.');
+      return;
+    }
+    if (!user?.id) return;
 
     setSaving(true);
     setShowPicker(false);
@@ -89,19 +98,23 @@ export default function ContactsScreen() {
           phone_number: phoneNumber,
           preset_message: presetMessage,
         },
-        { onConflict: 'user_id' }
-      );
+        { onConflict: 'user_id,phone_number' }
+      ).select().single();
 
       if (error) {
         console.error('Save error:', error);
         Alert.alert('Error', error.message || 'Failed to save emergency contact');
       } else {
-        setCurrentContact({
+        const savedContact = data ?? {
           user_id: user.id,
           contact_name: contact.name,
           phone_number: phoneNumber,
           preset_message: presetMessage,
-        });
+        };
+        setCurrentContacts((existing) => [
+          ...existing.filter((item) => item.phone_number !== savedContact.phone_number),
+          savedContact,
+        ]);
         Alert.alert('Success!', `${contact.name} set as your emergency contact.`);
       }
     } catch (err) {
@@ -113,7 +126,7 @@ export default function ContactsScreen() {
   };
 
   const savePresetMessage = async () => {
-    if (!currentContact) {
+    if (currentContacts.length === 0) {
       Alert.alert('No Contact', 'Please choose an emergency contact first.');
       return;
     }
@@ -127,8 +140,22 @@ export default function ContactsScreen() {
     if (error) {
       Alert.alert('Error', error.message);
     } else {
+      setCurrentContacts((existing) => existing.map((contact) => ({ ...contact, preset_message: presetMessage })));
       Alert.alert('Saved', 'Preset message updated.');
     }
+  };
+
+  const removeEmergencyContact = async (contactId: string) => {
+    const { error } = await supabase
+      .from('emergency_contacts')
+      .delete()
+      .eq('id', contactId)
+      .eq('user_id', user?.id);
+    if (error) {
+      Alert.alert('Could not remove contact', error.message);
+      return;
+    }
+    setCurrentContacts((existing) => existing.filter((contact) => contact.id !== contactId));
   };
 
   const handleMessageChange = (text: string) => {
@@ -210,18 +237,27 @@ export default function ContactsScreen() {
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
           <Text style={styles.title}>Emergency Contact</Text>
           <Text style={styles.subtitle}>
-            Manage your emergency contact and custom SOS message broadcast.
+            Manage the contacts who receive your SOS alert and the shared emergency message.
           </Text>
 
           {/* Current Contact Card */}
-          {currentContact ? (
+          {currentContacts.length ? (
             <View style={styles.currentCard}>
               <View style={styles.cardIcon}>
                 <Ionicons name="shield-checkmark" size={32} color={Colors.primaryYellow} />
               </View>
-              <Text style={styles.currentLabel}>Active Emergency Contact</Text>
-              <Text style={styles.currentName}>{currentContact.contact_name}</Text>
-              <Text style={styles.currentPhone}>{currentContact.phone_number}</Text>
+              <Text style={styles.currentLabel}>Emergency Contacts ({currentContacts.length})</Text>
+              {currentContacts.map((contact) => (
+                <View key={contact.id ?? contact.phone_number} style={styles.savedContactRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.currentName}>{contact.contact_name}</Text>
+                    <Text style={styles.currentPhone}>{contact.phone_number}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => removeEmergencyContact(contact.id)} accessibilityLabel={`Remove ${contact.contact_name}`}>
+                    <Ionicons name="trash-outline" size={20} color={Colors.primaryRed} />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
           ) : (
             <View style={[styles.currentCard, styles.noContactCard]}>
@@ -229,14 +265,14 @@ export default function ContactsScreen() {
                 <Ionicons name="warning" size={32} color={Colors.primaryRed} />
               </View>
               <Text style={styles.noContactText}>No Contact Configured</Text>
-              <Text style={styles.noContactSub}>You must set a contact to enable SOS alerts.</Text>
+              <Text style={styles.noContactSub}>Add at least one contact to send SOS alerts.</Text>
             </View>
           )}
 
           <TouchableOpacity style={styles.chooseButton} onPress={loadPhoneContacts}>
             <Ionicons name="people" size={20} color={Colors.white} style={{ marginRight: 8 }} />
             <Text style={styles.chooseButtonText}>
-              {currentContact ? 'Change Emergency Contact' : 'Select from Contacts'}
+              {currentContacts.length ? 'Add Emergency Contact' : 'Select from Contacts'}
             </Text>
           </TouchableOpacity>
 
@@ -251,7 +287,7 @@ export default function ContactsScreen() {
               )}
             </View>
             <Text style={styles.sectionSub}>
-              This text is automatically composed and sent to your contact during an SOS.
+              This message is sent to all saved contacts during an SOS.
             </Text>
             <TextInput
               style={styles.messageInput}
@@ -370,6 +406,7 @@ const styles = StyleSheet.create({
   },
   currentName: { fontSize: 22, fontWeight: 'bold', color: Colors.darkText },
   currentPhone: { fontSize: 16, color: '#555', marginTop: 4 },
+  savedContactRow: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F0E6D8' },
   noContactText: { fontSize: 18, fontWeight: 'bold', color: Colors.primaryRed, marginTop: 4 },
   noContactSub: { fontSize: 13, color: '#888', marginTop: 4, textAlign: 'center' },
   

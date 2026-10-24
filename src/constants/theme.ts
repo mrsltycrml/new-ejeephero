@@ -1,13 +1,16 @@
 export const Colors = {
-  primaryRed: '#D32F2F', // vibrant red
-  primaryYellow: '#FFC107', // golden amber
+  primaryRed: '#A62B36',
+  primaryYellow: '#C89A43',
   white: '#FFFFFF',
-  offWhite: '#FFF8F0', // warm off-white
-  darkText: '#2D2D2D',
-  subtleGray: '#999999',
+  offWhite: '#F3F5F7',
+  darkText: '#1F2D3A',
+  subtleGray: '#778493',
   cardBG: '#FFFFFF',
-  accentRed: '#B71C1C', // deep red for SOS
-  accentYellow: '#FFD54F', // light gold for highlights
-  tabActive: '#D32F2F',
-  tabInactive: '#BDBDBD',
+  accentRed: '#8F1D2C',
+  accentYellow: '#D9B566',
+  navy: '#203B53',
+  border: '#DCE2E8',
+  mutedBackground: '#EAF0F4',
+  tabActive: '#203B53',
+  tabInactive: '#8793A0',
 };
