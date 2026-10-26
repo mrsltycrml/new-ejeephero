@@ -1,108 +1,71 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.1';
+import { createRemoteJWKSet, jwtVerify } from 'https://deno.land/x/jose@v5.9.6/index.ts';
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+const issuer = Deno.env.get('CLERK_ISSUER_URL')?.replace(/\/$/, '');
+const clerkKeys = issuer?.startsWith('https://') ? createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`)) : null;
+const text = (s: unknown, max: number) => typeof s === 'string' ? s.trim().slice(0, max) : '';
+function normalizePhone(raw: unknown) {
+  const number = text(raw, 24).replace(/[\s()-]/g, '');
+  if (/^09\d{9}$/.test(number)) return `+63${number.slice(1)}`;
+  if (/^639\d{9}$/.test(number)) return `+${number}`;
+  return /^\+639\d{9}$/.test(number) ? number : null;
 }
 
-Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
-
+Deno.serve(async request => {
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   try {
-    const authorization = request.headers.get("Authorization");
-    const jwt = authorization?.replace(/^Bearer\s+/i, "");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!jwt || !supabaseUrl || !anonKey) return json({ error: "Sign in is required." }, 401);
-
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${jwt}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { data: { user }, error: userError } = await userClient.auth.getUser(jwt);
-    if (userError || !user) return json({ error: "Your session is not valid." }, 401);
-
-    const { data: profile, error: profileError } = await userClient
-      .from("profiles").select("status").eq("id", user.id).single();
-    if (profileError || profile?.status !== "approved") return json({ error: "Your account is not approved to use SOS dispatch." }, 403);
-
+    const url = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') || '';
+    if (!url || !serviceKey || !token) return json({ error: 'Sign in is required.' }, 401);
+    const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    let userId: string | null = null;
+    const { data: auth } = await db.auth.getUser(token);
+    if (auth.user) userId = auth.user.id;
+    if (!userId && issuer && clerkKeys) {
+      try {
+        const { payload } = await jwtVerify(token, clerkKeys, { issuer, algorithms: ['RS256'], requiredClaims: ['sub', 'exp', 'iat'] });
+        if (payload.email_verified !== true && payload.email_verified !== 'true') return json({ error: 'Verify your email address before saving emergency contacts.' }, 403);
+        const parties = (Deno.env.get('CLERK_AUTHORIZED_PARTIES') || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (payload.azp && parties.length && !parties.includes(String(payload.azp))) return json({ error: 'Invalid sign-in origin.' }, 401);
+        const { data: profile } = await db.from('profiles').select('id').eq('clerk_id', payload.sub!).single();
+        userId = profile?.id ?? null;
+      } catch { return json({ error: 'Your session is not valid.' }, 401); }
+    }
+    // Never accept identity from request.userId or an unsigned JWT.
+    if (!userId) return json({ error: 'Your session is not valid.' }, 401);
+    const { data: profile } = await db.from('profiles').select('status').eq('id', userId).single();
+    if (profile?.status !== 'approved') return json({ error: 'Your account is not active.' }, 403);
     const body = await request.json();
-    const latitude = Number(body.latitude);
-    const longitude = Number(body.longitude);
-    const accuracy = body.accuracy == null ? null : Number(body.accuracy);
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-      return json({ error: "A valid GPS location is required." }, 400);
+    if (body.action === 'contacts:list') {
+      const result = await db.from('emergency_contacts').select('*').eq('user_id', userId).order('created_at').limit(5);
+      if (result.error) return json({ error: 'Could not load contacts.' }, 500);
+      return json({ contacts: result.data });
     }
-
-    const { data: contacts, error: contactError } = await userClient
-      .from("emergency_contacts").select("contact_name,phone_number,preset_message").eq("user_id", user.id);
-    if (contactError || !contacts?.length) return json({ error: "Save a personal emergency contact first." }, 409);
-    const recipients = contacts.map((contact) => ({
-      ...contact,
-      normalizedPhone: contact.phone_number.replace(/[\s()-]/g, ""),
-    }));
-    if (recipients.some((contact) => !/^\+[1-9]\d{7,14}$/.test(contact.normalizedPhone))) {
-      return json({ error: "A saved contact number is invalid. Save mobile numbers in international format, such as +639XXXXXXXXX." }, 422);
+    if (body.action === 'contacts:save') {
+      const contact = body.contact || {};
+      const phone = normalizePhone(contact.phone_number);
+      const name = text(contact.contact_name, 80);
+      if (!phone || !name) return json({ error: 'Enter a name and Philippine mobile number.' }, 400);
+      const { data: existing, error } = await db.from('emergency_contacts').select('phone_number').eq('user_id', userId);
+      if (error) return json({ error: 'Could not read contacts.' }, 500);
+      if (existing.length >= 5 && !existing.some(c => c.phone_number === phone)) return json({ error: 'You can save up to five contacts.' }, 409);
+      const saved = await db.from('emergency_contacts').upsert({ user_id: userId, phone_number: phone, contact_name: name, preset_message: text(contact.preset_message, 300) || 'EMERGENCY! I need help. Please check on me.' }, { onConflict: 'user_id,phone_number' }).select().single();
+      if (saved.error) return json({ error: 'Could not save the contact.' }, 500);
+      return json({ contact: saved.data });
     }
-
-    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const fromNumber = Deno.env.get("TWILIO_FROM_NUMBER");
-    if (!accountSid || !authToken || !fromNumber) return json({ error: "Automated SMS is not configured; use the messaging app fallback." }, 503);
-
-    const vehicleLabel = [body.vehicle_plate, body.vehicle_body_number].filter(Boolean).join(" / ") || "Vehicle details unavailable";
-    const mapsLink = `https://maps.google.com/?q=${latitude},${longitude}`;
-    const message = `${contacts[0]?.preset_message || "EMERGENCY! I need help. Please check on me."}\n\nEjeepHero SOS\nLocation: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}${accuracy == null ? "" : ` (±${Math.round(accuracy)}m)`}\nMap: ${mapsLink}\nVehicle: ${vehicleLabel}`;
-
-    const eventResult = await userClient.from("sos_events").insert({
-      user_id: user.id,
-      latitude,
-      longitude,
-      gps_accuracy_meters: accuracy,
-      vehicle_id: body.vehicle_id || null,
-      vehicle_plate: body.vehicle_plate || null,
-      vehicle_body_number: body.vehicle_body_number || null,
-    });
-    if (eventResult.error) return json({ error: "Could not securely save the SOS event." }, 500);
-
-    const results = await Promise.allSettled(recipients.map(async (contact) => {
-      const form = new URLSearchParams({ To: contact.normalizedPhone, From: fromNumber, Body: message });
-      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: form,
-      });
-      if (!response.ok) {
-        console.error("Twilio SMS request failed with status", response.status);
-        return null;
-      }
-      const queued = await response.json();
-      return queued.status ?? "queued";
-    }));
-    const acceptedCount = results.filter((result) => result.status === "fulfilled" && Boolean(result.value)).length;
-    if (acceptedCount === 0) return json({ error: "SMS gateway could not accept the alerts; use the messaging app fallback." }, 502);
-    return json({
-      accepted: true,
-      acceptedCount,
-      recipientCount: recipients.length,
-      providerStatus: acceptedCount === recipients.length ? "queued" : "partial",
-      message: `Alert accepted for ${acceptedCount} of ${recipients.length} contact(s); carrier delivery confirmation may take time.`,
-    }, 202);
-  } catch (error) {
-    console.error("Emergency dispatch failed", error);
-    return json({ error: "Could not dispatch the alert. Use a hotline or messaging app." }, 500);
+    if (body.action === 'contacts:delete') {
+      const phone = normalizePhone(body.phone);
+      if (!phone) return json({ error: 'Invalid mobile number.' }, 400);
+      const result = await db.from('emergency_contacts').delete().eq('user_id', userId).eq('phone_number', phone);
+      return result.error ? json({ error: 'Could not remove contact.' }, 500) : json({ deleted: true });
+    }
+    return json({ error: 'SOS alerts open Messages on your phone. Tap Send there to share your alert.' }, 400);
+  } catch {
+    // Do not log private coordinates, contact numbers or tokens.
+    return json({ error: 'Could not complete the request. Use Messages or call a hotline.' }, 500);
   }
 });

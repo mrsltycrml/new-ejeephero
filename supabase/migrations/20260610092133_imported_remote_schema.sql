@@ -1,0 +1,3 @@
+-- Historical migration already applied by the original Supabase project.
+-- Its original SQL remains in supabase_migrations.schema_migrations.
+-- This marker reconciles the imported repository with the existing project.

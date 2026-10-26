@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function PendingApprovalScreen() {
+  const { t } = useTranslation();
   const { status, signOut, refreshProfile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -30,15 +32,15 @@ export default function PendingApprovalScreen() {
         </View>
 
         <Text style={styles.title}>
-          {isRejected ? 'Registration Rejected' : isSuspended ? 'Account Suspended' : 'Pending Approval'}
+          {isRejected ? t('auth.registrationRejected') : isSuspended ? 'Account Suspended' : t('auth.pendingApproval')}
         </Text>
 
         <Text style={styles.description}>
           {isRejected
-            ? 'Your registration has been rejected by an administrator. Please contact support if you believe this is an error.'
+            ? t('auth.rejectedDesc')
             : isSuspended
               ? 'Your account has been suspended after supervisor review. Contact the operator or administrator if you believe this is an error.'
-              : 'Your account is awaiting admin approval. You will be able to access the app once an administrator reviews and approves your registration.'}
+              : t('auth.pendingDesc')}
         </Text>
 
         {!isBlocked && (
@@ -48,7 +50,7 @@ export default function PendingApprovalScreen() {
             ) : (
               <>
                 <Ionicons name="refresh" size={20} color={Colors.white} style={{ marginRight: 8 }} />
-                <Text style={styles.refreshText}>Check Status</Text>
+                <Text style={styles.refreshText}>{t('auth.checkStatus')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -56,7 +58,7 @@ export default function PendingApprovalScreen() {
 
         <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
           <Ionicons name="log-out-outline" size={20} color={Colors.primaryRed} style={{ marginRight: 8 }} />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>{t('auth.logOut')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -102,7 +104,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '600',
     color: Colors.darkText,
     marginBottom: 12,
     textAlign: 'center',
@@ -115,11 +117,11 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   refreshButton: {
-    backgroundColor: Colors.primaryRed,
+    backgroundColor: Colors.ink,
     flexDirection: 'row',
     paddingVertical: 14,
     paddingHorizontal: 28,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
@@ -139,7 +141,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 14,
     paddingHorizontal: 28,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',

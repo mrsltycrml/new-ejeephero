@@ -50,8 +50,8 @@ export function calculateConfiguredFare(
   const includedKm = Math.max(0, route.base_distance_km ?? 4);
   const discount = 1 - DISCOUNT_RATE[passengerType];
   const fare = (baseFare * discount)
-    + (Math.max(0, distanceKm - includedKm) * rate * discount);
-  // LTFRB fare matrices round the resulting fare to the nearest ₱0.25.
+    + (Math.max(0, distanceKm - includedKm) * rate);
+  // Operator-reported policy: the additional per-km amount is the same for everyone.
   return Math.round(fare * 4) / 4;
 }
 
@@ -83,14 +83,25 @@ export function findWalkAndSaveSuggestion(args: {
   const walkingMetersPerMinute = args.walkingMetersPerMinute ?? 75;
   const ordered = [...args.stops].sort((a, b) => a.sequence_order - b.sequence_order);
   const destinationIndex = ordered.findIndex((stop) => stop.id === destination.id);
-  if (destinationIndex <= 0) return null;
+  if (destinationIndex < 0) return null;
 
-  const candidates = ordered
-    .slice(0, destinationIndex)
-    .map((stop) => ({
+  const allWithDistance = ordered
+    .map((stop, idx) => ({
       stop,
+      idx,
       distanceMeters: computeDistanceMeters(origin.latitude, origin.longitude, stop.latitude, stop.longitude),
     }))
+    .filter((item) => item.idx !== destinationIndex);
+
+  if (!allWithDistance.length) return null;
+
+  const nearestOverall = allWithDistance.reduce((best, current) =>
+    current.distanceMeters < best.distanceMeters ? current : best,
+  );
+  const isReverse = nearestOverall.idx > destinationIndex;
+
+  const candidates = allWithDistance
+    .filter((candidate) => (isReverse ? candidate.idx > destinationIndex : candidate.idx < destinationIndex))
     .filter((candidate) => candidate.distanceMeters <= maxWalkMeters);
 
   if (!candidates.length) return null;
@@ -98,17 +109,20 @@ export function findWalkAndSaveSuggestion(args: {
   const nearest = candidates.reduce((best, current) =>
     current.distanceMeters < best.distanceMeters ? current : best,
   );
-  const nearestIndex = ordered.findIndex((stop) => stop.id === nearest.stop.id);
+  const getSlice = (boardIndex: number) =>
+    isReverse
+      ? ordered.slice(destinationIndex, boardIndex + 1)
+      : ordered.slice(boardIndex, destinationIndex + 1);
+
   const currentFare = calculateConfiguredFare(
-    routeDistanceKm(ordered.slice(nearestIndex, destinationIndex + 1)),
+    routeDistanceKm(getSlice(nearest.idx)),
     route,
     passengerType,
   );
 
   const cheaper = candidates
     .map((candidate) => {
-      const boardIndex = ordered.findIndex((stop) => stop.id === candidate.stop.id);
-      const segmentDistance = routeDistanceKm(ordered.slice(boardIndex, destinationIndex + 1));
+      const segmentDistance = routeDistanceKm(getSlice(candidate.idx));
       const fare = calculateConfiguredFare(segmentDistance, route, passengerType);
       return { ...candidate, fare };
     })

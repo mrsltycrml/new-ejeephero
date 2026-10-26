@@ -90,18 +90,18 @@ export default function AdminDashboardScreen() {
   const handleApprove = (profile: Profile) => {
     confirmAction(
       'Approve User',
-      `Approve ${profile.email} as ${profile.role}?`,
+      `Approve ${profile.email || profile.full_name} as ${profile.role}?`,
       'Approve',
-      () => updateProfile(profile.id, { status: 'approved' }),
+      () => updateProfile(profile.id, { status: 'approved', is_approved: true } as any),
     );
   };
 
   const handleReject = (profile: Profile) => {
     confirmAction(
       'Reject User',
-      `Reject ${profile.email}?`,
+      `Reject ${profile.email || profile.full_name}?`,
       'Reject',
-      () => updateProfile(profile.id, { status: 'rejected' }),
+      () => updateProfile(profile.id, { status: 'rejected', is_approved: false } as any),
       true,
     );
   };
@@ -264,17 +264,17 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 6,
     backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: '#E8DFD3',
+    borderColor: Colors.border,
     gap: 6,
   },
   tabActive: {
-    backgroundColor: Colors.primaryRed,
+    backgroundColor: Colors.ink,
     borderColor: Colors.primaryRed,
   },
   tabText: {
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryYellow,
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.primaryRed,
+    backgroundColor: Colors.ink,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -346,20 +346,20 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   profileDate: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.subtleGray,
     marginTop: 2,
   },
   roleChip: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   roleChipText: {
     color: Colors.white,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 'bold',
-    textTransform: 'uppercase',
+    textTransform: 'none',
     letterSpacing: 0.5,
   },
   actionRow: {
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,

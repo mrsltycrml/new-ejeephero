@@ -11,8 +11,9 @@ export const NetworkProvider = ({ children }: { children: React.ReactNode }) => 
   const [isConnected, setIsConnected] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsConnected(!!state.isConnected && !!state.isInternetReachable);
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const online = Boolean(state.isConnected) && state.isInternetReachable !== false;
+      setIsConnected(online);
     });
     return unsubscribe;
   }, []);

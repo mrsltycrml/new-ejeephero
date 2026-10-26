@@ -1,0 +1,2 @@
+-- Historical profile-guard migration already applied by the original project.
+-- Original SQL is retained remotely; current access rules are in 20261027150000.

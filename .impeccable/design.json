@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-26T22:55:54.571Z",
+  "title": "Design System: eSAKAY",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Charcoal ink",
+        "tonalRamp": [
+          "oklch(15% 0.0081 240.2)",
+          "oklch(27% 0.0081 240.2)",
+          "oklch(38% 0.0081 240.2)",
+          "oklch(49% 0.0081 240.2)",
+          "oklch(61% 0.0081 240.2)",
+          "oklch(72% 0.0081 240.2)",
+          "oklch(84% 0.0081 240.2)",
+          "oklch(95% 0.0081 240.2)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Cool canvas",
+        "tonalRamp": [
+          "oklch(15% 0.0017 247.8)",
+          "oklch(27% 0.0017 247.8)",
+          "oklch(38% 0.0017 247.8)",
+          "oklch(49% 0.0017 247.8)",
+          "oklch(61% 0.0017 247.8)",
+          "oklch(72% 0.0017 247.8)",
+          "oklch(84% 0.0017 247.8)",
+          "oklch(95% 0.0017 247.8)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "White paper",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.9)",
+          "oklch(27% 0.0000 89.9)",
+          "oklch(38% 0.0000 89.9)",
+          "oklch(49% 0.0000 89.9)",
+          "oklch(61% 0.0000 89.9)",
+          "oklch(72% 0.0000 89.9)",
+          "oklch(84% 0.0000 89.9)",
+          "oklch(95% 0.0000 89.9)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Quiet border",
+        "tonalRamp": [
+          "oklch(15% 0.0035 247.9)",
+          "oklch(27% 0.0035 247.9)",
+          "oklch(38% 0.0035 247.9)",
+          "oklch(49% 0.0035 247.9)",
+          "oklch(61% 0.0035 247.9)",
+          "oklch(72% 0.0035 247.9)",
+          "oklch(84% 0.0035 247.9)",
+          "oklch(95% 0.0035 247.9)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted text",
+        "tonalRamp": [
+          "oklch(15% 0.0137 240.1)",
+          "oklch(27% 0.0137 240.1)",
+          "oklch(38% 0.0137 240.1)",
+          "oklch(49% 0.0137 240.1)",
+          "oklch(61% 0.0137 240.1)",
+          "oklch(72% 0.0137 240.1)",
+          "oklch(84% 0.0137 240.1)",
+          "oklch(95% 0.0137 240.1)"
+        ]
+      },
+      "subdued": {
+        "role": "neutral",
+        "displayName": "Subdued surface",
+        "tonalRamp": [
+          "oklch(15% 0.0017 247.8)",
+          "oklch(27% 0.0017 247.8)",
+          "oklch(38% 0.0017 247.8)",
+          "oklch(49% 0.0017 247.8)",
+          "oklch(61% 0.0017 247.8)",
+          "oklch(72% 0.0017 247.8)",
+          "oklch(84% 0.0017 247.8)",
+          "oklch(95% 0.0017 247.8)"
+        ]
+      },
+      "ember": {
+        "role": "primary",
+        "displayName": "Signal ember",
+        "tonalRamp": [
+          "oklch(15% 0.1586 28.7)",
+          "oklch(27% 0.1586 28.7)",
+          "oklch(38% 0.1586 28.7)",
+          "oklch(49% 0.1586 28.7)",
+          "oklch(61% 0.1586 28.7)",
+          "oklch(72% 0.1586 28.7)",
+          "oklch(84% 0.1586 28.7)",
+          "oklch(95% 0.1586 28.7)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Screen heading",
+        "purpose": "Shared 24 px application headings; compact admin/weather variant is 23 px."
+      },
+      "title": {
+        "displayName": "Section title",
+        "purpose": "16 px task and section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Descriptions and operational values."
+      },
+      "label": {
+        "displayName": "Field label",
+        "purpose": "Labels above shared fields."
+      },
+      "metadata": {
+        "displayName": "Metadata",
+        "purpose": "Roster plate, assignment, and secondary detail."
+      }
+    },
+    "shadows": [
+      {
+        "name": "floating-calendar",
+        "value": "0 14px 24px rgba(32,36,39,0.18)",
+        "purpose": "Separates the desktop calendar from content below it; translated from native shadow properties."
+      }
+    ],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "calendar-inline",
+        "value": "700px",
+        "purpose": "Below this width the reporting calendar opens in flow."
+      },
+      {
+        "name": "roster-columns",
+        "value": "760px",
+        "purpose": "Below this width unit rows reorganize identity and assignment into two lines."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main ordinary action in a form or journey.",
+      "html": "<button class=\"ds-primary\">Search places</button>",
+      "css": ".ds-primary{min-height:44px;border:0;border-radius:6px;background:#202427;color:#fff;padding:12px 16px;font:700 14px system-ui;cursor:pointer}.ds-primary:hover{opacity:.86}.ds-primary:active{opacity:.7}.ds-primary:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A quiet alternative beside the main action.",
+      "html": "<button class=\"ds-secondary\">Cancel</button>",
+      "css": ".ds-secondary{min-height:44px;border:1px solid #E5E7E9;border-radius:6px;background:#fff;color:#202427;padding:12px 16px;font:600 13px system-ui;cursor:pointer}.ds-secondary:hover{opacity:.86}.ds-secondary:active{opacity:.7}.ds-secondary:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    },
+    {
+      "name": "Emergency SOS",
+      "kind": "button",
+      "refersTo": "button-sos",
+      "description": "Starts the five-second cancellation timer before opening Messages.",
+      "html": "<button class=\"ds-sos\">Emergency SOS</button>",
+      "css": ".ds-sos{min-height:44px;border:0;border-radius:6px;background:#B63D32;color:#fff;padding:12px 16px;font:700 14px system-ui;cursor:pointer}.ds-sos:hover{opacity:.86}.ds-sos:active{opacity:.7}.ds-sos:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    },
+    {
+      "name": "Labeled field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A white input with a label and restrained border.",
+      "html": "<label class=\"ds-field\">Destination<input placeholder=\"Search a place, street, or landmark\"></label>",
+      "css": ".ds-field{display:grid;gap:7px;color:#202427;font:600 13px system-ui}.ds-field input{min-width:0;border:1px solid #E5E7E9;border-radius:6px;background:#fff;color:#202427;padding:12px 13px;font:400 15px system-ui}.ds-field input::placeholder{color:#626A70}.ds-field input:hover{border-color:#626A70}.ds-field input:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    },
+    {
+      "name": "Working panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Groups one coherent task without raised decoration.",
+      "html": "<section class=\"ds-panel\"><h2>Emergency contacts</h2><p>Add someone you trust.</p></section>",
+      "css": ".ds-panel{border:1px solid #E5E7E9;border-radius:8px;background:#fff;color:#202427;padding:20px;font:400 14px/1.5 system-ui}.ds-panel h2{margin:0 0 16px;font-size:16px;font-weight:600}.ds-panel p{margin:0}"
+    },
+    {
+      "name": "Selected roster filter",
+      "kind": "chip",
+      "refersTo": "filter-active",
+      "description": "Selection uses a charcoal border on white.",
+      "html": "<button class=\"ds-filter\" aria-pressed=\"true\">All drivers</button>",
+      "css": ".ds-filter{border:1px solid #202427;border-radius:8px;background:#fff;color:#202427;padding:8px 13px;font:600 12px system-ui;cursor:pointer}.ds-filter:hover{opacity:.86}.ds-filter:active{opacity:.7}.ds-filter:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    },
+    {
+      "name": "Fleet ledger row",
+      "kind": "custom",
+      "description": "Unit identity and current facts remain visible; shift detail expands on demand.",
+      "html": "<details class=\"ds-roster\"><summary><span><strong>Sample unit</strong><small>Plate unavailable · Sample</small></span><span class=\"ds-count\">0<small>trips today</small></span><span class=\"ds-status\">Off duty</span></summary><div>Route and shift details appear here.</div></details>",
+      "css": ".ds-roster{border-bottom:1px solid #E5E7E9;background:#fff;color:#202427;padding:14px 16px;font:400 14px/20px system-ui}.ds-roster summary{display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer}.ds-roster summary>span:first-child{flex:1;min-width:0}.ds-roster strong{font-size:15px;font-weight:600}.ds-roster small{display:block;color:#626A70;font:400 12px/18px system-ui}.ds-count{text-align:right;font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}.ds-status{color:#626A70;font-size:12px}.ds-roster>div{border-top:1px solid #E5E7E9;margin-top:12px;padding-top:16px}.ds-roster summary:hover{opacity:.86}.ds-roster summary:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    },
+    {
+      "name": "Activity tabs",
+      "kind": "nav",
+      "description": "A single selected category with an ink underline over a shared baseline.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Safety activity\"><button aria-current=\"page\">Driver grades</button><button>Speed events</button><button>Route flags</button></nav>",
+      "css": ".ds-tabs{display:flex;gap:24px;overflow-x:auto;border-bottom:1px solid #E5E7E9}.ds-tabs button{flex-shrink:0;min-height:44px;padding:0 2px;border:0;border-bottom:2px solid transparent;background:transparent;color:#626A70;font:500 14px system-ui;cursor:pointer}.ds-tabs button[aria-current]{border-bottom-color:#202427;color:#202427}.ds-tabs button:hover{color:#202427}.ds-tabs button:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    },
+    {
+      "name": "Bottom navigation",
+      "kind": "nav",
+      "description": "White navigation with charcoal active text and muted inactive text.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Passenger navigation\"><button aria-current=\"page\">Dashboard</button><button>Fares</button><button>Safety</button><button>More</button></nav>",
+      "css": ".ds-nav{display:flex;min-height:62px;border-top:1px solid #E5E7E9;background:#fff}.ds-nav button{flex:1;min-width:0;border:0;background:transparent;color:#626A70;font:700 11px system-ui;cursor:pointer}.ds-nav button[aria-current]{color:#202427}.ds-nav button:hover{background:#F1F2F3}.ds-nav button:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    },
+    {
+      "name": "Reporting period",
+      "kind": "custom",
+      "description": "The current period stays visible; the calendar opens on demand.",
+      "html": "<div class=\"ds-period\"><span>Reporting period<strong>October 2026</strong></span><button>Choose month</button></div>",
+      "css": ".ds-period{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:6px 12px;border:1px solid #E5E7E9;border-radius:8px;background:#fff;color:#626A70;font:600 12px system-ui}.ds-period strong{display:block;margin-top:2px;color:#202427;font-size:15px;font-weight:700}.ds-period button{min-height:44px;border:1px solid #E5E7E9;border-radius:8px;padding:0 11px;background:#fff;color:#202427;font:700 12px system-ui;cursor:pointer}.ds-period button:hover{opacity:.86}.ds-period button:active{opacity:.7}.ds-period button:focus-visible{outline:2px solid #202427;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Achromatic ledger",
+    "overview": "eSAKAY is a quiet operational interface for passengers, drivers, and supervisors. Cool neutral ground, white working surfaces, and charcoal controls keep the next task clear. The supplied official logo and actual maps, unit identities, and safety records provide the product's character.\n\nThe interface reveals detail when needed: compact rosters expand in place, calendars open from the current period, and activity tabs show one category at a time. Native bottom navigation and familiar platform typography remain shared across roles. This records the implemented simplification, not every token or composition proposed by the seeded direction.",
+    "keyCharacteristics": [
+      "Cool neutral canvas and white working surfaces.",
+      "Charcoal ordinary actions; color carries safety or data meaning.",
+      "Compact rows, restrained counts, and details on demand.",
+      "Official logo, real service information, and explicit sample states."
+    ],
+    "rules": [
+      {
+        "name": "The Signal Rule",
+        "body": "Use charcoal for ordinary actions and navigation. Reserve red for SOS, warnings, destructive actions, and meaningful safety data.",
+        "section": "colors"
+      },
+      {
+        "name": "The Quiet Surface Rule",
+        "body": "Separate repeated records with rules and spacing; use a container for a coherent task rather than a separate card for every fact.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do retain the official logo and consistent navigation across roles.",
+      "Do keep real and sample fleet data visibly distinct.",
+      "Do put identity, current status, and the next useful action before expanded details.",
+      "Do name the selected Philippine reporting period beside historical data.",
+      "Do keep empty, unavailable, estimated, and unverified states explicit."
+    ],
+    "donts": [
+      "Don't present sample positions as live GPS or unverified map geometry as authoritative.",
+      "Don't present operator fare estimates as a verified LTFRB matrix.",
+      "Don't imply that SOS sends automatically; Messages opens and the passenger taps Send.",
+      "Don't repeat decorative tinted panels or oversized metrics for ordinary information.",
+      "Don't replace an anchored header menu with a full-screen destination."
+    ]
+  }
+}

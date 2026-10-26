@@ -1,28 +1,42 @@
+import { Platform } from 'react-native';
 import { Accelerometer } from 'expo-sensors';
 import { supabase } from '../lib/supabase';
 
-// Conditionally import notifications - skip in Expo Go (SDK 53+)
+// Conditionally import notifications - skip on web and Expo Go (SDK 53+)
 let Notifications: any = null;
-try {
-  Notifications = require('expo-notifications');
-} catch (error) {
-  console.warn('Notifications not available in this environment (Expo Go SDK 53+)');
+if (Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+  } catch {
+    // Notifications unavailable in Expo Go
+  }
 }
 
-let accelerometerSubscription: any = null;
+let accelerometerSubscription: { remove: () => void } | null = null;
+let lastAnomalyTimestamp = 0;
+const ANOMALY_COOLDOWN_MS = 15_000;
 
-export const startAnomalyDetection = (vehicleId: string) => {
-  if (accelerometerSubscription) return;
+export const startAnomalyDetection = async (vehicleId: string) => {
+  if (Platform.OS === 'web' || accelerometerSubscription) return;
 
-  Accelerometer.setUpdateInterval(500);
-  accelerometerSubscription = Accelerometer.addListener(async ({ x, y, z }) => {
-    const gForce = Math.sqrt(x * x + y * y + z * z);
-    
-    // G-force > 2.5 indicates a hard brake or potential crash
-    if (gForce > 2.5) {
-      await triggerAnomaly(vehicleId, 'High G-Force / Potential Crash', gForce);
-    }
-  });
+  try {
+    const available = await Accelerometer.isAvailableAsync();
+    if (!available || accelerometerSubscription) return;
+
+    Accelerometer.setUpdateInterval(500);
+    accelerometerSubscription = Accelerometer.addListener(async ({ x, y, z }) => {
+      const gForce = Math.sqrt(x * x + y * y + z * z);
+
+      // G-force > 2.5 indicates a hard brake or potential crash; debounce 15s
+      const now = Date.now();
+      if (gForce > 2.5 && now - lastAnomalyTimestamp >= ANOMALY_COOLDOWN_MS) {
+        lastAnomalyTimestamp = now;
+        await triggerAnomaly(vehicleId, 'High G-Force / Potential Crash', gForce);
+      }
+    });
+  } catch {
+    // Ignore sensor initialization errors on unsupported devices
+  }
 };
 
 export const stopAnomalyDetection = () => {
@@ -33,36 +47,34 @@ export const stopAnomalyDetection = () => {
 };
 
 const triggerAnomaly = async (vehicleId: string, type: string, gForce: number) => {
-  // Get latest position
   const { data: pos } = await supabase
     .from('vehicle_positions')
-    .select('*')
+    .select('latitude, longitude')
     .eq('vehicle_id', vehicleId)
     .order('timestamp', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   await supabase.from('anomalies').insert({
     vehicle_id: vehicleId,
     type: `${type} (G-Force: ${gForce.toFixed(2)})`,
-    latitude: pos?.latitude,
-    longitude: pos?.longitude
+    latitude: pos?.latitude ?? null,
+    longitude: pos?.longitude ?? null,
   });
 
-  // Local notification to warn driver (if notifications are available)
   if (Notifications) {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "⚠️ Anomaly Detected!",
-          body: "High G-Force event detected. Is everything okay? Tap SOS if you need help.",
+          title: 'Anomaly Detected!',
+          body: 'High G-Force event detected. Is everything okay? Tap SOS if you need help.',
           sound: true,
-          priority: Notifications.AndroidNotificationPriority.MAX,
+          priority: Notifications.AndroidNotificationPriority?.MAX,
         },
         trigger: null,
       });
-    } catch (error) {
-      console.error('Failed to schedule notification:', error);
+    } catch {
+      // Ignore local notification errors
     }
   }
 };

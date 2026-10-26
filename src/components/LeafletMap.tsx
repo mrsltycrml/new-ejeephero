@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useMemo } from 'react';
 import { StyleSheet, View, Platform } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { scriptJson } from '../utils/scriptJson';
 import { RouteData, TerminalData, VehicleData } from '../services/offlineTransitService';
 import { StopSafetyProfile, LateNightSafeRoutingResult } from '../services/densityRoutingService';
 import { GeofenceEvaluationResult, DEFAULT_CONFIGURED_BAY_RADIUS_METERS } from '../services/geofencingService';
@@ -27,11 +28,14 @@ interface LeafletMapProps {
   terminals: TerminalData[];
   vehicles: VehicleData[];
   userLocation?: { latitude: number; longitude: number } | null;
+  destinationPlace?: { name: string; latitude: number; longitude: number } | null;
+  hideOccupancy?: boolean;
   geofenceResult?: GeofenceEvaluationResult | null;
   densityProfiles?: Map<string, StopSafetyProfile>;
   safeRoutingResult?: LateNightSafeRoutingResult | null;
   selectedTerminal?: TerminalData | null;
   selectedVehicle?: VehicleData | null;
+  fleetMode?: boolean;
   isOffline?: boolean;
   onSelectTerminal?: (terminal: TerminalData) => void;
   onSelectVehicle?: (vehicle: VehicleData) => void;
@@ -42,36 +46,42 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   terminals,
   vehicles,
   userLocation,
+  destinationPlace,
+  hideOccupancy = false,
   geofenceResult,
   densityProfiles,
   safeRoutingResult,
   selectedTerminal,
   selectedVehicle,
+  fleetMode = false,
   isOffline = false,
   onSelectTerminal,
   onSelectVehicle,
 }, ref) => {
-  const webViewRef = useRef<WebView | null>(null);
+  const webViewRef = useRef<any>(null);
+  const NativeWebView = WebView as React.ComponentType<any>;
   const isWeb = Platform.OS === 'web';
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Expose imperative methods to parent (like recenter)
   useImperativeHandle(ref, () => ({
     centerOn: (latitude: number, longitude: number, zoom = 16) => {
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(zoom)) return;
       const clampedZoom = Math.min(Math.max(zoom, MAKATI_MIN_ZOOM), MAKATI_MAX_ZOOM);
       const js = `if (window.leafletMap) { window.leafletMap.flyTo([${latitude}, ${longitude}], ${clampedZoom}, { duration: 0.8 }); }`;
       if (isWeb && iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage({ type: 'EXECUTE', js }, '*');
+        iframeRef.current.contentWindow.postMessage({ type: 'CENTER', latitude, longitude, zoom: clampedZoom }, '*');
       } else {
         webViewRef.current?.injectJavaScript(js + '; true;');
       }
     },
     animateToRegion: (region) => {
+      if (!Number.isFinite(region.latitude) || !Number.isFinite(region.longitude)) return;
       const rawZoom = region.latitudeDelta && region.latitudeDelta < 0.01 ? 17 : 16;
       const clampedZoom = Math.min(Math.max(rawZoom, MAKATI_MIN_ZOOM), MAKATI_MAX_ZOOM);
       const js = `if (window.leafletMap) { window.leafletMap.flyTo([${region.latitude}, ${region.longitude}], ${clampedZoom}, { duration: 0.8 }); }`;
       if (isWeb && iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage({ type: 'EXECUTE', js }, '*');
+        iframeRef.current.contentWindow.postMessage({ type: 'CENTER', latitude: region.latitude, longitude: region.longitude, zoom: clampedZoom }, '*');
       } else {
         webViewRef.current?.injectJavaScript(js + '; true;');
       }
@@ -91,13 +101,13 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     }
 
     return {
-      routes: routes.map(r => ({
+      routes: routes.filter(r => Boolean(r.geometry_verified_at && r.geometry_source_url) && r.coordinates?.length > 1).map(r => ({
         id: r.id,
         name: r.name,
         color_code: r.color_code,
         coordinates: r.coordinates,
       })),
-      terminals: terminals.map(t => ({
+      terminals: terminals.filter(t => Boolean(t.location_verified_at && t.location_source_url)).map(t => ({
         id: t.id,
         name: t.name,
         latitude: t.latitude,
@@ -120,9 +130,12 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         max_capacity: v.max_capacity,
         speed: v.speed,
         isSpeeding: Boolean(v.isSpeeding),
+        isSample: Boolean(v.is_sample),
         isSelected: selectedVehicle?.id === v.id,
       })),
       userLocation: userLocation || null,
+      destinationPlace: destinationPlace || null,
+      hideOccupancy,
       bayRadius: DEFAULT_CONFIGURED_BAY_RADIUS_METERS,
       isOffline: Boolean(isOffline),
     };
@@ -131,6 +144,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     terminals,
     vehicles,
     userLocation,
+    destinationPlace,
+    hideOccupancy,
     geofenceResult,
     densityProfiles,
     safeRoutingResult,
@@ -139,15 +154,24 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     isOffline,
   ]);
 
-  // Push data updates dynamically to avoid reloading the page
-  useEffect(() => {
-    const dataStr = JSON.stringify(mapData);
+  const initialDataRef = useRef(mapData);
+  const latestMapDataRef = useRef(mapData);
+  latestMapDataRef.current = mapData;
+
+  const pushLatestData = () => {
+    const current = latestMapDataRef.current;
+    const dataStr = scriptJson(current);
     const js = `if (window.renderMapData) { window.renderMapData(${dataStr}); }`;
     if (isWeb && iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({ type: 'UPDATE_DATA', data: mapData }, '*');
+      iframeRef.current.contentWindow.postMessage({ type: 'UPDATE_DATA', data: current }, '*');
     } else {
       webViewRef.current?.injectJavaScript(js + '; true;');
     }
+  };
+
+  // Push data updates dynamically to avoid reloading the page
+  useEffect(() => {
+    pushLatestData();
   }, [mapData, isWeb]);
 
   const htmlContent = useMemo(() => `
@@ -155,9 +179,11 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://unpkg.com; style-src 'unsafe-inline' https://unpkg.com; img-src data: blob: https://tile.openstreetmap.org https://unpkg.com; connect-src 'none'; base-uri 'none'; form-action 'none'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #map { width: 100%; height: 100%; overflow: hidden; background-color: #edf1f3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -247,6 +273,10 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       font-weight: 800;
       color: #203B53;
     }
+    .vehicle-icon-circle.selected {
+      outline: 3px solid #A62B36;
+      outline-offset: 2px;
+    }
 
     /* User Pulse Dot */
     .user-pulse-container {
@@ -316,19 +346,35 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     <span class="offline-dot"></span> Offline Makati Map Active
   </div>
   <script>
-    // 1. IDEA 1: HARD CAMERA LOCK TO MAKATI CITY
-    // Constrained bounds & viscosity=1.0 so user cannot pan outside Makati.
-    // minZoom=13 prevents zooming out of Makati, while maxZoom=19 permits granular street/building zoom.
+    function escapedMapText(value) { return String(value).replace(/[&<>"']/g, function(c) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
+    if (typeof L === 'undefined') {
+      document.getElementById('offline-badge').style.display = 'flex';
+      window.renderMapData = function(data) {
+        var mapEl = document.getElementById('map');
+        if (!mapEl) return;
+        var terms = (data && data.terminals) || [];
+        var listHtml = terms.slice(0, 10).map(function(t) {
+          return '<div style="padding:8px 12px;margin:4px 0;background:#fff;border-radius:8px;border:1px solid #dce2e8;font-size:12px;color:#1f2d3a;font-weight:600;">' +
+            escapedMapText(t.name) + ' <span style="color:#778493;font-weight:400;">(' + Number(t.latitude).toFixed(4) + ', ' + Number(t.longitude).toFixed(4) + ')</span></div>';
+        }).join('');
+        mapEl.innerHTML = '<div style="padding:16px;padding-top:48px;height:100%;overflow-y:auto;background:#f4f1ea;">' +
+          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">Offline Makati Transit Schematic</div>' +
+          listHtml + '</div>';
+      };
+      window.renderMapData(${scriptJson(initialDataRef.current)});
+    } else {
+    // The fleet view covers the full Makati–Mandaluyong corridor.
+    // Passenger maps retain the existing Makati-focused bounds.
     var MAKATI_BOUNDS = ${JSON.stringify(MAKATI_BOUNDS)};
     var map = L.map('map', {
       zoomControl: false,
       attributionControl: true,
-      minZoom: ${MAKATI_MIN_ZOOM},
+      minZoom: ${fleetMode ? 11 : MAKATI_MIN_ZOOM},
       maxZoom: ${MAKATI_MAX_ZOOM},
-      maxBounds: MAKATI_BOUNDS,
-      maxBoundsViscosity: 1.0,
+      maxBounds: ${fleetMode ? 'undefined' : 'MAKATI_BOUNDS'},
+      maxBoundsViscosity: ${fleetMode ? 0 : 1},
       bounceAtZoomLimits: true
-    }).setView([${MAKATI_CENTER.latitude}, ${MAKATI_CENTER.longitude}], ${MAKATI_DEFAULT_ZOOM});
+    }).setView([${fleetMode ? 14.567 : MAKATI_CENTER.latitude}, ${fleetMode ? 121.033 : MAKATI_CENTER.longitude}], ${fleetMode ? 14 : MAKATI_DEFAULT_ZOOM});
     window.leafletMap = map;
 
     // 2. IDEA 3: OFFLINE TILE CACHING & FALLBACK
@@ -347,8 +393,12 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         tile.setAttribute('role', 'presentation');
         var url = this.getTileUrl(coords);
 
-        if (window.caches) {
-          caches.open('ejeep-makati-tiles-v1').then(function(cache) {
+        // Opaque-origin frames and private browsers can throw even when reading
+        // CacheStorage. Keep isolation and fall back to ordinary image requests.
+        var tileCaches = null;
+        try { tileCaches = window.caches; } catch (_) {}
+        if (tileCaches) {
+          tileCaches.open('ejeep-makati-tiles-v1').then(function(cache) {
             cache.match(url).then(function(cachedResponse) {
               if (cachedResponse) {
                 cachedResponse.blob().then(function(blob) {
@@ -397,14 +447,16 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       }
     });
 
-    new OfflineTileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Standard OSM tiles use normal browser caching; do not bulk-cache them
+    // for offline use. The route and live markers remain available separately.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      minZoom: ${MAKATI_MIN_ZOOM},
+      minZoom: ${fleetMode ? 11 : MAKATI_MIN_ZOOM},
       maxZoom: ${MAKATI_MAX_ZOOM}
     }).addTo(map);
 
-    // 3. IDEA 2: VISUAL MAKATI BOUNDARY MASKING
-    // Inverted Donut Mask: Dims surrounding cities (Manila, Pasay, Mandaluyong, Taguig)
+    // Keep the city mask in the passenger view; it would obscure Mandaluyong units.
+    if (!${fleetMode}) {
     var worldRing = ${JSON.stringify(WORLD_MASK_OUTER_RING)};
     var makatiCoords = ${JSON.stringify(MAKATI_BOUNDARY_COORDINATES)};
     L.polygon([worldRing, makatiCoords], {
@@ -422,6 +474,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       dashArray: '5, 5',
       interactive: false
     }).addTo(map);
+    }
 
     // Layer Groups
     var routesLayer = L.layerGroup().addTo(map);
@@ -437,6 +490,12 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       } else if (window.parent) {
         window.parent.postMessage(msg, '*');
       }
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, function(character) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
+      });
     }
 
     window.renderMapData = function(data) {
@@ -495,7 +554,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           
           var html = '<div class="terminal-marker">' +
             '<div class="' + pinClasses + '">' + iconSymbol + '</div>' +
-            '<div class="terminal-badge" style="background-color:' + badgeColor + '">' + term.profile.crowdCount + '</div>' +
+            '<div class="terminal-badge" style="background-color:' + badgeColor + '">' + Number(term.profile.crowdCount || 0) + '</div>' +
             '</div>';
 
           var markerIcon = L.divIcon({
@@ -519,14 +578,15 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           var isPuno = veh.status === 'Puno';
           var isSakto = veh.status === 'Sakto';
           var statusColor = veh.isSpeeding ? '#D32F2F' : (isPuno ? '#F44336' : (isSakto ? '#FF9800' : '#4CAF50'));
-          var vehicleStatusText = veh.isSpeeding ? 'SPEEDING' : veh.status;
+          var vehicleStatusText = veh.isSample ? 'Sample' : (data.hideOccupancy ? 'Live' : (veh.isSpeeding ? 'SPEEDING' : veh.status));
+          if (data.hideOccupancy) statusColor = '#B63D32';
 
           var vHtml = '<div class="vehicle-marker-wrapper">' +
             '<div class="vehicle-pill" style="border-color:' + statusColor + '; color:' + statusColor + ';">' +
             '<span class="dot" style="background-color:' + statusColor + ';"></span>' +
-            (veh.body_number || 'Vehicle') + ' • ' + vehicleStatusText +
+            escapeHtml(veh.body_number || veh.plate_number || 'Vehicle') + ' • ' + escapeHtml(vehicleStatusText) +
             '</div>' +
-            '<div class="vehicle-icon-circle" style="border-color:' + statusColor + ';">' +
+            '<div class="vehicle-icon-circle' + (veh.isSelected ? ' selected' : '') + '" style="border-color:' + statusColor + ';">' +
             'EJ' +
             '</div>' +
             '</div>';
@@ -543,10 +603,25 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
             sendEvent('SELECT_VEHICLE', { id: veh.id });
           });
         });
+        var tracked = data.vehicles.find(function(veh) { return veh.isSelected; });
+        if (tracked) {
+          var trackKey = tracked.id + ':' + Number(tracked.latitude).toFixed(5) + ':' + Number(tracked.longitude).toFixed(5);
+          if (window.lastTrackedVehicle !== trackKey) {
+            map.flyTo([tracked.latitude, tracked.longitude], Math.max(map.getZoom(), 16), { duration: 0.6 });
+            window.lastTrackedVehicle = trackKey;
+          }
+        } else {
+          window.lastTrackedVehicle = null;
+        }
       }
 
       // 4. Draw User Location
       userLayer.clearLayers();
+      if (data.destinationPlace) {
+        var placeLabel = document.createElement('span');
+        placeLabel.textContent = 'Destination: ' + data.destinationPlace.name;
+        L.marker([data.destinationPlace.latitude, data.destinationPlace.longitude], { title: 'Destination: ' + data.destinationPlace.name }).bindPopup(placeLabel).addTo(userLayer);
+      }
       if (data.userLocation) {
         var uHtml = '<div class="user-pulse-container">' +
           '<div class="user-pulse-ring"></div>' +
@@ -563,34 +638,55 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     };
 
     // Initial render
-    window.renderMapData(${JSON.stringify(mapData)});
+    window.renderMapData(${scriptJson(initialDataRef.current)});
+    }
 
     // Handle iframe messages on web
     window.addEventListener('message', function(e) {
+      if (e.source !== window.parent) return;
       if (e.data && e.data.type === 'UPDATE_DATA') {
         window.renderMapData(e.data.data);
-      } else if (e.data && e.data.type === 'EXECUTE') {
-        try { eval(e.data.js); } catch(err) { console.error(err); }
+      } else if (e.data && e.data.type === 'CENTER' && window.leafletMap) {
+        var lat=Number(e.data.latitude), lon=Number(e.data.longitude), zoom=Number(e.data.zoom);
+        if (Number.isFinite(lat) && Number.isFinite(lon) && Number.isFinite(zoom)) window.leafletMap.flyTo([lat,lon],Math.min(19,Math.max(10,zoom)),{duration:0.2});
       }
     });
   </script>
 </body>
 </html>
-  `, [mapData]);
+  `, [fleetMode]);
+
+  const handleRawMessage = React.useCallback(
+    (raw: unknown) => {
+      try {
+        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!data || typeof data !== 'object') return;
+        const payload = data as { type?: string; id?: string };
+        if (payload.type === 'SELECT_TERMINAL' && onSelectTerminal) {
+          const found = terminals.find((t) => t.id === payload.id);
+          if (found) onSelectTerminal(found);
+        } else if (payload.type === 'SELECT_VEHICLE' && onSelectVehicle) {
+          const found = vehicles.find((v) => v.id === payload.id);
+          if (found) onSelectVehicle(found);
+        }
+      } catch {
+        // ignore non-map messages
+      }
+    },
+    [onSelectTerminal, onSelectVehicle, terminals, vehicles]
+  );
+
+  useEffect(() => {
+    if (!isWeb || typeof window === 'undefined') return;
+    const listener = (event: MessageEvent) => {
+      if (event.source === iframeRef.current?.contentWindow) handleRawMessage(event.data);
+    };
+    window.addEventListener('message', listener);
+    return () => window.removeEventListener('message', listener);
+  }, [isWeb, handleRawMessage]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'SELECT_TERMINAL' && onSelectTerminal) {
-        const found = terminals.find(t => t.id === data.id);
-        if (found) onSelectTerminal(found);
-      } else if (data.type === 'SELECT_VEHICLE' && onSelectVehicle) {
-        const found = vehicles.find(v => v.id === data.id);
-        if (found) onSelectVehicle(found);
-      }
-    } catch {
-      // ignore
-    }
+    handleRawMessage(event.nativeEvent.data);
   };
 
   if (isWeb) {
@@ -599,6 +695,9 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         <iframe
           ref={iframeRef as any}
           srcDoc={htmlContent}
+          sandbox="allow-scripts allow-same-origin"
+          referrerPolicy="strict-origin-when-cross-origin"
+          onLoad={pushLatestData}
           style={{ width: '100%', height: '100%', border: 'none' }}
           title="Leaflet Map"
         />
@@ -608,17 +707,17 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
 
   return (
     <View style={styles.container}>
-      <WebView
+      <NativeWebView
         ref={webViewRef}
         originWhitelist={['*']}
         source={{ html: htmlContent }}
         style={styles.map}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        onLoadEnd={pushLatestData}
         onMessage={handleMessage}
         scrollEnabled={false}
         overScrollMode="never"
-        scalesPageToFit={true}
       />
     </View>
   );

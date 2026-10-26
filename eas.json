@@ -12,11 +12,27 @@
       "channel": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://neifadvftploburrtfmb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_VqkkE5u0VSuop1vq-t3zEA_nilN0jmV",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Zmlyc3QtZG9lLTQ0MDAuY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "EXPO_PUBLIC_R2_PUBLIC_URL": "https://ejeephero.carlosbusuego15.workers.dev",
+        "EXPO_PUBLIC_PWA_URL": "https://ejeephero.carlosbusuego15.workers.dev",
+        "EXPO_PUBLIC_APK_DOWNLOAD_URL": "https://ejeephero.carlosbusuego15.workers.dev/releases/ejeephero-latest.apk"
       }
     },
     "production": {
       "channel": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://neifadvftploburrtfmb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_VqkkE5u0VSuop1vq-t3zEA_nilN0jmV",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Zmlyc3QtZG9lLTQ0MDAuY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "EXPO_PUBLIC_R2_PUBLIC_URL": "https://ejeephero.carlosbusuego15.workers.dev",
+        "EXPO_PUBLIC_PWA_URL": "https://ejeephero.carlosbusuego15.workers.dev",
+        "EXPO_PUBLIC_APK_DOWNLOAD_URL": "https://ejeephero.carlosbusuego15.workers.dev/releases/ejeephero-latest.apk"
+      }
     }
   },
   "submit": {

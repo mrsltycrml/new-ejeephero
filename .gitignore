@@ -43,3 +43,15 @@ yarn-error.*
 
 # supabase CLI temp folder
 supabase/.temp/
+
+# Local release artifacts and security evidence
+.release/
+
+# Local QA captures, build packages, and review evidence
+*-preview.png
+*.apk
+.impeccable/review/
+
+# One-time QA account/session helpers
+scripts/qa-signin.mjs
+scripts/verify-data-access.mjs

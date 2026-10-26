@@ -10,11 +10,19 @@ test('fare adds the route rate only beyond the included distance', () => {
   assert.equal(calculateConfiguredFare(6, { base_fare: 17, per_km_rate: 2.4, base_distance_km: 4 }, 'regular'), 21.75);
 });
 
-test('discounted passenger fares apply the 20% discount and round to the nearest quarter peso', () => {
+test('discounted passenger fares apply the discount to the base only', () => {
   const route = { base_fare: 17, per_km_rate: 2.4, base_distance_km: 4 };
-  assert.equal(calculateConfiguredFare(6, route, 'student'), 17.5);
-  assert.equal(calculateConfiguredFare(6, route, 'senior'), 17.5);
-  assert.equal(calculateConfiguredFare(6, route, 'pwd'), 17.5);
+  assert.equal(calculateConfiguredFare(6, route, 'student'), 18.5);
+  assert.equal(calculateConfiguredFare(6, route, 'senior'), 18.5);
+  assert.equal(calculateConfiguredFare(6, route, 'pwd'), 18.5);
+});
+
+test('operator-reported fare adds one peso per km for every passenger type', () => {
+  const route = { base_fare: 15, per_km_rate: 1, base_distance_km: 4 };
+  assert.equal(calculateConfiguredFare(6, route, 'regular'), 17);
+  assert.equal(calculateConfiguredFare(6, route, 'student'), 14);
+  assert.equal(calculateConfiguredFare(6, route, 'senior'), 14);
+  assert.equal(calculateConfiguredFare(6, route, 'pwd'), 14);
 });
 
 test('route distance sums consecutive stop segments', () => {
@@ -41,7 +49,7 @@ test('walk-and-save recommends a nearby later stop only when it lowers the estim
   });
   assert.equal(suggestion?.stop.id, 'b');
   assert.equal(suggestion?.walkingTimeMinutes, 2);
-  assert.ok((suggestion?.savings ?? 0) > 1);
+  assert.ok((suggestion?.savings ?? 0) >= 1);
 });
 
 test('walk-and-save stays silent when no cheaper stop is within walking range', () => {
