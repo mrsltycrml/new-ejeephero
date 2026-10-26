@@ -1,0 +1,7 @@
+[functions.emergency-dispatch]
+# Both Supabase and Clerk sessions are cryptographically verified inside the handler.
+verify_jwt = false
+
+[functions.herobot-chat]
+# Identity is verified by the signed JWT + PostgREST/RLS inside this handler.
+verify_jwt = false

@@ -1,0 +1,2 @@
+-- Historical hybrid-auth migration already applied by the original project.
+-- Its original SQL remains in the remote migration ledger.

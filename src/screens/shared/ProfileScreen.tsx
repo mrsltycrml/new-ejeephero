@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator, Modal, Platform } from 'react-native';
+import { useUser } from '@clerk/clerk-expo';
 import { useAuth } from '../../contexts/AuthContext';
+import { isClerkConfigured } from '../../lib/clerk';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseAuth } from '../../lib/supabase';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../../locales/i18n';
+import AppDownloadModal from '../../components/AppDownloadModal';
 
 export default function ProfileScreen() {
-  const { user, role, status, isAdmin, fullName, signOut, refreshProfile } = useAuth();
+  const { user, role, status, isAdmin, fullName, authProvider, signOut, refreshProfile } = useAuth();
   const { i18n, t } = useTranslation();
+  const [downloadModalVisible, setDownloadModalVisible] = useState(false);
 
   // Edit Name State
   const [isEditingName, setIsEditingName] = useState(false);
@@ -18,9 +22,18 @@ export default function ProfileScreen() {
 
   // Password Reset State
   const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  const clerkUserHook = isClerkConfigured ? useUser() : null;
+
+  useEffect(() => {
+    if (!isEditingName) {
+      setNewName(fullName);
+    }
+  }, [fullName, isEditingName]);
 
   // Language Selector State
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
@@ -99,55 +112,65 @@ export default function ProfileScreen() {
       Alert.alert('Required Fields', 'Please fill in both password fields.');
       return;
     }
-    if (newPassword.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+    const minLen = authProvider === 'clerk' ? 15 : 6;
+    if (newPassword.length < minLen) {
+      Alert.alert('Validation Error', `Password must be at least ${minLen} characters.`);
       return;
     }
     if (newPassword !== confirmPassword) {
       Alert.alert('Validation Error', 'Passwords do not match.');
       return;
     }
+    if (authProvider === 'clerk' && !currentPassword) {
+      Alert.alert('Current Password Required', 'Enter your current password to verify this change.');
+      return;
+    }
 
     setUpdatingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-
-      if (error) {
-        Alert.alert('Error', error.message);
-      } else {
+      if (authProvider === 'clerk' && clerkUserHook?.user) {
+        await clerkUserHook.user.updatePassword({
+          currentPassword,
+          newPassword,
+        });
+        setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setShowPasswordSection(false);
         Alert.alert('Success', 'Password updated successfully!');
+      } else {
+        const { error } = await supabaseAuth.auth.updateUser({ password: newPassword });
+        if (error) {
+          Alert.alert('Error', error.message);
+        } else {
+          setNewPassword('');
+          setConfirmPassword('');
+          setShowPasswordSection(false);
+          Alert.alert('Success', 'Password updated successfully!');
+        }
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update password.');
+      const msg = err?.errors?.[0]?.longMessage || err?.message || 'Failed to update password.';
+      Alert.alert('Error', msg);
     } finally {
       setUpdatingPassword(false);
     }
   };
 
-  const roleBadgeColor = role === 'driver' ? Colors.primaryRed : Colors.primaryYellow;
-  const roleBadgeText = role === 'driver' ? 'Driver' : 'Passenger';
+  const roleBadgeColor = isAdmin ? '#37535A' : role === 'driver' ? Colors.ink : '#78512F';
+  const roleBadgeText = isAdmin ? 'Admin' : role === 'driver' ? 'Driver' : 'Passenger';
+  const roleIcon = isAdmin ? 'shield-checkmark' : role === 'driver' ? 'car' : 'people';
   const statusColor = status === 'approved' ? '#4CAF50' : status === 'pending' ? '#FF9800' : '#F44336';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Avatar Card */}
       <View style={styles.avatarCard}>
         <View style={styles.avatarCircle}>
-          <Ionicons name="person" size={48} color={Colors.white} />
+          <Ionicons name="person" size={30} color={Colors.ink} />
         </View>
-        <Text style={styles.nameHeader}>{fullName || 'No Name Set'}</Text>
-        <Text style={styles.emailHeader}>{user?.email || 'Unknown'}</Text>
-        <View style={[styles.roleBadge, { backgroundColor: roleBadgeColor }]}>
-          <Ionicons
-            name={role === 'driver' ? 'car' : 'people'}
-            size={14}
-            color={Colors.white}
-            style={{ marginRight: 6 }}
-          />
-          <Text style={styles.roleBadgeText}>{roleBadgeText}</Text>
+        <View style={styles.heroIdentity}>
+          <Text style={styles.nameHeader}>{fullName || (isAdmin ? 'Admin' : 'No Name Set')}</Text>
+          <Text style={styles.emailHeader}>{user?.email || 'Unknown'}</Text>
         </View>
       </View>
 
@@ -160,7 +183,7 @@ export default function ProfileScreen() {
         {/* Full Name Edit Row */}
         <View style={styles.settingsRow}>
           <View style={styles.infoIconBg}>
-            <Ionicons name="person-outline" size={20} color={Colors.primaryRed} />
+            <Ionicons name="person-outline" size={20} color={Colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>Full Name</Text>
@@ -176,7 +199,7 @@ export default function ProfileScreen() {
                 <View style={styles.editActions}>
                   <TouchableOpacity onPress={handleSaveName} disabled={updatingName} style={styles.iconButton}>
                     {updatingName ? (
-                      <ActivityIndicator size="small" color={Colors.primaryRed} />
+                      <ActivityIndicator size="small" color={Colors.ink} />
                     ) : (
                       <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
                     )}
@@ -197,7 +220,7 @@ export default function ProfileScreen() {
                   onPress={() => { setIsEditingName(true); setNewName(fullName); }}
                   style={styles.editBtn}
                 >
-                  <Ionicons name="pencil" size={16} color={Colors.primaryRed} />
+                  <Ionicons name="pencil" size={16} color={Colors.ink} />
                 </TouchableOpacity>
               </View>
             )}
@@ -209,7 +232,7 @@ export default function ProfileScreen() {
         {/* Email Row (Non-Editable) */}
         <View style={styles.settingsRow}>
           <View style={styles.infoIconBg}>
-            <Ionicons name="mail-outline" size={20} color={Colors.primaryRed} />
+            <Ionicons name="mail-outline" size={20} color={Colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>Email</Text>
@@ -217,12 +240,10 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.divider} />
-
         {/* Account Status Row */}
-        <View style={styles.settingsRow}>
+        {role !== 'driver' && <><View style={styles.divider} /><View style={styles.settingsRow}>
           <View style={styles.infoIconBg}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primaryRed} />
+            <Ionicons name="shield-checkmark-outline" size={20} color={Colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>Account Status</Text>
@@ -233,43 +254,35 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
-        </View>
+        </View></>}
 
-        <View style={styles.divider} />
-
-        {/* Role Row */}
-        <View style={styles.settingsRow}>
-          <View style={styles.infoIconBg}>
-            <Ionicons name="id-card-outline" size={20} color={Colors.primaryRed} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.infoLabel}>Role</Text>
-            <Text style={styles.infoValueReadOnly}>{roleBadgeText}</Text>
-          </View>
-        </View>
-
-        {isAdmin && (
-          <>
-            <View style={styles.divider} />
-            <View style={styles.settingsRow}>
-              <View style={[styles.infoIconBg, { backgroundColor: '#FFF3E0' }]}>
-                <Ionicons name="star" size={20} color="#FF9800" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.infoLabel}>Admin Access</Text>
-                <Text style={[styles.infoValue, { color: '#FF9800' }]}>Enabled</Text>
-              </View>
+        {role === 'passenger' && !isAdmin && <>
+          <View style={styles.divider} />
+          <View style={styles.settingsRow}>
+            <View style={styles.infoIconBg}>
+              <Ionicons name="id-card-outline" size={20} color={Colors.ink} />
             </View>
-          </>
-        )}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.infoLabel}>Role</Text>
+              <Text style={styles.infoValueReadOnly}>{roleBadgeText}</Text>
+            </View>
+          </View>
+        </>}
+
       </View>
 
       {/* Security settings / Change Password */}
       <TouchableOpacity
         style={styles.collapseHeader}
+        accessibilityRole="button"
+        accessibilityLabel="Password and security settings"
+        accessibilityState={{ expanded: showPasswordSection }}
         onPress={() => setShowPasswordSection(!showPasswordSection)}
       >
-        <Text style={styles.sectionTitle}>{t('profile.accountSettings')}</Text>
+        <View style={styles.securityHeading}>
+          <View style={styles.securityIcon}><Ionicons name="lock-closed-outline" size={20} color={Colors.ink} /></View>
+          <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>Password & security</Text><Text style={styles.securitySub}>Change your sign-in password</Text></View>
+        </View>
         <Ionicons
           name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
           size={20}
@@ -279,11 +292,24 @@ export default function ProfileScreen() {
 
       {showPasswordSection && (
         <View style={styles.infoCard}>
-          <Text style={styles.passwordTitle}>Change Password</Text>
-          
+          <Text style={styles.passwordTitle}>Change password</Text>
+
+          {authProvider === 'clerk' && (
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Current Password"
+              accessibilityLabel="Current password"
+              placeholderTextColor="#A0A0A0"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+            />
+          )}
+
           <TextInput
             style={styles.passwordInput}
-            placeholder="New Password (min 6 characters)"
+            placeholder={authProvider === 'clerk' ? 'New Password (min 15 characters)' : 'New Password (min 6 characters)'}
+            accessibilityLabel="New password"
             placeholderTextColor="#A0A0A0"
             value={newPassword}
             onChangeText={setNewPassword}
@@ -293,6 +319,7 @@ export default function ProfileScreen() {
           <TextInput
             style={styles.passwordInput}
             placeholder="Confirm New Password"
+            accessibilityLabel="Confirm new password"
             placeholderTextColor="#A0A0A0"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
@@ -322,7 +349,7 @@ export default function ProfileScreen() {
         onPress={() => setShowLanguageSelector(true)}
       >
         <View style={styles.languageIconBg}>
-          <Ionicons name="globe-outline" size={22} color={Colors.primaryRed} />
+          <Ionicons name="globe-outline" size={22} color={Colors.ink} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.languageLabel}>{t('profile.language')}</Text>
@@ -360,7 +387,7 @@ export default function ProfileScreen() {
                 <Ionicons 
                   name={i18n.language === 'en' ? 'radio-button-on' : 'radio-button-off'} 
                   size={24} 
-                  color={i18n.language === 'en' ? Colors.primaryRed : Colors.subtleGray}
+                  color={i18n.language === 'en' ? Colors.ink : Colors.subtleGray}
                   style={{ marginRight: 12 }}
                 />
                 <Text style={[styles.languageOptionText, i18n.language === 'en' && styles.languageOptionTextActive]}>
@@ -378,7 +405,7 @@ export default function ProfileScreen() {
                 <Ionicons 
                   name={i18n.language === 'fil' ? 'radio-button-on' : 'radio-button-off'} 
                   size={24} 
-                  color={i18n.language === 'fil' ? Colors.primaryRed : Colors.subtleGray}
+                  color={i18n.language === 'fil' ? Colors.ink : Colors.subtleGray}
                   style={{ marginRight: 12 }}
                 />
                 <Text style={[styles.languageOptionText, i18n.language === 'fil' && styles.languageOptionTextActive]}>
@@ -390,12 +417,27 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* App Info */}
-      <View style={styles.appInfoCard}>
-        <Text style={styles.appInfoTitle}>EjeepHero</Text>
-        <Text style={styles.appInfoVersion}>Version 1.0.0</Text>
-        <Text style={styles.appInfoDesc}>Philippine e-Jeepney Transit Tracker</Text>
-      </View>
+      {/* App Download / iOS PWA Guide */}
+      <TouchableOpacity
+        style={styles.languageCard}
+        onPress={() => setDownloadModalVisible(true)}
+      >
+        <View style={styles.languageIconBg}>
+          <Ionicons name="phone-portrait-outline" size={22} color={Colors.ink} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.languageLabel}>MOBILE DISTRIBUTION</Text>
+          <Text style={styles.languageValue}>
+            Download Android APK / iOS Install Guide
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.subtleGray} />
+      </TouchableOpacity>
+
+      <AppDownloadModal
+        visible={downloadModalVisible}
+        onClose={() => setDownloadModalVisible(false)}
+      />
 
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -409,62 +451,61 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.offWhite,
+    backgroundColor: Colors.canvas,
   },
   content: {
-    padding: 20,
-    paddingBottom: 40,
+    width: '100%',
+    maxWidth: 920,
+    alignSelf: 'center',
+    padding: 18,
+    paddingBottom: 36,
   },
   avatarCard: {
-    backgroundColor: Colors.primaryRed,
-    borderRadius: 24,
-    padding: 30,
+    paddingVertical: 8,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: Colors.primaryRed,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 6,
+    marginBottom: 22,
   },
   avatarCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.sand,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 3,
-    borderColor: Colors.primaryYellow,
+    marginRight: 18,
   },
+  heroIdentity: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   nameHeader: {
-    color: Colors.white,
+    color: Colors.ink,
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '600',
     marginBottom: 4,
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
   emailHeader: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
+    maxWidth: '100%',
+    flexShrink: 1,
+    ...(Platform.OS === 'web' ? { overflowWrap: 'anywhere' as any } : {}),
+    color: Colors.subtleGray,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '500',
-    marginBottom: 14,
-    textAlign: 'center',
+    marginBottom: 10,
   },
   roleBadge: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 7,
     alignItems: 'center',
   },
   roleBadgeText: {
     color: Colors.white,
-    fontSize: 13,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'none',
+    letterSpacing: 0.8,
   },
   sectionHeader: {
     marginBottom: 10,
@@ -474,27 +515,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 6,
     marginBottom: 12,
-    paddingHorizontal: 4,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.paper,
   },
+  securityHeading: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  securityIcon: { width: 40, height: 40, borderRadius: 6, backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center' },
+  securitySub: { color: Colors.subtleGray, fontSize: 12, marginTop: 3 },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '600',
     color: Colors.darkText,
   },
   infoCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    padding: 20,
+    backgroundColor: Colors.paper,
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#F0E6D8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    borderColor: Colors.border,
   },
   settingsRow: {
     flexDirection: 'row',
@@ -504,17 +548,17 @@ const styles = StyleSheet.create({
   infoIconBg: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    backgroundColor: Colors.paper,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
   },
   infoLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.subtleGray,
     fontWeight: '700',
-    textTransform: 'uppercase',
+    textTransform: 'none',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
@@ -525,7 +569,7 @@ const styles = StyleSheet.create({
   },
   infoValueReadOnly: {
     fontSize: 16,
-    color: '#777',
+    color: Colors.subtleGray,
     fontWeight: '500',
   },
   displayRow: {
@@ -548,7 +592,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.offWhite,
     borderWidth: 1,
-    borderColor: '#E8DFD3',
+    borderColor: Colors.border,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -565,7 +609,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#F0E6D8',
+    backgroundColor: Colors.border,
   },
   statusDot: {
     width: 8,
@@ -581,22 +625,22 @@ const styles = StyleSheet.create({
   passwordInput: {
     backgroundColor: Colors.offWhite,
     borderWidth: 1,
-    borderColor: '#E8DFD3',
+    borderColor: Colors.border,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 6,
     fontSize: 15,
     color: Colors.darkText,
     marginBottom: 12,
   },
   updatePasswordBtn: {
-    backgroundColor: Colors.primaryRed,
+    backgroundColor: Colors.ink,
     flexDirection: 'row',
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 4,
-    shadowColor: Colors.primaryRed,
+    shadowColor: Colors.ink,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
@@ -607,59 +651,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
   },
-  appInfoCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#F0E6D8',
-  },
-  appInfoTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: Colors.primaryRed,
-    letterSpacing: 0.5,
-  },
-  appInfoVersion: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    marginTop: 4,
-  },
-  appInfoDesc: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 2,
-  },
   languageCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.paper,
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 14,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E8DFD3',
+    borderColor: Colors.border,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
   },
   languageIconBg: {
     width: 44,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: '#FFF0F0',
+    borderRadius: 8,
+    backgroundColor: Colors.paper,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   languageLabel: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: Colors.subtleGray,
     letterSpacing: 0.5,
     marginBottom: 2,
@@ -690,7 +704,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '600',
     color: Colors.darkText,
   },
   languageOptions: {
@@ -701,14 +715,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: Colors.offWhite,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   languageOptionActive: {
     backgroundColor: '#FFF5F5',
-    borderColor: Colors.primaryRed,
+    borderColor: Colors.ink,
   },
   languageOptionText: {
     fontSize: 16,
@@ -716,14 +730,14 @@ const styles = StyleSheet.create({
     color: Colors.darkText,
   },
   languageOptionTextActive: {
-    color: Colors.primaryRed,
+    color: Colors.ink,
     fontWeight: '700',
   },
   logoutButton: {
-    backgroundColor: Colors.accentRed,
+    backgroundColor: Colors.ink,
     flexDirection: 'row',
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: Colors.accentRed,

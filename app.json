@@ -1,26 +1,24 @@
 {
   "expo": {
-    "name": "EjeepHero",
+    "name": "eSAKAY",
     "slug": "ejeephero",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/esakay-app-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ejeephero.mobile",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "EjeepHero needs your location to track your ride and show your position on the map.",
-        "NSMotionUsageDescription": "EjeepHero needs accelerometer access to detect potential anomalies or crashes."
+        "NSLocationWhenInUseUsageDescription": "eSAKAY needs your location to track your ride and show your position on the map.",
+        "NSMotionUsageDescription": "eSAKAY needs accelerometer access to detect potential anomalies or crashes."
       }
     },
     "android": {
       "package": "com.ejeephero.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#1F4E79",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/esakay-app-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -31,19 +29,23 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/esakay-app-icon.png",
+      "name": "eSAKAY",
+      "shortName": "eSAKAY",
+      "themeColor": "#FFFFFF",
+      "backgroundColor": "#F5F4F1"
     },
     "plugins": [
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow EjeepHero to show your location and share an active e-jeep shift."
+          "locationWhenInUsePermission": "Allow eSAKAY to show your location and share an active e-jeep shift."
         }
       ],
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/esakay-app-icon.png",
           "color": "#C41E3A",
           "defaultChannel": "general"
         }
@@ -51,13 +53,20 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow EjeepHero to access your contacts to set emergency speed dials."
+          "contactsPermission": "Allow eSAKAY to access your contacts to set emergency speed dials."
         }
       ],
       "expo-sensors",
       "expo-sqlite",
       "expo-font",
-      "expo-status-bar"
-    ]
+      "expo-status-bar",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5b2ac721-6a0d-4fc2-b767-44635d065cd7"
+      }
+    }
   }
 }

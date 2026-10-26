@@ -1,0 +1,2 @@
+-- Historical migration already applied by the original Supabase project.
+-- Original SQL is retained in the project's migration ledger; do not reseed.
