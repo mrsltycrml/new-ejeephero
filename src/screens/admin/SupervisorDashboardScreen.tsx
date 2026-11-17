@@ -136,6 +136,7 @@ export default function SupervisorDashboardScreen() {
   const [unitChoices, setUnitChoices] = useState<UnitChoice[]>([]);
   const [mapRouteFilter, setMapRouteFilter] = useState('all');
   const [mapUnitFilter, setMapUnitFilter] = useState('all');
+  const [vehicleFocusRequestId, setVehicleFocusRequestId] = useState<string | number>();
   const [routeMenuOpen, setRouteMenuOpen] = useState(false);
   const [unitMenuOpen, setUnitMenuOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -331,6 +332,7 @@ export default function SupervisorDashboardScreen() {
     if (!requestedTrackKey) return;
     setMapRouteFilter('all');
     setMapUnitFilter(requestedTrackKey);
+    setVehicleFocusRequestId(route.params?.trackRequestId);
     setActivityView('map');
     setManageMode('none');
   }, [requestedTrackKey, route.params?.trackRequestId]);
@@ -604,6 +606,7 @@ export default function SupervisorDashboardScreen() {
                 terminals={mapTerminals}
                 vehicles={mapVehicles}
                 selectedVehicle={selectedMapVehicle}
+                vehicleFocusRequestId={vehicleFocusRequestId}
                 selectedRouteId={mapRouteFilter === 'all' ? null : mapRouteFilter}
                 fleetMode
               />

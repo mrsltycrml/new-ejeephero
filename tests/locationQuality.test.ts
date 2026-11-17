@@ -30,6 +30,9 @@ test('device units convert once and captured time, zero and unknown values survi
   assert.throws(() => positionPayload('v', fix, now + 31000), /stale/);
 });
 test('transition rejects duplicates and impossible jumps but recovers after a long observation gap', () => {
+  const jump = { ...fix, latitude: 15, timestamp: now + 1000 };
+  assert.equal(locationQuality(jump, now + 1000), 'live');
+  assert.equal(acceptFix(fix, jump, now + 1000), false);
   assert.equal(acceptFix(fix, fix, now), false);
   assert.equal(acceptFix({ ...fix, timestamp: now - 5000 }, { ...fix, latitude: 15 }, now), false);
   assert.equal(acceptFix({ ...fix, timestamp: now - 300000 }, { ...fix, latitude: 15 }, now), true);

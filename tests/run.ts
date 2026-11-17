@@ -14,3 +14,4 @@ import './routeMap.test.ts';
 // Module-hook fixtures must finish importing before the next hook is installed.
 await import('./mapHtmlSerialization.test.ts');
 await import('./anomalyLocation.test.ts');
+await import('./driverShiftStart.test.ts');

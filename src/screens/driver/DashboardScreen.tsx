@@ -13,7 +13,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from '../../contexts/LocationContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { fromDeviceLocation, locationDescription, locationQuality, type MeasuredFix } from '../../services/locationQuality';
+import { locationDescription, locationQuality, type MeasuredFix } from '../../services/locationQuality';
 import { startAnomalyDetection, stopAnomalyDetection } from '../../services/anomalyDetector';
 import {
   offlineTransit,
@@ -278,9 +278,8 @@ export default function DashboardScreen() {
       if (permission.status !== 'granted') throw new Error('Allow location access to start a live shift.');
       if (!isConnected) throw new Error('Connect to the internet before starting a shift.');
       await startGpsTracking();
-      const firstFix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const measured = fromDeviceLocation(firstFix);
-      if (locationQuality(measured) !== 'live') throw new Error('Wait for a fresh GPS fix with accuracy within 30 m before starting.');
+      const measured = fix;
+      if (!measured || !foreground || locationError || locationQuality(measured) !== 'live') throw new Error('Wait for a fresh GPS fix with accuracy within 30 m before starting.');
       const created = await supabase
         .from('vehicles')
         .insert({

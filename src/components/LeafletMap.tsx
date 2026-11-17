@@ -29,6 +29,7 @@ export interface LeafletMapProps {
   alightingStop?: TerminalData | null;
   walkingRoutes?: WalkingRouteGeometry[];
   selectedVehicle?: VehicleData | null;
+  vehicleFocusRequestId?: string | number;
   fleetMode?: boolean;
   isOffline?: boolean;
   onSelectTerminal?: (terminal: TerminalData) => void;
@@ -49,6 +50,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   alightingStop,
   walkingRoutes,
   selectedVehicle,
+  vehicleFocusRequestId,
   fleetMode = false,
   isOffline = false,
   onSelectTerminal,
@@ -129,6 +131,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     fitPoints: journeyMap.fitPoints,
     cameraKey: journeyMap.cameraKey,
     selectedRouteId,
+    selectedVehicleId: selectedVehicle?.id || null,
+    vehicleFocusRequestId,
     hideOccupancy,
     isOffline: Boolean(isOffline),
   }), [
@@ -141,6 +145,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     geofenceResult,
     selectedTerminal,
     selectedVehicle,
+    vehicleFocusRequestId,
     isOffline,
     journeyMap, selectedRouteId, boardingStop, alightingStop, now,
   ]);
@@ -508,6 +513,17 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       if (window.journeyCameraKey !== data.cameraKey) {
         if (data.fitPoints.length) map.fitBounds(data.fitPoints.map(function(p) { return [p.latitude,p.longitude]; }), {padding:[30,30],maxZoom:16});
         window.journeyCameraKey = data.cameraKey;
+      }
+      // Selection/request identity moves the camera once; telemetry never changes this key.
+      var vehicleFocusKey = data.selectedVehicleId ? JSON.stringify([data.selectedVehicleId, data.vehicleFocusRequestId == null ? null : data.vehicleFocusRequestId]) : null;
+      if (window.vehicleFocusKey !== vehicleFocusKey) {
+        window.vehicleFocusKey = vehicleFocusKey;
+        window.pendingVehicleFocus = vehicleFocusKey !== null;
+      }
+      var focusVehicle = (data.vehicles || []).find(function(v) { return v.id === data.selectedVehicleId; });
+      if (window.pendingVehicleFocus && focusVehicle) {
+        map.flyTo([focusVehicle.latitude, focusVehicle.longitude], Math.max(map.getZoom(), 16), {duration:0.6});
+        window.pendingVehicleFocus = false;
       }
 
       // 2. Draw Terminals & Geofence Circles
