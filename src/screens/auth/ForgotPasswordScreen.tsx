@@ -6,15 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSignIn } from '@clerk/clerk-expo';
 import { Colors } from '../../constants/theme';
 import { supabaseAuth } from '../../lib/supabase';
 import { isClerkConfigured } from '../../lib/clerk';
+import { FormScrollView } from '../../components/AppUI';
 
 function ClerkForgotPasswordContent() {
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -238,15 +236,12 @@ function SupabaseForgotPasswordContent() {
 
 export default function ForgotPasswordScreen({ navigation }: any) {
   return (
-    <KeyboardAvoidingView
-      style={styles.outer}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <FormScrollView
+      containerStyle={styles.outer}
+      keyboardVerticalOffset={0}
+      contentContainerStyle={styles.scrollContainer}
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={Colors.ink} />
         </TouchableOpacity>
@@ -262,8 +257,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
         </View>
 
         {isClerkConfigured ? <ClerkForgotPasswordContent /> : <SupabaseForgotPasswordContent />}
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </FormScrollView>
   );
 }
 

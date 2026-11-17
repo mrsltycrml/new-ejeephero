@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, Alert, FlatList, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, FlatList, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScreenSkeleton, triggerHaptic } from '../../components/AppUI';
 import { Colors } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { SAMPLE_DRIVERS, SAMPLE_UNITS, type SampleDriver, type SampleUnit } from '../../constants/sampleFleet';
@@ -120,13 +121,23 @@ function Filters<T extends string>({ options, selected, onChange }: {
 function SearchBox({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
   return <View style={styles.searchBox}>
     <Ionicons name="search" size={18} color={Colors.tabInactive} />
-    <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#6B7784" style={styles.searchInput} autoCapitalize="none" />
-    {value ? <TouchableOpacity accessibilityLabel="Clear search" onPress={() => onChangeText('')}><Ionicons name="close-circle" size={18} color={Colors.tabInactive} /></TouchableOpacity> : null}
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor="#6B7784"
+      style={styles.searchInput}
+      autoCapitalize="none"
+      returnKeyType="search"
+      enterKeyHint="search"
+      clearButtonMode="while-editing"
+    />
+    {Platform.OS === 'web' && value ? <TouchableOpacity accessibilityLabel="Clear search" onPress={() => onChangeText('')}><Ionicons name="close-circle" size={18} color={Colors.tabInactive} /></TouchableOpacity> : null}
   </View>;
 }
 
 function LoadingView() {
-  return <View style={styles.center}><ActivityIndicator size="large" color={Colors.primaryRed} /><Text style={styles.loadingText}>Loading operations…</Text></View>;
+  return <ScreenSkeleton preset="list" />;
 }
 
 function UnitCard({ item, driverName, routeName, onTrack, onDelete, onEndShift }: { item: UnitSummary; driverName: string; routeName: string; onTrack: () => void; onDelete: () => void; onEndShift?: () => void }) {
@@ -188,6 +199,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         }
         if (!entry) throw new Error('Could not locate the unit in the roster.');
         await setRegistryDeleted('units', adminId, first.mode, entry.id, true);
+        triggerHaptic('medium');
         const updated = await loadRegistry('units', adminId);
         setRegistryRows(updated.rows);
         setRegistryRevision((value) => value + 1);
@@ -203,6 +215,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
       const action = async () => {
         try {
           await forceEndShift(record.activeShift!.id);
+          triggerHaptic('medium');
           refresh();
         } catch (cause) { Alert.alert('Could not end shift', cause instanceof Error ? cause.message : 'Try again.'); }
       };
@@ -215,6 +228,8 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
     style={styles.page}
     data={shown}
     keyExtractor={(item) => item.key}
+    keyboardShouldPersistTaps="handled"
+    automaticallyAdjustKeyboardInsets
     contentContainerStyle={[styles.listContent, width >= 900 && styles.listContentWide]}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[Colors.primaryRed]} />}
     ListHeaderComponent={<>
@@ -255,7 +270,16 @@ function DriverCard({ item, routeName, speedCount, routeCutCount, periodTrips, o
     : item.activeShift ? 'On trip' : 'Off duty';
   const tone = accountBlocked ? 'red' : item.activeShift ? 'green' : 'gray';
   const totalViolations = speedCount === null || routeCutCount === null ? null : speedCount + routeCutCount;
-  return <View style={styles.card}>
+  const openQuickActions = () => {
+    if (Platform.OS === 'web') return;
+    triggerHaptic('light');
+    Alert.alert(item.profile.full_name || 'Driver', status, [
+      { text: expanded ? 'Collapse details' : 'View details', onPress: () => setExpanded(!expanded) },
+      { text: 'Hide from active drivers', style: 'destructive', onPress: onHide },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+  return <Pressable onLongPress={openQuickActions} delayLongPress={350} style={styles.card}>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Details for ${item.profile.full_name || 'driver'}`} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={styles.cardHeader}>
       <View style={styles.cardHeading}>
         <Text style={styles.cardTitle}>{item.profile.full_name || 'Unnamed driver'}</Text>
@@ -279,7 +303,7 @@ function DriverCard({ item, routeName, speedCount, routeCutCount, periodTrips, o
         <Text style={styles.deleteButtonText}>Hide from active drivers</Text>
       </TouchableOpacity>
     </View>}
-  </View>;
+  </Pressable>;
 }
 
 function SampleDriverCard({ item }: { item: SampleDriver }) {
@@ -336,7 +360,7 @@ export function AdminDriversScreen() {
     const hideDriverProfile = (driver: DriverSummary) => {
       const name = driver.profile.full_name || driver.profile.email || 'this driver';
       const action = async () => {
-        try { await setDriverHidden(driver.profile.id, true); refresh(); }
+        try { await setDriverHidden(driver.profile.id, true); triggerHaptic('medium'); refresh(); }
         catch (cause) { Alert.alert('Could not hide driver', cause instanceof Error ? cause.message : 'Try again.'); }
       };
       if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(`Hide ${name} from active drivers? Their trip history stays intact.`)) void action(); }
@@ -348,6 +372,8 @@ export function AdminDriversScreen() {
     style={styles.page}
     data={shown}
     keyExtractor={(item) => item.key}
+    keyboardShouldPersistTaps="handled"
+    automaticallyAdjustKeyboardInsets
     contentContainerStyle={[styles.listContent, width >= 900 && styles.listContentWide]}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[Colors.primaryRed]} />}
     ListHeaderComponent={<>
@@ -382,7 +408,7 @@ const styles = StyleSheet.create({
   listContent: { width: '100%', maxWidth: 1100, alignSelf: 'center', padding: 14, paddingBottom: 32 },
   listContentWide: { paddingHorizontal: 24, paddingTop: 22 },
   header: { gap: 14, paddingVertical: 6, marginBottom: 18 },
-  title: { fontSize: 23, fontWeight: '600', color: Colors.ink, letterSpacing: -0.4 },
+  title: { fontSize: 30, fontWeight: '700', color: Colors.ink, letterSpacing: -0.6 },
   subtitle: { fontSize: 13, lineHeight: 18, color: Colors.subtleGray },
   summaryStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 4 },
   summaryItem: { flexGrow: 1, flexBasis: 75, minHeight: 52, paddingHorizontal: 8, paddingVertical: 5, alignItems: 'flex-start', justifyContent: 'center' },

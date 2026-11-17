@@ -19,7 +19,7 @@ export function PassengerSelect({ label, value, options, onSelect, disabled = fa
 export const passengerStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.canvas },
   content: { width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 20, paddingBottom: 32, gap: 24 },
-  title: { fontSize: 24, fontWeight: '600', color: Colors.ink },
+  title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.6, color: Colors.ink },
   subtitle: { fontSize: 14, lineHeight: 21, color: Colors.subtleGray, marginTop: 5 },
   section: { backgroundColor: Colors.paper, padding: 20, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, gap: 16 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: Colors.ink },

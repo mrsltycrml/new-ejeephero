@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Platform, Linking } from 'react-native';
 import * as Location from 'expo-location';
 import * as SMS from 'expo-sms';
 import * as Crypto from 'expo-crypto';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
+import { BottomSheetModal, triggerHaptic } from './AppUI';
 import { passengerStyles as s } from './PassengerUI';
 import EmergencyHotlines from './EmergencyHotlines';
 import { buildEmergencyMessage, type PassengerFix } from '../services/passengerSafety';
@@ -27,11 +28,15 @@ export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeV
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const clearTimer = () => { if (timer.current) clearInterval(timer.current); timer.current = null; };
   useEffect(() => () => { run.current++; clearTimer(); }, []);
-  const close = () => { run.current++; clearTimer(); busy.current = false; setCount(null); setVisible(false); };
+  const close = () => {
+    if (count !== null) triggerHaptic('light');
+    run.current++; clearTimer(); busy.current = false; setCount(null); setVisible(false);
+  };
 
   const activate = () => {
     if (busy.current) return;
     busy.current = true;
+    triggerHaptic('warning');
     const current = ++run.current;
     const vehicle = { id: activeVehicleId, plate: activeVehiclePlate, body: activeVehicleBody, sample: activeVehicleIsSample };
     setVisible(true); setCount(5); setPhase('countdown'); setStatus(''); setFix(null); setMessage(''); setContacts([]); setContactsLoaded(false);
@@ -57,7 +62,7 @@ export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeV
     })();
     const deadline = Date.now() + 5000;
     const dispatch = async () => {
-      clearTimer(); setCount(null); setPhase('locating'); setStatus('Getting your current location…');
+      clearTimer(); triggerHaptic('medium'); setCount(null); setPhase('locating'); setStatus('Getting your current location…');
       const [point, list] = await Promise.all([gpsPromise, contactPromise]);
       if (run.current !== current) return;
       if (!point) { setPhase('fallback'); setStatus('Could not get a fresh location. Check location access or call a hotline below.'); return; }
@@ -115,9 +120,7 @@ export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeV
   };
   return <>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Emergency SOS, starts a five second cancellation timer" onPress={activate} style={[s.button, { backgroundColor: Colors.primaryRed }]}><Ionicons name="alert-circle-outline" size={20} color={Colors.white} /><Text style={s.buttonText}>Emergency SOS</Text></TouchableOpacity>
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
-      <View style={{ flex: 1, padding: 16, backgroundColor: 'rgba(24,40,46,0.5)', alignItems: 'center', justifyContent: 'center' }}>
-        <ScrollView style={{ maxHeight: '92%', width: '100%', maxWidth: 480, borderRadius: 12, backgroundColor: Colors.paper }} contentContainerStyle={{ padding: 22, gap: 16 }}>
+    <BottomSheetModal visible={visible} onClose={close} maxWidth={480} contentContainerStyle={{ gap: 16 }}>
           <Text accessibilityRole="header" style={s.title}>{phase === 'countdown' ? 'Preparing an SOS alert' : 'Emergency alert'}</Text>
           {count !== null ? <><Text accessibilityLiveRegion="polite" style={{ fontSize: 44, fontWeight: '800', color: Colors.primaryRed, fontVariant: ['tabular-nums'] }}>{count} sec</Text><Text style={s.body}>When the timer ends, the app will attempt to send an SMS with your location and unit details. If unavailable, open Messages and tap Send.</Text><TouchableOpacity accessibilityRole="button" style={[s.button, { backgroundColor: Colors.ink }]} onPress={close}><Text style={s.buttonText}>Cancel alert</Text></TouchableOpacity></>
             : <><Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.body}>{status}</Text>{(phase === 'locating' || phase === 'opening') && <ActivityIndicator color={Colors.primaryRed} />}{phase === 'locating' && <TouchableOpacity accessibilityRole="button" style={[s.button, s.secondary]} onPress={close}><Text style={s.label}>Cancel alert</Text></TouchableOpacity>}</>}
@@ -126,8 +129,6 @@ export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeV
           <EmergencyHotlines />
           {contacts.map(c => <TouchableOpacity key={c.phone_number} accessibilityRole="link" onPress={() => Linking.openURL(`tel:${c.phone_number}`)} style={[s.button, s.secondary]}><Ionicons name="call-outline" size={18} color={Colors.ink} /><Text style={s.label}>Call {c.contact_name}</Text></TouchableOpacity>)}
           {(phase === 'ready' || phase === 'fallback' || phase === 'opening') && <TouchableOpacity accessibilityRole="button" onPress={close} style={[s.button, s.secondary]}><Text style={s.label}>Close</Text></TouchableOpacity>}
-        </ScrollView>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   </>;
 }

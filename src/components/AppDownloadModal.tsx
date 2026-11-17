@@ -1,17 +1,16 @@
 import React from 'react';
 import {
-  Modal,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Linking,
-  ScrollView,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/theme';
 import { APK_DOWNLOAD_URL } from '../services/r2StorageService';
+import { BottomSheetModal } from './AppUI';
 
 interface AppDownloadModalProps {
   visible: boolean;
@@ -24,69 +23,63 @@ export default function AppDownloadModal({ visible, onClose }: AppDownloadModalP
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerBadge}>
-              <Ionicons name="download-outline" size={20} color={Colors.white} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Get eSAKAY</Text>
-              <Text style={styles.subtitle}>Choose how to use the app on your phone.</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color={Colors.darkText} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-            {/* Android Direct APK Download */}
-            <View style={styles.card}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="logo-android" size={24} color="#2E7D32" />
-                <Text style={styles.cardTitle}>Android</Text>
-              </View>
-              <Text style={styles.cardDesc}>
-                Download the app file and open it on your phone.
-              </Text>
-              <View style={styles.stepsList}>
-                <Text style={styles.stepItem}>1. Download the Android app.</Text>
-                <Text style={styles.stepItem}>2. Open the downloaded file.</Text>
-                <Text style={styles.stepItem}>3. Allow "Install from this source" if prompted by Android.</Text>
-              </View>
-              <TouchableOpacity style={styles.apkBtn} onPress={handleDownloadApk}>
-                <Ionicons name="cloud-download-outline" size={20} color={Colors.white} />
-                <Text style={styles.apkBtnText}>Download Android app</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* iOS Safari Add to Home Screen Guide */}
-            <View style={styles.card}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="logo-apple" size={24} color={Colors.navy} />
-                <Text style={styles.cardTitle}>iPhone</Text>
-              </View>
-              <Text style={styles.cardDesc}>
-                Add the eSAKAY website to your Home Screen from Safari.
-              </Text>
-              <View style={styles.stepsList}>
-                <Text style={styles.stepItem}>1. Open eSAKAY in Safari.</Text>
-                <Text style={styles.stepItem}>2. Tap Share, then Add to Home Screen.</Text>
-              </View>
-              {Platform.OS === 'web' && (
-                <View style={styles.webActiveBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#1B5E20" />
-                  <Text style={styles.webActiveText}>
-                    On iPhone, use Safari’s Share menu to add this app to your Home Screen.
-                  </Text>
-                </View>
-              )}
-            </View>
-          </ScrollView>
+    <BottomSheetModal visible={visible} onClose={onClose} maxWidth={520} contentContainerStyle={styles.content}>
+      <View style={styles.headerRow}>
+        <View style={styles.headerBadge}>
+          <Ionicons name="download-outline" size={20} color={Colors.white} />
         </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Get eSAKAY</Text>
+          <Text style={styles.subtitle}>Choose how to use the app on your phone.</Text>
+        </View>
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+          <Ionicons name="close" size={22} color={Colors.darkText} />
+        </TouchableOpacity>
       </View>
-    </Modal>
+
+      {/* Android Direct APK Download */}
+      <View style={styles.card}>
+        <View style={styles.cardTitleRow}>
+          <Ionicons name="logo-android" size={24} color="#2E7D32" />
+          <Text style={styles.cardTitle}>Android</Text>
+        </View>
+        <Text style={styles.cardDesc}>
+          Download the app file and open it on your phone.
+        </Text>
+        <View style={styles.stepsList}>
+          <Text style={styles.stepItem}>1. Download the Android app.</Text>
+          <Text style={styles.stepItem}>2. Open the downloaded file.</Text>
+          <Text style={styles.stepItem}>3. Allow "Install from this source" if prompted by Android.</Text>
+        </View>
+        <TouchableOpacity style={styles.apkBtn} onPress={handleDownloadApk}>
+          <Ionicons name="cloud-download-outline" size={20} color={Colors.white} />
+          <Text style={styles.apkBtnText}>Download Android app</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* iOS Safari Add to Home Screen Guide */}
+      <View style={styles.card}>
+        <View style={styles.cardTitleRow}>
+          <Ionicons name="logo-apple" size={24} color={Colors.navy} />
+          <Text style={styles.cardTitle}>iPhone</Text>
+        </View>
+        <Text style={styles.cardDesc}>
+          Add the eSAKAY website to your Home Screen from Safari.
+        </Text>
+        <View style={styles.stepsList}>
+          <Text style={styles.stepItem}>1. Open eSAKAY in Safari.</Text>
+          <Text style={styles.stepItem}>2. Tap Share, then Add to Home Screen.</Text>
+        </View>
+        {Platform.OS === 'web' && (
+          <View style={styles.webActiveBadge}>
+            <Ionicons name="checkmark-circle" size={16} color="#1B5E20" />
+            <Text style={styles.webActiveText}>
+              On iPhone, use Safari’s Share menu to add this app to your Home Screen.
+            </Text>
+          </View>
+        )}
+      </View>
+    </BottomSheetModal>
   );
 }
 

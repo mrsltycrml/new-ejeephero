@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { ScreenSkeleton } from '../../components/AppUI';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/theme';
@@ -92,11 +93,7 @@ export default function WeatherScreen() {
   }, []);
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primaryRed} />
-      </View>
-    );
+    return <ScreenSkeleton preset="cards" />;
   }
 
   if (!weather?.weather?.[0] || !weather?.main) {
@@ -138,7 +135,7 @@ const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: Colors.canvas },
   container: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 18, paddingBottom: 36, gap: 12 },
   header: { marginBottom: 2 },
-  title: { fontSize: 23, fontWeight: '600', color: Colors.ink },
+  title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.6, color: Colors.ink },
   subtitle: { fontSize: 13, color: Colors.subtleGray, marginTop: 4 },
   mainCard: { flexDirection: 'row', alignItems: 'center', gap: 20, backgroundColor: Colors.paper, borderRadius: 8, padding: 22, borderWidth: 1, borderColor: Colors.border },
   weatherIcon: { width: 70, height: 70, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: Colors.paper },

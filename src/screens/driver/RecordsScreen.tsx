@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SkeletonBlock } from '../../components/AppUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
@@ -102,7 +103,7 @@ export default function RecordsScreen() {
     <Text style={styles.title}>Records</Text>
     <Text style={styles.subtitle}>Your company safety grade and recorded driving events.</Text>
     <ReportingPeriodPicker value={period} onChange={setPeriod} label="Reporting period" />
-    {loading ? <ActivityIndicator style={styles.loader} color={Colors.primaryRed} /> : error ? <View style={styles.messageCard}><Text style={styles.message}>{error}</Text><TouchableOpacity onPress={() => { setLoading(true); void load(); }}><Text style={styles.retry}>Refresh records</Text></TouchableOpacity></View> : <>
+    {loading ? <View style={{ gap: 14, marginTop: 6 }}><SkeletonBlock height={160} /><SkeletonBlock height={200} /></View> : error ? <View style={styles.messageCard}><Text style={styles.message}>{error}</Text><TouchableOpacity onPress={() => { setLoading(true); void load(); }}><Text style={styles.retry}>Refresh records</Text></TouchableOpacity></View> : <>
       <View style={styles.gradeCard}>
         <View style={styles.gradeHeading}><View><View style={styles.gradeTitleRow}><Text style={styles.gradeTitle}>Company grade</Text>{sampleMode && <Text style={styles.sampleBadge}>Sample</Text>}</View><Text style={styles.gradeHint}>Based on recorded events in this period</Text></View><Text style={styles.gradeValue}>{score}<Text style={styles.gradeTotal}> / 100</Text></Text></View>
         <View style={styles.gradeBreakdown}>
@@ -126,7 +127,7 @@ export default function RecordsScreen() {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: Colors.canvas },
   content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: 18, paddingBottom: 38, gap: 14 },
-  title: { color: Colors.ink, fontSize: 24, fontWeight: '600' },
+  title: { color: Colors.ink, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
   subtitle: { color: Colors.subtleGray, fontSize: 13, marginTop: -9, marginBottom: 4 },
   loader: { marginTop: 38 },
   messageCard: { backgroundColor: Colors.paper, padding: 18, borderRadius: 8 },

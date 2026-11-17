@@ -7,9 +7,6 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSignUp } from '@clerk/clerk-expo';
@@ -18,6 +15,7 @@ import { isClerkConfigured } from '../../lib/clerk';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import ESakayLogo from '../../components/ESakayLogo';
+import { FormScrollView } from '../../components/AppUI';
 
 function splitFullName(raw: string): { firstName: string; lastName: string } {
   const parts = raw.trim().split(/\s+/).filter(Boolean);
@@ -396,15 +394,12 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.outer}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <FormScrollView
+      containerStyle={styles.outer}
+      keyboardVerticalOffset={0}
+      contentContainerStyle={styles.scrollContainer}
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={Colors.ink} />
         </TouchableOpacity>
@@ -534,8 +529,7 @@ export default function RegisterScreen({ navigation }: any) {
             {t('auth.alreadyHaveAccount')} <Text style={styles.linkAction}>{t('auth.logIn')}</Text>
           </Text>
         </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </FormScrollView>
   );
 }
 

@@ -10,6 +10,7 @@ import { ESAKAY_OPERATIONS } from '../../constants/esakayOperations';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
+import { triggerHaptic } from '../../components/AppUI';
 import { loadActiveFleetUnits } from '../../services/fleetRegistryService';
 
 type ShiftUnit = { bodyNumber: string; plateNumber: string; isSample?: boolean };
@@ -161,6 +162,7 @@ export default function DashboardScreen() {
 
   const updatePassengerCount = async (nextCount: number) => {
     const clamped = Math.max(0, Math.min(maxCapacity, nextCount));
+    triggerHaptic('light');
     setPassengerCount(clamped);
     if (vehicleId) {
       await supabase
@@ -191,6 +193,7 @@ export default function DashboardScreen() {
         setPassengerCount(0);
         setTelemetryError('');
         setIsActive(false);
+        triggerHaptic('medium');
         return;
       }
 
@@ -224,8 +227,10 @@ export default function DashboardScreen() {
       setVehicleId(newVehicleId);
       setPassengerCount(0);
       setIsActive(true);
+      triggerHaptic('success');
       startAnomalyDetection(newVehicleId);
     } catch (error) {
+      triggerHaptic('error');
       let rollbackFailed = false;
       if (insertedId) {
         locationSub.current?.remove();
@@ -404,8 +409,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   sectionHeader: {
-    fontSize: 23,
-    fontWeight: '600',
+    fontSize: 30,
+    fontWeight: '700',
+    letterSpacing: -0.6,
     color: Colors.ink,
     marginBottom: 4,
     marginTop: 0,

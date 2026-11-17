@@ -6,9 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSignIn } from '@clerk/clerk-expo';
@@ -18,6 +15,7 @@ import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import AppDownloadModal from '../../components/AppDownloadModal';
 import ESakayLogo from '../../components/ESakayLogo';
+import { FormScrollView } from '../../components/AppUI';
 
 async function tryLegacySupabaseSignIn(normalizedEmail: string, password: string): Promise<boolean> {
   if (!isSupabaseConfigured) return false;
@@ -359,15 +357,12 @@ export default function LoginScreen({ navigation }: any) {
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.outer}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <FormScrollView
+      containerStyle={styles.outer}
+      keyboardVerticalOffset={0}
+      contentContainerStyle={styles.scrollContainer}
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
         <View style={styles.logoContainer}>
           <ESakayLogo width={220} />
         </View>
@@ -401,8 +396,7 @@ export default function LoginScreen({ navigation }: any) {
           visible={downloadModalVisible}
           onClose={() => setDownloadModalVisible(false)}
         />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </FormScrollView>
   );
 }
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Modal, FlatList, ActivityIndicator, Keyboard
+  TextInput, FlatList, Keyboard
 } from 'react-native';
+import { BottomSheetModal, ScreenSkeleton } from '../../components/AppUI';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
@@ -138,11 +139,7 @@ export default function DirectoryScreen({ driverMode = false }: { driverMode?: b
   );
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.subtleGray} />
-      </View>
-    );
+    return <ScreenSkeleton preset="cards" />;
   }
 
   return (
@@ -321,69 +318,76 @@ export default function DirectoryScreen({ driverMode = false }: { driverMode?: b
         </ScrollView>
       )}
 
-      {/* CUSTOM DROPDOWN PICKER MODAL */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {modalType === 'from' ? t('directory.selectDeparturePoint') : t('directory.selectDestinationPoint')}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={24} color={Colors.darkText} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Search Input inside Picker */}
-            <View style={styles.modalSearchWrapper}>
-              <Ionicons name="search" size={20} color={Colors.subtleGray} style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.modalSearchInput}
-                placeholder={t('directory.searchTerminals')}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <FlatList
-              data={filteredTerminals}
-              keyExtractor={item => item.id}
-              ListHeaderComponent={
-                modalType === 'from' ? (
-                  <TouchableOpacity
-                    style={styles.gpsOption}
-                    onPress={() => selectItem('gps')}
-                  >
-                    <View style={styles.gpsOptionIconBg}>
-                      <Ionicons name="location" size={20} color={Colors.white} />
-                    </View>
-                    <View style={{ marginLeft: 14 }}>
-                      <Text style={styles.gpsOptionTitle}>{t('directory.currentGpsLocation')}</Text>
-                      <Text style={styles.gpsOptionSub}>{t('directory.autoLocateNearest')}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ) : undefined
-              }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => selectItem(item.id)}
-                >
-                  <View style={[styles.modalItemColorBar, { backgroundColor: item.routes?.color_code || Colors.primaryRed }]} />
-                  <View style={{ flex: 1, paddingLeft: 12 }}>
-                    <Text style={styles.modalItemName}>{item.name}</Text>
-                    <Text style={styles.modalItemSub}>{item.routes?.name}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#CCC" />
-                </TouchableOpacity>
-              )}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 30 }}
-            />
-          </View>
+      {/* CUSTOM DROPDOWN PICKER BOTTOM SHEET */}
+      <BottomSheetModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        scrollable={false}
+        sheetStyle={{ height: '78%' }}
+        contentContainerStyle={{ flex: 1 }}
+      >
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>
+            {modalType === 'from' ? t('directory.selectDeparturePoint') : t('directory.selectDestinationPoint')}
+          </Text>
+          <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+            <Ionicons name="close" size={24} color={Colors.darkText} />
+          </TouchableOpacity>
         </View>
-      </Modal>
+
+        {/* Search Input inside Picker */}
+        <View style={styles.modalSearchWrapper}>
+          <Ionicons name="search" size={20} color={Colors.subtleGray} style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.modalSearchInput}
+            placeholder={t('directory.searchTerminals')}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#999"
+            returnKeyType="search"
+            enterKeyHint="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+
+        <FlatList
+          data={filteredTerminals}
+          keyExtractor={item => item.id}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          ListHeaderComponent={
+            modalType === 'from' ? (
+              <TouchableOpacity
+                style={styles.gpsOption}
+                onPress={() => selectItem('gps')}
+              >
+                <View style={styles.gpsOptionIconBg}>
+                  <Ionicons name="location" size={20} color={Colors.white} />
+                </View>
+                <View style={{ marginLeft: 14 }}>
+                  <Text style={styles.gpsOptionTitle}>{t('directory.currentGpsLocation')}</Text>
+                  <Text style={styles.gpsOptionSub}>{t('directory.autoLocateNearest')}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : undefined
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.modalItem}
+              onPress={() => selectItem(item.id)}
+            >
+              <View style={[styles.modalItemColorBar, { backgroundColor: item.routes?.color_code || Colors.primaryRed }]} />
+              <View style={{ flex: 1, paddingLeft: 12 }}>
+                <Text style={styles.modalItemName}>{item.name}</Text>
+                <Text style={styles.modalItemSub}>{item.routes?.name}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#CCC" />
+            </TouchableOpacity>
+          )}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 16 }}
+        />
+      </BottomSheetModal>
 
     </View>
   );

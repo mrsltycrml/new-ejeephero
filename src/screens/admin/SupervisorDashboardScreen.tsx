@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PassengerSelect } from '../../components/PassengerUI';
-import { ActivityIndicator, Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScreenSkeleton, triggerHaptic } from '../../components/AppUI';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
 import { supabase } from '../../lib/supabase';
@@ -228,9 +229,11 @@ export default function SupervisorDashboardScreen() {
   const reviewViolation = async (violation: Violation, status: 'confirmed' | 'dismissed') => {
     const { error } = await supabase.from('trip_violations').update({ status }).eq('id', violation.id);
     if (error) {
+      triggerHaptic('error');
       Alert.alert('Could not update violation', error.message);
       return;
     }
+    triggerHaptic(status === 'confirmed' ? 'success' : 'medium');
     await loadDashboard();
   };
 
@@ -264,7 +267,7 @@ export default function SupervisorDashboardScreen() {
   const selectedMapVehicle = mapUnitFilter === 'all' ? null : mapVehicles.find((vehicle) => unitKey(vehicle) === mapUnitFilter) || null;
   const selectedUnitLabel = shownUnitChoices.find((unit) => unit.key === mapUnitFilter)?.label || requestedTrackLabel || 'unit';
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={Colors.primaryRed} /></View>;
+  if (loading) return <ScreenSkeleton preset="dashboard" />;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
@@ -442,7 +445,7 @@ const styles = StyleSheet.create({
   activityTab: { minHeight: 44, justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', paddingHorizontal: 2 },
   activityTabActive: { borderBottomColor: Colors.ink },
   activityTabText: { fontSize: 14, color: Colors.subtleGray, fontWeight: '500' },
-  pageTitle: { color: Colors.ink, fontSize: 23, fontWeight: '600', letterSpacing: -0.4 },
+  pageTitle: { color: Colors.ink, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
   reportToolbar: { flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap', gap: 8, zIndex: 30 },
   reportPeriod: { flexGrow: 1, flexShrink: 1, flexBasis: 550, minWidth: 0, maxWidth: '100%', zIndex: 30 },
   exportButton: { minHeight: 44, alignSelf: 'center', backgroundColor: Colors.ink, paddingHorizontal: 15, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

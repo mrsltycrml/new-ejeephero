@@ -53,10 +53,12 @@ export default function HeroBotScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       <ScrollView
         style={styles.chatArea}
         contentContainerStyle={{ padding: 18, paddingBottom: 26, width: '100%', maxWidth: 900, alignSelf: 'center' }}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         {messages.map((msg, i) => (

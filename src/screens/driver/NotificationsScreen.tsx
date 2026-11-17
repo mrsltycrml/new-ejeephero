@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -8,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ScreenSkeleton } from '../../components/AppUI';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -125,11 +125,7 @@ export default function NotificationsScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primaryRed} />
-      </View>
-    );
+    return <ScreenSkeleton preset="list" />;
   }
 
   return (
@@ -190,7 +186,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.canvas },
   content: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 18, paddingBottom: 36 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.canvas },
-  title: { fontSize: 23, fontWeight: '600', color: Colors.ink },
+  title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.6, color: Colors.ink },
   subtitle: { fontSize: 13, color: Colors.subtleGray, marginTop: 4, marginBottom: 20, lineHeight: 19 },
   examplesTitle: { color: Colors.ink, fontSize: 17, fontWeight: '600', marginTop: 24, marginBottom: 12 },
   exampleIcon: { width: 40, height: 40, borderRadius: 6, backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center' },

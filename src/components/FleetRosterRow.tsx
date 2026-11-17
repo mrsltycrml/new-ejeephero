@@ -1,13 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { Alert, Platform, Pressable, View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/theme';
+import { triggerHaptic } from './AppUI';
 
 type Props = { body: string; plate: string; driver: string; route: string; trips: number; total: number; started: string; ended: string; status: string; onTrack: () => void; onDelete?: () => void; onEndShift?: () => void };
 export default function FleetRosterRow(props: Props) {
   const [open, setOpen] = useState(false);
   const wide = useWindowDimensions().width >= 760;
-  return <View style={styles.row}>
+  const openQuickActions = () => {
+    if (Platform.OS === 'web') return;
+    triggerHaptic('light');
+    const buttons: { text: string; style?: 'cancel' | 'destructive' | 'default'; onPress?: () => void }[] = [
+      { text: 'Track unit', onPress: props.onTrack },
+    ];
+    if (props.onEndShift) buttons.push({ text: 'Force end shift', style: 'destructive', onPress: props.onEndShift });
+    if (props.onDelete) buttons.push({ text: 'Delete unit', style: 'destructive', onPress: props.onDelete });
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert(props.body, `${props.status} · ${props.driver}`, buttons);
+  };
+  return <Pressable onLongPress={openQuickActions} delayLongPress={350} style={styles.row}>
     <View style={styles.top}>
       <View style={styles.identity}><Text style={styles.name}>{props.body}</Text><Text style={styles.meta}>Plate {props.plate || '—'}</Text></View>
       {wide && <View style={styles.assignment}><Text style={styles.value}>{props.driver}</Text><Text style={styles.meta} numberOfLines={1}>{props.route}</Text></View>}
@@ -22,7 +34,7 @@ export default function FleetRosterRow(props: Props) {
       {props.onEndShift && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`End shift for ${props.body}`} onPress={props.onEndShift} style={styles.delete}><Ionicons name="stop-circle-outline" size={16} color={Colors.primaryRed}/><Text style={{ color: Colors.primaryRed, fontSize: 13 }}>Force end shift</Text></TouchableOpacity>}
       {props.onDelete && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete unit ${props.body}`} onPress={props.onDelete} style={styles.delete}><Ionicons name="trash-outline" size={16} color={Colors.primaryRed}/><Text style={{ color: Colors.primaryRed, fontSize: 13 }}>Delete unit</Text></TouchableOpacity>}
     </View>}
-  </View>;
+  </Pressable>;
 }
 function Pair({ label, value }: { label: string; value: string }) { return <View style={styles.pair}><Text style={styles.meta}>{label}</Text><Text style={styles.value}>{value}</Text></View>; }
 const styles=StyleSheet.create({

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useAuth } from '../../contexts/AuthContext';
 import { isClerkConfigured } from '../../lib/clerk';
@@ -9,6 +9,7 @@ import { supabase, supabaseAuth } from '../../lib/supabase';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../../locales/i18n';
 import AppDownloadModal from '../../components/AppDownloadModal';
+import { BottomSheetModal, FormScrollView } from '../../components/AppUI';
 
 export default function ProfileScreen() {
   const { user, role, status, isAdmin, fullName, authProvider, signOut, refreshProfile } = useAuth();
@@ -163,7 +164,7 @@ export default function ProfileScreen() {
   const statusColor = status === 'approved' ? '#4CAF50' : status === 'pending' ? '#FF9800' : '#F44336';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <FormScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.avatarCard}>
         <View style={styles.avatarCircle}>
           <Ionicons name="person" size={30} color={Colors.ink} />
@@ -360,62 +361,57 @@ export default function ProfileScreen() {
         <Ionicons name="chevron-forward" size={20} color={Colors.subtleGray} />
       </TouchableOpacity>
 
-      {/* Language Selector Modal */}
-      <Modal
+      {/* Language Selector Bottom Sheet */}
+      <BottomSheetModal
         visible={showLanguageSelector}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowLanguageSelector(false)}
+        onClose={() => setShowLanguageSelector(false)}
+        scrollable={false}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.languageModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('profile.selectLanguage')}</Text>
-              <TouchableOpacity onPress={() => setShowLanguageSelector(false)}>
-                <Ionicons name="close" size={24} color={Colors.darkText} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.languageOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.languageOption,
-                  i18n.language === 'en' && styles.languageOptionActive
-                ]}
-                onPress={() => handleChangeLanguage('en')}
-              >
-                <Ionicons 
-                  name={i18n.language === 'en' ? 'radio-button-on' : 'radio-button-off'} 
-                  size={24} 
-                  color={i18n.language === 'en' ? Colors.ink : Colors.subtleGray}
-                  style={{ marginRight: 12 }}
-                />
-                <Text style={[styles.languageOptionText, i18n.language === 'en' && styles.languageOptionTextActive]}>
-                  {t('profile.english')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.languageOption,
-                  i18n.language === 'fil' && styles.languageOptionActive
-                ]}
-                onPress={() => handleChangeLanguage('fil')}
-              >
-                <Ionicons 
-                  name={i18n.language === 'fil' ? 'radio-button-on' : 'radio-button-off'} 
-                  size={24} 
-                  color={i18n.language === 'fil' ? Colors.ink : Colors.subtleGray}
-                  style={{ marginRight: 12 }}
-                />
-                <Text style={[styles.languageOptionText, i18n.language === 'fil' && styles.languageOptionTextActive]}>
-                  {t('profile.tagalog')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>{t('profile.selectLanguage')}</Text>
+          <TouchableOpacity onPress={() => setShowLanguageSelector(false)}>
+            <Ionicons name="close" size={24} color={Colors.darkText} />
+          </TouchableOpacity>
         </View>
-      </Modal>
+
+        <View style={styles.languageOptions}>
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              i18n.language === 'en' && styles.languageOptionActive
+            ]}
+            onPress={() => handleChangeLanguage('en')}
+          >
+            <Ionicons 
+              name={i18n.language === 'en' ? 'radio-button-on' : 'radio-button-off'} 
+              size={24} 
+              color={i18n.language === 'en' ? Colors.ink : Colors.subtleGray}
+              style={{ marginRight: 12 }}
+            />
+            <Text style={[styles.languageOptionText, i18n.language === 'en' && styles.languageOptionTextActive]}>
+              {t('profile.english')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              i18n.language === 'fil' && styles.languageOptionActive
+            ]}
+            onPress={() => handleChangeLanguage('fil')}
+          >
+            <Ionicons 
+              name={i18n.language === 'fil' ? 'radio-button-on' : 'radio-button-off'} 
+              size={24} 
+              color={i18n.language === 'fil' ? Colors.ink : Colors.subtleGray}
+              style={{ marginRight: 12 }}
+            />
+            <Text style={[styles.languageOptionText, i18n.language === 'fil' && styles.languageOptionTextActive]}>
+              {t('profile.tagalog')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheetModal>
 
       {/* App Download / iOS PWA Guide */}
       <TouchableOpacity
@@ -444,7 +440,7 @@ export default function ProfileScreen() {
         <Ionicons name="log-out-outline" size={22} color={Colors.white} style={{ marginRight: 8 }} />
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </FormScrollView>
   );
 }
 

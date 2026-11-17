@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenSkeleton } from '../components/AppUI';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -81,10 +83,11 @@ function ServiceHeaderActions({ onAccount, onAlerts, onBot, alertsLabel = "Open 
 const PassengerTabs = ({ navigation: stackNavigation }: any) => {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [accountOpen, setAccountOpen] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
   return (
-    <View style={{ flex: 1 }}><Tab.Navigator screenOptions={({ navigation }) => ({ ...commonScreenOptions, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => { setNoticesOpen(false); setAccountOpen((value) => !value); }} onAlerts={() => { setAccountOpen(false); setNoticesOpen(value => !value); }} alertsLabel="Boarding notices" onBot={() => { setAccountOpen(false); setNoticesOpen(false); stackNavigation.navigate('PassengerAssistant'); }} /> })}>
+    <View style={{ flex: 1 }}><Tab.Navigator screenOptions={({ navigation }) => ({ ...commonScreenOptions, tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: Math.max(6, insets.bottom), height: 60 + insets.bottom }, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => { setNoticesOpen(false); setAccountOpen((value) => !value); }} onAlerts={() => { setAccountOpen(false); setNoticesOpen(value => !value); }} alertsLabel="Boarding notices" onBot={() => { setAccountOpen(false); setNoticesOpen(false); stackNavigation.navigate('PassengerAssistant'); }} /> })}>
       <Tab.Screen
         name="Map"
         component={PassengerHomeScreen}
@@ -115,9 +118,10 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
 const DriverTabs = ({ navigation: stackNavigation }: any) => {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [accountOpen, setAccountOpen] = useState(false);
   return (
-    <View style={{ flex: 1 }}><Tab.Navigator screenOptions={({ navigation }) => ({ ...commonScreenOptions, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => setAccountOpen((value) => !value)} onAlerts={() => navigation.navigate('Alerts')} /> })}>
+    <View style={{ flex: 1 }}><Tab.Navigator screenOptions={({ navigation }) => ({ ...commonScreenOptions, tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: Math.max(6, insets.bottom), height: 60 + insets.bottom }, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => setAccountOpen((value) => !value)} onAlerts={() => navigation.navigate('Alerts')} /> })}>
       <Tab.Screen
         name="Dashboard"
         component={DriverDashboardScreen}
@@ -159,6 +163,7 @@ function AdminHeaderActions({ onAlerts, onProfile, alertCount, activePanel }: { 
 const AdminTabs = ({ navigation: stackNavigation }: any) => {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [alertCount, setAlertCount] = useState(0);
   const [notice, setNotice] = useState('');
   const [activePanel, setActivePanel] = useState<AdminPanel>(null);
@@ -194,7 +199,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
       ...commonScreenOptions,
       tabBarActiveTintColor: Colors.ink,
       tabBarInactiveTintColor: Colors.subtleGray,
-      tabBarStyle: { backgroundColor: Colors.paper, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 6, paddingBottom: 5, height: 62, elevation: 0 },
+      tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: Math.max(6, insets.bottom), height: 60 + insets.bottom },
       headerStyle: { backgroundColor: Colors.paper },
       headerTintColor: Colors.navy,
       headerRight: () => <AdminHeaderActions alertCount={alertCount} activePanel={activePanel} onAlerts={() => setActivePanel((open) => open === 'alerts' ? null : 'alerts')} onProfile={() => setActivePanel((open) => open === 'profile' ? null : 'profile')} />,
@@ -246,23 +251,7 @@ export const AppNavigator = () => {
   </View>;
 
   if (loading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: Colors.offWhite,
-          gap: 12,
-        }}
-      >
-        <ESakayLogo width={160} />
-        <ActivityIndicator size="large" color={Colors.ink} />
-        <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.darkText }}>
-          Loading eSAKAY…
-        </Text>
-      </View>
-    );
+    return <ScreenSkeleton preset="dashboard" />;
   }
 
   return (
