@@ -1,3 +1,4 @@
+import { mergeAdminUnits, type UnifiedUnitRow } from '../../utils/adminUnitRows';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -530,19 +531,6 @@ export function AdminDriversScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. UNITS TAB (Board 03 right, Board 04 left, Board 08 right)
 // ─────────────────────────────────────────────────────────────────────────────
-type UnifiedUnitRow = {
-  key: string;
-  body: string;
-  plate: string;
-  driverName: string;
-  routeName: string;
-  state: 'on_shift' | 'stale' | 'inactive';
-  shiftStarted?: string;
-  lastGps?: string;
-  activeShiftId?: string;
-  registryId?: string;
-};
-
 export function AdminUnitsScreen({ navigation }: { navigation: any }) {
   const { user } = useAuth();
   const { data, loading, refreshing, error, refresh } = useOperationsData();
@@ -575,48 +563,16 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
     [data.drivers]
   );
 
-  const combinedUnits: UnifiedUnitRow[] = useMemo(() => {
-    const fromDb: UnifiedUnitRow[] = dbUnits.map((u) => {
-      const shift = u.activeShift || u.latestShift;
-      return {
-        key: u.key,
-        body: u.bodyNumber || u.plateNumber || 'Unit',
-        plate: u.plateNumber || 'Plate unavailable',
-        driverName: driversMap.get(shift.driver_id) || 'Driver',
-        routeName: data.routes.find(route => route.id === shift.route_id)?.name || 'Route unavailable',
-        state: u.activeShift ? 'on_shift' : 'inactive',
-        shiftStarted: new Date(shift.created_at).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        }),
-        lastGps: 'GPS unavailable',
-        activeShiftId: u.activeShift?.id,
-      };
-    });
-    const seen = new Set(fromDb.map((u) => u.body.toUpperCase()));
-    const fromReg: UnifiedUnitRow[] = registryUnits
-      .filter((r) => !r.deleted_at && !seen.has(r.body_number.toUpperCase()))
-      .map((r) => {
-        seen.add(r.body_number.toUpperCase());
-        return {
-          key: r.body_number.toUpperCase(),
-          body: r.body_number,
-          plate: r.plate_number || 'Plate unavailable',
-          driverName: r.assigned_driver || 'Unassigned',
-          routeName: r.route_name || 'Route unavailable',
-          state: 'inactive',
-          registryId: r.id,
-        };
-      });
-    return [...fromDb, ...fromReg];
-  }, [dbUnits, driversMap, registryUnits, data.routes]);
+  const combinedUnits = useMemo(
+    () => mergeAdminUnits(dbUnits, driversMap, data.routes, registryUnits),
+    [dbUnits, driversMap, data.routes, registryUnits]
+  );
 
   const filteredUnits = useMemo(() => {
     const q = query.trim().toLowerCase();
     return combinedUnits.filter((u) => {
       if (filter === 'on_shift' && u.state === 'inactive') return false;
-      if (filter === 'inactive' && u.state !== 'inactive') return false;
+      if (filter === 'inactive' && !u.registryDeletedAt) return false;
       return `${u.body} ${u.plate} ${u.driverName}`.toLowerCase().includes(q);
     });
   }, [combinedUnits, filter, query]);
@@ -649,6 +605,8 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
     try {
       const adminId = user?.id || 'admin-preview';
       if (!isNew && !editModalUnit?.registryId) throw new Error('This shift has no editable registry entry.');
+      const registry = registryUnits.find(unit => unit.id === editModalUnit?.registryId);
+      if (!isNew && !registry) throw new Error('This registry entry is no longer available.');
       await saveRegistryRecord(
         'units',
         adminId,
@@ -656,9 +614,9 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         {
           body_number: formBody.trim(),
           plate_number: formPlate.trim() || null,
-          route_name: isNew ? '' : registryUnits.find(unit => unit.id === editModalUnit?.registryId)?.route_name || '',
-          assigned_driver: null,
-          notes: formCapacity.trim() ? `${formCapacity} seats` : null,
+          route_name: registry?.route_name || '',
+          assigned_driver: registry?.assigned_driver ?? null,
+          notes: formCapacity.trim() ? `${formCapacity} seats` : registry?.notes ?? null,
         },
         isNew ? undefined : editModalUnit?.registryId
       );
@@ -792,7 +750,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
 
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={styles.rowTitle}>{u.body}</Text>
+                    <Text style={styles.rowTitle}>{u.body || 'Body unavailable'}</Text>
                     {u.state === 'on_shift' && (
                       <View style={[styles.statusBadge, styles.badgeGreen]}>
                         <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>On shift</Text>
@@ -807,17 +765,18 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
                     )}
                     {u.state === 'inactive' && (
                       <View style={[styles.statusBadge, styles.badgeGray]}>
-                        <Text style={[styles.statusBadgeText, styles.badgeGrayText]}>Inactive</Text>
+                        <Text style={[styles.statusBadgeText, styles.badgeGrayText]}>Off shift</Text>
                       </View>
                     )}
                   </View>
                   <Text style={styles.rowSub}>
-                    Plate {u.plate}
+                    Plate {u.plate || 'unavailable'}
                     {u.state !== 'inactive' ? ` · ${u.driverName}` : ' · Historical records kept'}
                   </Text>
+                  {!!u.registryDeletedAt && <Text style={styles.rowSub}>Inactive in registry · historical records kept</Text>}
                 </View>
 
-                {u.state === 'inactive' ? (
+                {u.registryDeletedAt ? (
                   <TouchableOpacity
                     accessibilityRole="button"
                     onPress={() => {
@@ -857,9 +816,10 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
 
             <TouchableOpacity
               accessibilityRole="button"
+              disabled={!selectedUnit.registryId}
               onPress={() => {
                 setFormBody(selectedUnit.body);
-                setFormPlate(selectedUnit.plate);
+                setFormPlate(selectedUnit.plate ?? '');
                 setFormCapacity('');
                 setEditModalUnit(selectedUnit);
               }}
@@ -869,7 +829,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
             </TouchableOpacity>
           </View>
 
-          {selectedUnit.state !== 'inactive' && (
+          {!!selectedUnit.activeShiftId && (
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => setForceEndModalUnit(selectedUnit)}
@@ -915,7 +875,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Unit</Text>
                 <Text style={styles.kvValue}>
-                  {forceEndModalUnit.body} · {forceEndModalUnit.plate}
+                  {forceEndModalUnit.body || 'Body unavailable'} · {forceEndModalUnit.plate || 'Plate unavailable'}
                 </Text>
               </View>
               <View style={styles.kvRow}>
@@ -1002,7 +962,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
           {editModalUnit && (
             <View style={[styles.statusBadge, styles.badgeGreen]}>
               <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>
-                {editModalUnit.state === 'inactive' ? 'Inactive' : 'Active'}
+                {editModalUnit.registryDeletedAt ? 'Inactive in registry' : 'Active in registry'}
               </Text>
             </View>
           )}
@@ -1052,7 +1012,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
           </Text>
         </TouchableOpacity>
 
-        {editModalUnit && editModalUnit.state !== 'inactive' && (
+        {editModalUnit?.registryId && !editModalUnit.registryDeletedAt && (
           <TouchableOpacity
             accessibilityRole="button"
             onPress={() => {

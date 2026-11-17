@@ -6,8 +6,12 @@ import { registerHooks } from 'node:module';
 const cache = new Map<string, string>();
 let tables: Record<string, any[]> = {};
 let failed = false;
+let cacheWriteFailed = false;
 let fleet: any[] = [];
-const storage = { getItem: async (key: string) => cache.get(key) ?? null, setItem: async (key: string, value: string) => { cache.set(key, value); } };
+const storage = { getItem: async (key: string) => cache.get(key) ?? null, setItem: async (key: string, value: string) => {
+  if (cacheWriteFailed) throw new Error('Storage full');
+  cache.set(key, value);
+} };
 const database = {
   rpc: async () => ({ data: failed ? null : fleet, error: failed ? { message: 'offline' } : null }),
   from(table: string) {
@@ -37,7 +41,7 @@ hooks.deregister();
 
 const route = { id: 'real-route-99', name: 'Verified service', is_active: true, coordinates: [], base_fare: 0, per_km_rate: 0 };
 const stop = { id: 'real-stop', route_id: route.id, name: 'Verified stop', latitude: 14.6, longitude: 121.1, sequence_order: 0, location_verified_at: '2026-11-01T00:00:00Z', location_source_url: 'https://example.test/survey' };
-test.beforeEach(() => { failed = false; });
+test.beforeEach(() => { failed = false; cacheWriteFailed = false; });
 
 test('empty fleet stays empty even in development; sample fleet rows are excluded', async () => {
   fleet = [];
@@ -88,6 +92,31 @@ test('old seeded cache cannot reappear after an unavailable read', async () => {
   assert.deepEqual(result.routes, []);
   assert.deepEqual(result.terminals, []);
   failed = false;
+});
+
+test('successful empty source reads stay empty when the cache cannot be written', async () => {
+  tables = { routes: [route], terminals: [stop] };
+  await offlineTransit.syncWithRemote();
+  tables = { routes: [], terminals: [] };
+  cacheWriteFailed = true;
+  const result = await offlineTransit.getTransitData();
+  assert.equal(result.status, 'ready');
+  assert.equal(result.isFromCache, false);
+  assert.equal(result.error, null);
+  assert.deepEqual(result.routes, []);
+  assert.deepEqual(result.terminals, []);
+});
+
+test('successful source changes survive cache write failures', async () => {
+  tables = { routes: [route], terminals: [stop] };
+  await offlineTransit.syncWithRemote();
+  tables = { routes: [{ ...route, id: 'new-route' }], terminals: [] };
+  cacheWriteFailed = true;
+  assert.deepEqual((await offlineTransit.syncWithRemote()).routes.map(row => row.id), ['new-route']);
+  const result = await offlineTransit.getTransitData();
+  assert.equal(result.status, 'ready');
+  assert.equal(result.isFromCache, false);
+  assert.deepEqual(result.routes.map(row => row.id), ['new-route']);
 });
 
 test('live fleet excludes sample database vehicles and preserves missing telemetry as unknown', async () => {

@@ -73,3 +73,27 @@ Report: this file.
 3. No authenticated UI session, web build, physical GPS/SMS, actual write RPC, or PDF download was exercised. Main/controller owns subsequent independent review and integration/visual checks.
 4. Current public reference data was reported by the controller as 2 routes / 6 unverified stops and no segments/walks/matrices. Under these gates, verified boarding/fare/walking content is intentionally unavailable. No remote records were edited or deleted.
 5. Historical unflagged database rows cannot be distinguished from legitimate source records by inventing a naming heuristic. Explicit is_sample flags are respected; source cleanup remains outside scope.
+
+## Fix round 1 — four review findings
+
+All four findings addressed:
+
+1. Cache persistence is now best-effort after a successful remote read. Both syncWithRemote and getTransitData return the source snapshot even if AsyncStorage.setItem rejects, including successful empty results. A failed source read still uses the existing timestamped cache behavior.
+2. Unit rows retain a missing plate as null. The edit form receives an empty string and continues to save null; unavailable labels exist only at rendering sites. Registry values take precedence over historical shift identifiers for editing.
+3. Extracted the existing screen merge into src/utils/adminUnitRows.ts and preserved registryId on matching shift-derived rows. Matching normalizes body/plate whitespace and case, prefers a current registry entry over an archived duplicate, and retains unmatched archived entries as distinct rows. Existing route/assigned-driver/notes fields are preserved when saving the basic unit form.
+4. registryDeletedAt now tracks registry deletion independently of shift state. Restore appears only for deleted entries; Mark unit inactive remains available for undeleted registry entries, including units without a current shift. The Inactive filter uses registry deletion. Off-shift badges no longer imply deletion, and Force-end requires an actual activeShiftId. Unregistered historical rows cannot enter the registry edit form.
+
+Regression evidence and verification:
+
+- Before the cache fix, the two new tests failed: a successful empty read returned cached status, and a changed successful source snapshot rejected with Storage full.
+- Before the registry fix, the extracted unchanged merge failed all five new behavioral tests: missing plate became display text; registry identity was lost; deletion state was absent; archived rows disappeared; and renamed/current entries were not matched.
+- `rtk node --experimental-strip-types tests/realData.test.ts`: PASS, 11/11.
+- `rtk node --experimental-strip-types tests/adminUnitRows.test.ts`: PASS, 5/5.
+- `rtk npm test`: PASS, 49/49.
+- `rtk proxy node node_modules/typescript/bin/tsc --noEmit`: PASS, exit 0.
+- `rtk git diff --check`: PASS.
+- Existing MODULE_TYPELESS_PACKAGE_JSON warning remains; no new dependencies or baseline-warning changes.
+
+Round files: src/services/offlineTransitService.ts, src/screens/admin/AdminOperationsScreens.tsx, src/utils/adminUnitRows.ts (new pure production merge), tests/realData.test.ts, tests/adminUnitRows.test.ts (new), tests/run.ts, and this report.
+
+No remote writes, deployments, subagents, authenticated UI actions, or real registry mutations were performed. The original unapplied-migration and device/UI verification limitations remain. A storage failure still means the new snapshot is not persisted for a later session; it no longer overrides the successful source response.

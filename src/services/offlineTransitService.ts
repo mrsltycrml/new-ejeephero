@@ -137,7 +137,9 @@ export class OfflineTransitService {
   public async syncWithRemote() {
     const [routes, terminals] = await Promise.all([readAll<RouteData>('routes'), readAll<TerminalData>('terminals')]);
     const current = { ...normalizeTransit(routes, terminals), syncedAt: new Date().toISOString() };
-    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(current));
+    try {
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(current));
+    } catch { /* Cache persistence must not override a successful source read. */ }
     return current;
   }
 
