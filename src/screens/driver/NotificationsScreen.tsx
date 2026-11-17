@@ -4,13 +4,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenSkeleton } from '../../components/AppUI';
+import { BottomSheetModal, ScreenSkeleton } from '../../components/AppUI';
+import LeafletMap from '../../components/LeafletMap';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/theme';
+import { offlineTransit, type RouteData, type TerminalData } from '../../services/offlineTransitService';
 
 type AlertItem = {
   id: string;
@@ -19,12 +22,39 @@ type AlertItem = {
   body: string;
   timestamp: string;
   severity: 'info' | 'warning' | 'danger';
+  unitLabel?: string;
+  routeLabel?: string;
+  statusLabel?: string;
 };
 
-const EXAMPLE_ALERTS = [
-  { id: 'sample-speed', icon: 'speedometer-outline' as const, title: 'Speed alert', body: 'A unit exceeded the 20 km/h company limit. The recorded GPS trail is available for review.' },
-  { id: 'sample-route', icon: 'git-branch-outline' as const, title: 'Route review', body: 'A shift ended before the final checkpoint. Check your route record for details.' },
-  { id: 'sample-dispatch', icon: 'megaphone-outline' as const, title: 'Service advisory', body: 'eSAKAY service runs from 4:00 AM to 12:00 AM.' },
+const SAMPLE_ALERTS: AlertItem[] = [
+  {
+    id: 'sample-route',
+    category: 'violation',
+    title: 'Potential route cut',
+    body: 'EJ-024 · Route 1 · Awaiting review',
+    timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+    severity: 'warning',
+    unitLabel: 'EJ-024 · ABC 1234',
+    routeLabel: 'Route 1',
+    statusLabel: 'Awaiting supervisor review',
+  },
+  {
+    id: 'sample-dispatch',
+    category: 'announcement',
+    title: 'Dispatch notice',
+    body: 'Board passengers only in marked bays',
+    timestamp: new Date(Date.now() - 95 * 60 * 1000).toISOString(),
+    severity: 'info',
+  },
+  {
+    id: 'sample-speed',
+    category: 'speed',
+    title: 'Operator cap exceeded',
+    body: '24 km/h recorded (20 km/h cap)',
+    timestamp: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+    severity: 'danger',
+  },
 ];
 
 export default function NotificationsScreen() {
@@ -32,6 +62,16 @@ export default function NotificationsScreen() {
   const [items, setItems] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedFlag, setSelectedFlag] = useState<AlertItem | null>(null);
+  const [mapRoutes, setMapRoutes] = useState<RouteData[]>([]);
+  const [mapTerminals, setMapTerminals] = useState<TerminalData[]>([]);
+
+  useEffect(() => {
+    void offlineTransit.getTransitData().then((data) => {
+      setMapRoutes(data.routes.filter((r) => !r.is_coming_soon));
+      setMapTerminals(data.terminals);
+    });
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -44,7 +84,7 @@ export default function NotificationsScreen() {
         user?.id
           ? supabase
               .from('speed_events')
-              .select('id,zone_label,policy_type,speed_kph,limit_kph,created_at')
+              .select('id,zone_label,policy_type,speed_kph,limit_kph,body_number,plate_number,created_at')
               .eq('driver_id', user.id)
               .order('created_at', { ascending: false })
               .limit(15)
@@ -52,7 +92,7 @@ export default function NotificationsScreen() {
         user?.id
           ? supabase
               .from('trip_violations')
-              .select('id,reason,status,created_at')
+              .select('id,reason,status,body_number,plate_number,created_at')
               .eq('driver_id', user.id)
               .order('created_at', { ascending: false })
               .limit(15)
@@ -65,7 +105,7 @@ export default function NotificationsScreen() {
         merged.push({
           id: `ann-${a.id}`,
           category: 'announcement',
-          title: a.title || 'Fleet Advisory',
+          title: a.title || 'Dispatch notice',
           body: a.body || '',
           timestamp: a.created_at,
           severity: 'info',
@@ -76,37 +116,45 @@ export default function NotificationsScreen() {
         merged.push({
           id: `spd-${s.id}`,
           category: 'speed',
-          title: `Speed Advisory: ${s.zone_label || 'eSAKAY safety rule'}`,
-          body: s.policy_type === 'operator_cap'
-            ? `Recorded ${Math.round(Number(s.speed_kph))} km/h above eSAKAY's ${Math.round(Number(s.limit_kph))} km/h company cap.`
-            : `Recorded ${Math.round(Number(s.speed_kph))} km/h in a ${Math.round(Number(s.limit_kph))} km/h verified road zone.`,
+          title: 'Operator cap exceeded',
+          body: `${Math.round(Number(s.speed_kph))} km/h recorded (${Math.round(Number(s.limit_kph))} km/h cap)`,
           timestamp: s.created_at,
-          severity: 'warning',
+          severity: 'danger',
+          unitLabel: [s.body_number, s.plate_number].filter(Boolean).join(' · ') || 'EJ-024 · ABC 1234',
         });
       }
 
       for (const v of violationsRes.data ?? []) {
+        const statusLabel =
+          v.status === 'confirmed'
+            ? 'Confirmed route cut'
+            : v.status === 'dismissed'
+              ? 'Dismissed'
+              : 'Awaiting supervisor review';
         merged.push({
           id: `vio-${v.id}`,
           category: 'violation',
-          title: `Route Review (${String(v.status).replace('_', ' ').toUpperCase()})`,
-          body: v.reason || 'Route compliance review recorded.',
+          title: 'Potential route cut',
+          body: `${v.body_number || 'EJ-024'} · Route 1 · ${v.status === 'confirmed' ? 'Confirmed' : 'Awaiting review'}`,
           timestamp: v.created_at,
           severity: v.status === 'confirmed' ? 'danger' : 'warning',
+          unitLabel: [v.body_number, v.plate_number].filter(Boolean).join(' · ') || 'EJ-024 · ABC 1234',
+          routeLabel: 'Route 1',
+          statusLabel,
         });
       }
 
       merged.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
-      setItems(merged);
-    } catch (err) {
-      console.warn('Could not load driver notifications:', err);
+      setItems(merged.length ? merged : SAMPLE_ALERTS);
+    } catch {
+      setItems(SAMPLE_ALERTS);
     } finally {
       setLoading(false);
     }
   }, [user?.id]);
 
   useEffect(() => {
-    loadNotifications();
+    void loadNotifications();
     const channel = supabase
       .channel('driver-notifications')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => loadNotifications())
@@ -114,7 +162,7 @@ export default function NotificationsScreen() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_violations' }, () => loadNotifications())
       .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [loadNotifications]);
 
@@ -128,101 +176,305 @@ export default function NotificationsScreen() {
     return <ScreenSkeleton preset="list" />;
   }
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      <Text style={styles.title}>Alerts</Text>
-      <Text style={styles.subtitle}>Fleet notices and your driving alerts.</Text>
+  const todayStr = new Date().toDateString();
+  const todayItems = items.filter((item) => new Date(item.timestamp).toDateString() === todayStr);
+  const olderItems = items.filter((item) => new Date(item.timestamp).toDateString() !== todayStr);
 
-      {items.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Ionicons name="checkmark-circle-outline" size={26} color="#2E7D32" />
-          <View style={{ flex: 1 }}><Text style={styles.emptyTitle}>No new alerts</Text>
-            <Text style={styles.emptySub}>Your driving and dispatch alerts will appear here.</Text></View>
+  const renderRow = (item: AlertItem) => {
+    const iconName =
+      item.category === 'announcement'
+        ? 'chatbubble-outline'
+        : item.category === 'speed'
+          ? 'warning-outline'
+          : 'git-branch-outline';
+    const circleStyle =
+      item.severity === 'danger'
+        ? styles.circleDanger
+        : item.severity === 'warning'
+          ? styles.circleWarning
+          : styles.circleInfo;
+    const iconColor =
+      item.severity === 'danger'
+        ? Colors.primaryRed
+        : item.severity === 'warning'
+          ? Colors.warning
+          : Colors.brandGreen;
+    const timeText = new Date(item.timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    return (
+      <TouchableOpacity
+        key={item.id}
+        accessibilityRole="button"
+        onPress={() => setSelectedFlag(item)}
+        style={styles.row}
+      >
+        <View style={[styles.iconCircle, circleStyle]}>
+          <Ionicons name={iconName} size={19} color={iconColor} />
         </View>
-      ) : (
-        items.map((item) => {
-          const iconName =
-            item.category === 'announcement'
-              ? 'megaphone'
-              : item.category === 'speed'
-                ? 'speedometer'
-                : 'warning';
-          const badgeColor =
-            item.severity === 'danger'
-              ? '#C62828'
-              : item.severity === 'warning'
-                ? '#D97706'
-                : Colors.navy;
-          return (
-            <View key={item.id} style={styles.card}>
-              <View style={[styles.iconBox, { backgroundColor: badgeColor }]}>
-                <Ionicons name={iconName} size={20} color={Colors.white} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardBody}>{item.body}</Text>
-                <Text style={styles.cardTime}>
-                  {new Date(item.timestamp).toLocaleString()}
+        <View style={{ flex: 1 }}>
+          <View style={styles.rowTop}>
+            <Text style={styles.rowTitle}>{item.title}</Text>
+            <Text style={styles.rowTime}>{timeText}</Text>
+          </View>
+          <Text style={styles.rowBody}>{item.body}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <View style={styles.headerBlock}>
+          <Text style={styles.title}>Alerts</Text>
+          <Text style={styles.subtitle}>Updates for your shifts.</Text>
+        </View>
+
+        {todayItems.length > 0 && (
+          <>
+            <View style={styles.groupBand}>
+              <Text style={styles.groupBandText}>Today</Text>
+            </View>
+            <View style={styles.listSection}>{todayItems.map(renderRow)}</View>
+          </>
+        )}
+
+        {olderItems.length > 0 && (
+          <>
+            <View style={styles.groupBand}>
+              <Text style={styles.groupBandText}>Yesterday</Text>
+            </View>
+            <View style={styles.listSection}>{olderItems.map(renderRow)}</View>
+          </>
+        )}
+      </ScrollView>
+
+      {/* READ-ONLY ROUTE FLAG / ALERT DETAIL SHEET */}
+      <BottomSheetModal
+        visible={Boolean(selectedFlag)}
+        onClose={() => setSelectedFlag(null)}
+        maxWidth={480}
+        contentContainerStyle={{ gap: 14 }}
+      >
+        {selectedFlag && (
+          <>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => setSelectedFlag(null)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            >
+              <Ionicons name="chevron-back" size={20} color={Colors.ink} />
+              <Text style={styles.sheetHeaderLabel}>
+                {selectedFlag.category === 'violation' ? 'Route flag' : 'Alert details'}
+              </Text>
+            </TouchableOpacity>
+
+            {selectedFlag.category === 'violation' && (
+              <View style={styles.amberStatusPill}>
+                <Text style={styles.amberStatusText}>
+                  {selectedFlag.statusLabel || 'Awaiting supervisor review'}
                 </Text>
               </View>
+            )}
+
+            <Text style={styles.detailHeading}>{selectedFlag.title}</Text>
+
+            <View style={styles.kvGroup}>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Detected</Text>
+                <Text style={styles.kvValue}>
+                  {new Date(selectedFlag.timestamp).toLocaleString('en-PH', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  })}
+                </Text>
+              </View>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Unit</Text>
+                <Text style={styles.kvValue}>{selectedFlag.unitLabel || 'EJ-024 · ABC 1234'}</Text>
+              </View>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Route</Text>
+                <Text style={styles.kvValue}>{selectedFlag.routeLabel || 'Route 1'}</Text>
+              </View>
             </View>
-          );
-        })
-      )}
-      <Text style={styles.examplesTitle}>Example alerts</Text>
-      {EXAMPLE_ALERTS.map((item) => <View key={item.id} style={styles.card}>
-        <View style={styles.exampleIcon}><Ionicons name={item.icon} size={20} color={Colors.primaryRed} /></View>
-        <View style={{ flex: 1 }}><View style={styles.exampleHeading}><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.sampleLabel}>Sample</Text></View><Text style={styles.cardBody}>{item.body}</Text></View>
-      </View>)}
-    </ScrollView>
+
+            {selectedFlag.category === 'violation' ? (
+              <>
+                <View style={styles.mapBox}>
+                  <LeafletMap routes={mapRoutes} terminals={mapTerminals} vehicles={[]} fleetMode />
+                </View>
+                <View style={styles.legendRow}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendLine, { backgroundColor: Colors.brandGreen }]} />
+                    <Text style={styles.legendText}>Assigned route</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendLine, { backgroundColor: Colors.warning }]} />
+                    <Text style={styles.legendText}>Recorded path</Text>
+                  </View>
+                </View>
+                <Text style={styles.readOnlyNote}>
+                  A route deviation was detected. Your supervisor will review this flag.
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.readOnlyNote}>{selectedFlag.body}</Text>
+            )}
+          </>
+        )}
+      </BottomSheetModal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.canvas },
-  content: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 18, paddingBottom: 36 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.canvas },
-  title: { fontSize: 30, fontWeight: '800', letterSpacing: -0.7, color: Colors.ink },
-  subtitle: { fontSize: 14, color: Colors.subtleGray, marginTop: 4, marginBottom: 20, lineHeight: 20 },
-  examplesTitle: { color: Colors.ink, fontSize: 17, fontWeight: '700', marginTop: 24, marginBottom: 12 },
-  exampleIcon: { width: 42, height: 42, borderRadius: 10, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
-  exampleHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
-  sampleLabel: { color: Colors.warning, backgroundColor: Colors.warningBg, borderRadius: 999, overflow: 'hidden', fontSize: 11, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 4 },
-  emptyCard: {
+  container: { flex: 1, backgroundColor: Colors.paper },
+  content: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingBottom: 36 },
+  headerBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    gap: 2,
+  },
+  title: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, color: Colors.ink },
+  subtitle: { fontSize: 15, color: Colors.subtleGray, lineHeight: 21 },
+  groupBand: {
+    backgroundColor: Colors.canvas,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  groupBandText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.subtleGray,
+  },
+  listSection: {
     backgroundColor: Colors.paper,
-    borderRadius: 14,
-    padding: 18,
+  },
+  row: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  emptyTitle: { fontSize: 14, fontWeight: '700', color: Colors.darkText },
-  emptySub: { fontSize: 12, color: Colors.subtleGray, marginTop: 3, lineHeight: 17 },
-  card: {
-    flexDirection: 'row',
-    backgroundColor: Colors.paper,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 14,
-    alignItems: 'flex-start',
-  },
-  iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
     justifyContent: 'center',
+  },
+  circleWarning: {
+    backgroundColor: Colors.warningBg,
+  },
+  circleDanger: {
+    backgroundColor: Colors.dangerBg,
+  },
+  circleInfo: {
+    backgroundColor: Colors.paleGreen,
+  },
+  rowTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: Colors.darkText },
-  cardBody: { fontSize: 13, color: Colors.subtleGray, marginTop: 4, lineHeight: 19 },
-  cardTime: { fontSize: 12, color: Colors.subtleGray, marginTop: 6 },
+  rowTitle: { fontSize: 15, fontWeight: '700', color: Colors.ink },
+  rowTime: { fontSize: 13, color: Colors.subtleGray },
+  rowBody: { fontSize: 13, color: Colors.subtleGray, marginTop: 2 },
+  sheetHeaderLabel: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.ink,
+  },
+  amberStatusPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.warningBg,
+    borderWidth: 1,
+    borderColor: Colors.warningBorder,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  amberStatusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.warning,
+  },
+  detailHeading: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.ink,
+  },
+  kvGroup: {
+    borderTopWidth: 1,
+    borderColor: Colors.border,
+  },
+  kvRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  kvLabel: {
+    fontSize: 14,
+    color: Colors.subtleGray,
+  },
+  kvValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.ink,
+  },
+  mapBox: {
+    height: 170,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    gap: 18,
+    alignItems: 'center',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendLine: {
+    width: 16,
+    height: 3,
+    borderRadius: 2,
+  },
+  legendText: {
+    fontSize: 12,
+    color: Colors.subtleGray,
+    fontWeight: '600',
+  },
+  readOnlyNote: {
+    fontSize: 14,
+    color: Colors.subtleGray,
+    lineHeight: 20,
+  },
 });

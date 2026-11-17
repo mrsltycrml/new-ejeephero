@@ -84,16 +84,15 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
           setStatusMessage(`Enter the 6-digit verification code sent to ${normalizedEmail}.`);
         } else {
           setErrorMessage(
-            'Additional verification is required. Please use Forgot Password to verify your email with a 6-digit code.'
+            'Additional verification is required. Please use Forgot password to verify your email with a 6-digit code.'
           );
         }
       } else {
         setErrorMessage(
-          'Additional verification is required. Please use Forgot Password to verify your email with a 6-digit code.'
+          'Additional verification is required. Please use Forgot password to verify your email with a 6-digit code.'
         );
       }
     } catch (err: any) {
-      // Seamless fallback for past Supabase accounts (e.g. legacy passwords or pre-Clerk credentials)
       const legacyOk = await tryLegacySupabaseSignIn(normalizedEmail, password);
       if (legacyOk) return;
 
@@ -141,16 +140,16 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
 
   if (pendingFactor) {
     return (
-      <View style={styles.formCard}>
+      <View style={styles.formSection}>
         {!!statusMessage && (
-          <View style={[styles.errorBanner, { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }]}>
-            <Ionicons name="mail-unread-outline" size={18} color="#1B5E20" />
-            <Text style={[styles.errorBannerText, { color: '#1B5E20' }]}>{statusMessage}</Text>
+          <View style={[styles.errorBanner, { backgroundColor: Colors.paleGreen, borderColor: Colors.brandGreen }]}>
+            <Ionicons name="mail-unread-outline" size={18} color={Colors.brandGreen} />
+            <Text style={[styles.errorBannerText, { color: Colors.ink }]}>{statusMessage}</Text>
           </View>
         )}
         {!!errorMessage && (
           <View style={styles.errorBanner} accessibilityRole="alert">
-            <Ionicons name="alert-circle" size={18} color="#B71C1C" />
+            <Ionicons name="alert-circle" size={18} color={Colors.primaryRed} />
             <Text style={styles.errorBannerText}>{errorMessage}</Text>
           </View>
         )}
@@ -168,7 +167,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
           autoFocus
         />
         <TouchableOpacity style={styles.button} onPress={handleVerifySignInCode} disabled={loading}>
-          {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.buttonText}>Verify & Log In</Text>}
+          {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.buttonText}>Verify & sign in</Text>}
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => {
@@ -178,33 +177,33 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
           }}
           style={[styles.forgotPasswordBtn, { alignSelf: 'center', marginTop: 10 }]}
         >
-          <Text style={styles.forgotPasswordText}>Back to Sign In</Text>
+          <Text style={styles.forgotPasswordText}>Back to sign in</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.formCard}>
+    <View style={styles.formSection}>
       {!!errorMessage && (
         <View style={styles.errorBanner} accessibilityRole="alert">
-          <Ionicons name="alert-circle" size={18} color="#B71C1C" />
+          <Ionicons name="alert-circle" size={18} color={Colors.primaryRed} />
           <Text style={styles.errorBannerText}>{errorMessage}</Text>
         </View>
       )}
 
       {!isLoaded && (
         <View style={styles.loadingAuthRow}>
-          <ActivityIndicator size="small" color={Colors.navy} />
+          <ActivityIndicator size="small" color={Colors.brandGreen} />
           <Text style={styles.loadingAuthText}>Connecting to secure sign-in…</Text>
         </View>
       )}
 
-      <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Email address</Text>
+      <Text style={styles.fieldLabel}>Email address</Text>
       <TextInput
         style={styles.input}
         accessibilityLabel="Email address"
-        placeholder={t('auth.emailPlaceholder')}
+        placeholder="you@example.com"
         placeholderTextColor={Colors.subtleGray}
         value={email}
         onChangeText={(val) => {
@@ -215,12 +214,12 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
         keyboardType="email-address"
         autoComplete="email"
       />
-      <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Password</Text>
+      <Text style={styles.fieldLabel}>Password</Text>
       <View style={styles.passwordWrapper}>
         <TextInput
           style={styles.passwordInput}
           accessibilityLabel="Password"
-          placeholder={t('auth.passwordPlaceholder')}
+          placeholder="Enter password"
           placeholderTextColor={Colors.subtleGray}
           value={password}
           onChangeText={(val) => {
@@ -237,7 +236,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
           onPress={() => setShowPassword((prev) => !prev)}
           accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
         >
-          <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#666" />
+          <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.subtleGray} />
         </TouchableOpacity>
       </View>
 
@@ -255,7 +254,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
         {loading ? (
           <ActivityIndicator color={Colors.white} />
         ) : (
-          <Text style={styles.buttonText}>{t('auth.logIn')}</Text>
+          <Text style={styles.buttonText}>Sign in</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -296,31 +295,31 @@ function SupabaseSignInForm({ navigation }: { navigation: any }) {
   };
 
   return (
-    <View style={styles.formCard}>
+    <View style={styles.formSection}>
       {!!errorMessage && (
         <View style={styles.errorBanner} accessibilityRole="alert">
-          <Ionicons name="alert-circle" size={18} color="#B71C1C" />
+          <Ionicons name="alert-circle" size={18} color={Colors.primaryRed} />
           <Text style={styles.errorBannerText}>{errorMessage}</Text>
         </View>
       )}
 
-      <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Email address</Text>
+      <Text style={styles.fieldLabel}>Email address</Text>
       <TextInput
         style={styles.input}
         accessibilityLabel="Email address"
-        placeholder={t('auth.emailPlaceholder')}
+        placeholder="you@example.com"
         placeholderTextColor={Colors.subtleGray}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
       />
-      <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Password</Text>
+      <Text style={styles.fieldLabel}>Password</Text>
       <View style={styles.passwordWrapper}>
         <TextInput
           style={styles.passwordInput}
           accessibilityLabel="Password"
-          placeholder={t('auth.passwordPlaceholder')}
+          placeholder="Enter password"
           placeholderTextColor={Colors.subtleGray}
           value={password}
           onChangeText={setPassword}
@@ -331,7 +330,7 @@ function SupabaseSignInForm({ navigation }: { navigation: any }) {
           style={styles.eyeButton}
           onPress={() => setShowPassword((prev) => !prev)}
         >
-          <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#666" />
+          <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.subtleGray} />
         </TouchableOpacity>
       </View>
 
@@ -345,7 +344,7 @@ function SupabaseSignInForm({ navigation }: { navigation: any }) {
         {loading ? (
           <ActivityIndicator color={Colors.white} />
         ) : (
-          <Text style={styles.buttonText}>{t('auth.logIn')}</Text>
+          <Text style={styles.buttonText}>Sign in</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -353,7 +352,6 @@ function SupabaseSignInForm({ navigation }: { navigation: any }) {
 }
 
 export default function LoginScreen({ navigation }: any) {
-  const { t } = useTranslation();
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
 
   return (
@@ -363,43 +361,45 @@ export default function LoginScreen({ navigation }: any) {
       contentContainerStyle={styles.scrollContainer}
       showsVerticalScrollIndicator={false}
     >
-        <View style={styles.heroCard}>
-          <ESakayLogo width={186} />
-          <View style={styles.heroPill}>
-            <Ionicons name="flash" size={12} color={Colors.brandMintLight} />
-            <Text style={styles.heroPillText}>ELECTRIC TRANSIT NETWORK</Text>
-          </View>
-          <Text accessibilityRole="header" style={styles.heroTitle}>Sign in to eSAKAY</Text>
-          <Text style={styles.heroSub}>Real-time Makati–Mandaluyong e-jeepney tracking, fares, and commuter safety.</Text>
-        </View>
-        {isClerkConfigured ? (
-          <ClerkSignInForm navigation={navigation} />
-        ) : (
-          <SupabaseSignInForm navigation={navigation} />
-        )}
+      <View style={styles.logoHeader}>
+        <ESakayLogo showIcon />
+      </View>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkButton}>
-          <Text style={styles.linkText}>
-            {t('auth.noAccount')} <Text style={styles.linkAction}>{t('auth.registerNow')}</Text>
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.headingBlock}>
+        <Text accessibilityRole="header" style={styles.title}>Welcome back</Text>
+        <Text style={styles.subtitle}>Sign in to plan your ride.</Text>
+      </View>
 
-        <TouchableOpacity
-          onPress={() => setDownloadModalVisible(true)}
-          style={styles.downloadBanner}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="phone-portrait-outline" size={18} color={Colors.ink} />
-          <Text style={styles.downloadBannerText}>
-            Get the eSAKAY mobile app
-          </Text>
-          <Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} />
-        </TouchableOpacity>
+      {isClerkConfigured ? (
+        <ClerkSignInForm navigation={navigation} />
+      ) : (
+        <SupabaseSignInForm navigation={navigation} />
+      )}
 
-        <AppDownloadModal
-          visible={downloadModalVisible}
-          onClose={() => setDownloadModalVisible(false)}
-        />
+      <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkButton}>
+        <Text style={styles.linkText}>
+          New to ejeephero? <Text style={styles.linkAction}>Create account</Text>
+        </Text>
+      </TouchableOpacity>
+
+      <Text style={styles.footerCaption}>
+        Passenger accounts are ready after registration.
+      </Text>
+
+      <TouchableOpacity
+        onPress={() => setDownloadModalVisible(true)}
+        style={styles.downloadBanner}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="phone-portrait-outline" size={16} color={Colors.subtleGray} />
+        <Text style={styles.downloadBannerText}>Install ejeephero on your phone</Text>
+        <Ionicons name="chevron-forward" size={15} color={Colors.subtleGray} />
+      </TouchableOpacity>
+
+      <AppDownloadModal
+        visible={downloadModalVisible}
+        onClose={() => setDownloadModalVisible(false)}
+      />
     </FormScrollView>
   );
 }
@@ -407,106 +407,60 @@ export default function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   outer: {
     flex: 1,
-    backgroundColor: Colors.canvas,
+    backgroundColor: Colors.paper,
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 28,
     width: '100%',
-    maxWidth: 540,
+    maxWidth: 440,
     alignSelf: 'center',
   },
-  logoContainer: {
+  logoHeader: {
     alignItems: 'center',
-    marginBottom: 25,
-    gap: 10,
+    marginBottom: 28,
   },
-  heroCard: {
-    backgroundColor: Colors.ink,
-    borderRadius: 22,
-    padding: 24,
-    marginBottom: 16,
-    alignItems: 'flex-start',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: Colors.brandSurfaceDark,
-  },
-  heroPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.brandSurfaceDark,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    marginTop: 4,
-  },
-  heroPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-    color: Colors.brandMintLight,
-  },
-  heroTitle: {
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-    color: Colors.white,
-  },
-  heroSub: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#A7F3D0',
-  },
-  jeepneyBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: Colors.navy,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
+  headingBlock: {
+    marginBottom: 20,
+    gap: 4,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: Colors.navy,
-    letterSpacing: 0.2,
-  },
-  titleHighlight: {
-    color: Colors.primaryRed,
+    fontSize: 26,
+    fontWeight: '700',
+    color: Colors.ink,
+    letterSpacing: -0.4,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.subtleGray,
-    marginTop: 6,
-    fontWeight: '400',
-    textAlign: 'center',
+    lineHeight: 21,
   },
-  formCard: {
-    backgroundColor: Colors.paper,
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  formSection: {
+    marginBottom: 16,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.ink,
+    marginBottom: 8,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: '#FFEBEE',
+    backgroundColor: Colors.dangerBg,
     borderWidth: 1,
-    borderColor: '#FFCDD2',
-    borderRadius: 6,
+    borderColor: Colors.primaryRed,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 14,
   },
   errorBannerText: {
     flex: 1,
     fontSize: 13,
-    color: '#B71C1C',
+    color: Colors.primaryRed,
     fontWeight: '600',
     lineHeight: 18,
   },
@@ -517,19 +471,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   loadingAuthText: {
-    fontSize: 12,
-    color: Colors.navy,
+    fontSize: 13,
+    color: Colors.ink,
     fontWeight: '600',
   },
   input: {
     backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: 14,
-    borderRadius: 6,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    minHeight: 52,
+    borderRadius: 12,
+    marginBottom: 16,
     fontSize: 16,
-    color: Colors.darkText,
+    color: Colors.ink,
   },
   passwordWrapper: {
     flexDirection: 'row',
@@ -537,38 +493,40 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 6,
+    borderRadius: 12,
+    minHeight: 52,
     marginBottom: 12,
   },
   passwordInput: {
     flex: 1,
     minWidth: 0,
     flexShrink: 1,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     fontSize: 16,
-    color: Colors.darkText,
+    color: Colors.ink,
   },
   eyeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   forgotPasswordBtn: {
     alignSelf: 'flex-end',
-    marginBottom: 10,
+    marginBottom: 18,
   },
   forgotPasswordText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: Colors.ink,
+    color: Colors.brandGreen,
   },
   button: {
-    backgroundColor: Colors.ink,
-    padding: 15,
-    borderRadius: 6,
+    backgroundColor: Colors.brandGreen,
+    minHeight: 52,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: Colors.ink,
+    justifyContent: 'center',
   },
   buttonText: {
     color: Colors.white,
@@ -576,34 +534,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   linkButton: {
-    padding: 10,
+    paddingVertical: 12,
   },
   linkText: {
-    color: Colors.subtleGray,
+    color: Colors.ink,
     textAlign: 'center',
     fontSize: 15,
   },
   linkAction: {
-    color: Colors.ink,
+    color: Colors.brandGreen,
     fontWeight: '700',
+  },
+  footerCaption: {
+    marginTop: 8,
+    fontSize: 13,
+    color: Colors.subtleGray,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   downloadBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 14,
-    backgroundColor: Colors.paper,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
+    gap: 6,
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   downloadBannerText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.ink,
-    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.subtleGray,
   },
 });

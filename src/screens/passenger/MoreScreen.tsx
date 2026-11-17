@@ -1,96 +1,175 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s } from '../../components/PassengerUI';
 import { Colors } from '../../constants/theme';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function MoreScreen({ navigation }: any) {
-  const cards = [
+  const { signOut } = useAuth();
+
+  const tools = [
+    {
+      screen: 'PassengerAssistant',
+      name: 'ejeepherobot',
+      desc: 'Ask a commuting question',
+      icon: 'chatbubble-outline' as const,
+    },
     {
       screen: 'PassengerDirectory',
-      tag: 'ROUTES & STOPS',
-      name: 'Route directory & planner',
-      desc: 'Explore all Route 1 terminals, fares, and stop-to-stop trip planning.',
-      icon: 'bus' as const,
+      name: 'Routes & trip planner',
+      desc: 'Explore stops and route options',
+      icon: 'git-branch-outline' as const,
     },
     {
       screen: 'PassengerWeather',
-      tag: 'LIVE ADVISORY',
-      name: 'Makati weather radar',
-      desc: 'Real-time temperature, rain forecast, and commuter safety advisories.',
-      icon: 'thunderstorm' as const,
-    },
-    {
-      screen: 'PassengerAbout',
-      tag: 'ELECTRIC TRANSIT',
-      name: 'About eSAKAY',
-      desc: 'Learn about Meralco’s zero-emission electric jeepney network.',
-      icon: 'leaf' as const,
+      name: 'Makati weather',
+      desc: 'Forecast and travel advisory',
+      icon: 'cloud-outline' as const,
     },
   ];
 
-  return (
-    <ScrollView style={s.screen} contentContainerStyle={s.content}>
-      {/* AI ASSISTANT HERO CARD */}
-      <TouchableOpacity
-        accessibilityRole="button"
-        onPress={() => navigation.getParent()?.navigate('PassengerAssistant')}
-        style={s.heroBanner}
-        activeOpacity={0.9}
-      >
-        <View style={[s.row, { justifyContent: 'space-between' }]}>
-          <View style={s.pillDark}>
-            <Ionicons name="sparkles" size={14} color={Colors.brandMintLight} />
-            <Text style={{ fontSize: 11, fontWeight: '800', color: Colors.brandMintLight }}>AI TRANSIT CONCIERGE</Text>
-          </View>
-          <Ionicons name="arrow-forward-circle" size={26} color={Colors.brandMintLight} />
-        </View>
-        <Text style={s.heroTitle}>Ask esakaybot</Text>
-        <Text style={s.heroSubtitle}>
-          Instant answers on Route 1 stops, operating hours, discounted fares, and active e-jeeps.
-        </Text>
-      </TouchableOpacity>
+  const handleSignOut = () => {
+    void signOut().catch(() => Alert.alert('Could not sign out', 'Please try again.'));
+  };
 
-      {/* BENTO GRID */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-        {cards.map((item) => (
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={styles.container}>
+      <View style={styles.headerBlock}>
+        <Text style={s.title}>More</Text>
+        <Text style={s.subtitle}>Tools for your everyday commute.</Text>
+      </View>
+
+      <View style={styles.listSection}>
+        {tools.map((item) => (
           <TouchableOpacity
             key={item.screen}
             accessibilityRole="button"
             onPress={() => navigation.getParent()?.navigate(item.screen)}
-            style={[
-              s.section,
-              {
-                flexGrow: 1,
-                flexBasis: 260,
-                justifyContent: 'space-between',
-                gap: 14,
-              },
-            ]}
+            style={styles.row}
           >
-            <View style={[s.row, { justifyContent: 'space-between' }]}>
-              <View
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: 14,
-                  backgroundColor: Colors.ink,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Ionicons name={item.icon} size={22} color={Colors.brandMintLight} />
-              </View>
-              <Ionicons name="chevron-forward-circle-outline" size={22} color={Colors.subtleGray} />
+            <View style={styles.iconCircle}>
+              <Ionicons name={item.icon} size={20} color={Colors.brandGreen} />
             </View>
-            <View style={{ gap: 4 }}>
-              <Text style={s.eyebrow}>{item.tag}</Text>
-              <Text style={s.sectionTitle}>{item.name}</Text>
-              <Text style={s.muted}>{item.desc}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{item.name}</Text>
+              <Text style={styles.rowDesc}>{item.desc}</Text>
             </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
           </TouchableOpacity>
         ))}
       </View>
+
+      <View style={styles.sectionBand}>
+        <Text style={styles.sectionBandText}>Account</Text>
+      </View>
+
+      <View style={styles.listSection}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => navigation.getParent()?.navigate('PassengerProfile')}
+          style={styles.row}
+        >
+          <View style={styles.iconCircle}>
+            <Ionicons name="person-outline" size={20} color={Colors.brandGreen} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>Profile</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => navigation.getParent()?.navigate('PassengerAbout')}
+          style={styles.row}
+        >
+          <View style={styles.iconCircle}>
+            <Ionicons name="information-circle-outline" size={20} color={Colors.brandGreen} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>About ejeephero</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        onPress={handleSignOut}
+        style={styles.signOutBtn}
+      >
+        <Text style={styles.signOutText}>Sign out</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingBottom: 36,
+  },
+  headerBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    gap: 2,
+  },
+  listSection: {
+    borderTopWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.paper,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.paleGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.ink,
+  },
+  rowDesc: {
+    fontSize: 13,
+    color: Colors.subtleGray,
+    marginTop: 2,
+  },
+  sectionBand: {
+    backgroundColor: Colors.canvas,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  sectionBandText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.subtleGray,
+  },
+  signOutBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
+  signOutText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.brandGreen,
+    textDecorationLine: 'underline',
+  },
+});

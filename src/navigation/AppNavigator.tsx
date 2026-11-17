@@ -5,7 +5,6 @@ import { ScreenSkeleton } from '../components/AppUI';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
 import ESakayLogo from '../components/ESakayLogo';
@@ -25,8 +24,8 @@ import HeroBotScreen from '../screens/passenger/HeroBotScreen';
 import DirectoryScreen from '../screens/passenger/DirectoryScreen';
 import FareScreen from '../screens/passenger/FareScreen';
 import SafetyScreen from '../screens/passenger/SafetyScreen';
-import AboutScreen from "../screens/passenger/AboutScreen";
-import PassengerNotices from "../components/PassengerNotices";
+import AboutScreen from '../screens/passenger/AboutScreen';
+import PassengerNotices from '../components/PassengerNotices';
 import MoreScreen from '../screens/passenger/MoreScreen';
 import { PassengerJourneyProvider } from '../contexts/PassengerJourneyContext';
 
@@ -35,9 +34,9 @@ import DriverDashboardScreen from '../screens/driver/DashboardScreen';
 import NotificationsScreen from '../screens/driver/NotificationsScreen';
 import DriverRecordsScreen from '../screens/driver/RecordsScreen';
 
-// Admin Screens
+// Admin / Supervisor Screens
 import SupervisorDashboardScreen from '../screens/admin/SupervisorDashboardScreen';
-import { AdminDriversScreen, AdminUnitsScreen } from '../screens/admin/AdminOperationsScreens';
+import { AdminDriversScreen, AdminUnitsScreen, AdminReportsScreen } from '../screens/admin/AdminOperationsScreens';
 
 // Shared
 import WeatherScreen from '../screens/shared/WeatherScreen';
@@ -49,140 +48,332 @@ const Tab = createBottomTabNavigator();
 const commonScreenOptions = {
   headerTitleAlign: 'left' as const,
   headerStatusBarHeight: Platform.OS === 'web' ? 0 : undefined,
-  tabBarActiveTintColor: Colors.brandMintLight,
+  tabBarActiveTintColor: Colors.brandGreen,
   tabBarInactiveTintColor: Colors.tabInactive,
   tabBarStyle: {
-    backgroundColor: Colors.ink,
+    backgroundColor: Colors.paper,
     borderTopWidth: 1,
-    borderTopColor: Colors.brandSurfaceDark,
+    borderTopColor: Colors.border,
     paddingTop: 6,
     paddingBottom: 8,
-    height: 66,
-    elevation: 12,
+    height: 64,
+    elevation: 0,
   },
   tabBarItemStyle: {
     paddingVertical: 2,
-    height: 52,
+    height: 50,
   },
   tabBarLabelStyle: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '800' as const,
-    letterSpacing: 0.2,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '600' as const,
     marginTop: 2,
     paddingBottom: 2,
   },
   tabBarIconStyle: { marginTop: 0 },
   headerStyle: {
-    backgroundColor: Colors.ink,
+    backgroundColor: Colors.paper,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   headerShadowVisible: false,
-  headerTintColor: Colors.white,
+  headerTintColor: Colors.ink,
   headerTitleStyle: {
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     fontSize: 18,
-    color: Colors.white,
+    color: Colors.ink,
   },
 };
 
-function ServiceHeaderActions({ onAccount, onAlerts, onBot, alertsLabel = "Open driver alerts", open }: { onAccount: () => void; onAlerts?: () => void; onBot?: () => void; alertsLabel?: string; open: boolean }) {
-  const { width } = useWindowDimensions();
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
-    {onBot && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open esakaybot" onPress={onBot} style={{ minWidth: 42, height: 38, paddingHorizontal: 12, justifyContent: 'center', flexDirection: "row", gap: 6, alignItems: "center", borderRadius: 999, backgroundColor: Colors.brandSurfaceDark, borderWidth: 1, borderColor: Colors.brandMint }}><Ionicons name="sparkles" size={14} color={Colors.brandMintLight} />{width >= 360 && <Text style={{ color: Colors.brandMintLight, fontWeight: "800", fontSize: 12 }}>esakaybot</Text>}</TouchableOpacity>}
-    {onAlerts && <TouchableOpacity accessibilityRole="button" accessibilityLabel={alertsLabel} onPress={onAlerts} style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: Colors.brandSurfaceDark, borderWidth: 1, borderColor: '#1E463E', alignItems: 'center', justifyContent: 'center' }}><Ionicons name="notifications-outline" size={18} color={Colors.white} /></TouchableOpacity>}
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open account menu" accessibilityState={{ expanded: open }} onPress={onAccount} style={{ height: 38, minWidth: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 999, backgroundColor: open ? Colors.brandMint : Colors.brandSurfaceDark, borderWidth: 1, borderColor: open ? Colors.brandMintLight : '#1E463E' }}><Ionicons name="person-circle-outline" size={19} color={Colors.white} />{width >= 520 && <Text style={{ color: Colors.white, fontWeight: '800', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={12} color={Colors.white} /></TouchableOpacity>
-  </View>;
+function ServiceHeaderActions({
+  onAccount,
+  onAlerts,
+  alertsLabel = 'Open driver alerts',
+  open,
+}: {
+  onAccount: () => void;
+  onAlerts?: () => void;
+  alertsLabel?: string;
+  open: boolean;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 16 }}>
+      {onAlerts && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={alertsLabel}
+          onPress={onAlerts}
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            backgroundColor: Colors.paper,
+            borderWidth: 1,
+            borderColor: Colors.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="notifications-outline" size={19} color={Colors.ink} />
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Open account menu"
+        accessibilityState={{ expanded: open }}
+        onPress={onAccount}
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 19,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: open ? Colors.paleGreen : Colors.paper,
+          borderWidth: 1,
+          borderColor: open ? Colors.brandGreen : Colors.border,
+        }}
+      >
+        <Ionicons name="person-outline" size={19} color={open ? Colors.brandGreen : Colors.ink} />
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 const PassengerTabs = ({ navigation: stackNavigation }: any) => {
-  const { t } = useTranslation();
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [accountOpen, setAccountOpen] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
   const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
-  const tabHeight = Platform.OS === 'web' ? 66 : 56 + tabBottom;
+  const tabHeight = Platform.OS === 'web' ? 64 : 56 + tabBottom;
   const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.ink }}><Tab.Navigator safeAreaInsets={webSafeInsets} screenOptions={({ navigation }) => ({ ...commonScreenOptions, tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight }, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => { setNoticesOpen(false); setAccountOpen((value) => !value); }} onAlerts={() => { setAccountOpen(false); setNoticesOpen(value => !value); }} alertsLabel="Boarding notices" onBot={() => { setAccountOpen(false); setNoticesOpen(false); stackNavigation.navigate('PassengerAssistant'); }} /> })}>
-      <Tab.Screen
-        name="Map"
-        component={PassengerHomeScreen}
-        options={{ title: 'Dashboard', tabBarIcon: ({ color }) => <Ionicons name="map" size={21} color={color} /> }}
+    <View style={{ flex: 1, backgroundColor: Colors.paper }}>
+      <Tab.Navigator
+        safeAreaInsets={webSafeInsets}
+        screenOptions={({ navigation, route }) => ({
+          ...commonScreenOptions,
+          tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight },
+          headerTitle: () => (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}>
+              <ESakayLogo compact color={route.name === 'Map' ? Colors.ink : Colors.brandGreen} />
+            </TouchableOpacity>
+          ),
+          headerRight: () => (
+            <ServiceHeaderActions
+              open={accountOpen}
+              onAccount={() => {
+                setNoticesOpen(false);
+                setAccountOpen((value) => !value);
+              }}
+            />
+          ),
+        })}
+      >
+        <Tab.Screen
+          name="Map"
+          component={PassengerHomeScreen}
+          options={{
+            title: 'Map',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'location' : 'location-outline'} size={21} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="Fares"
+          component={FareScreen}
+          options={{
+            title: 'Fare',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'ticket' : 'ticket-outline'} size={21} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="Safety"
+          component={SafetyScreen}
+          options={{
+            title: 'Safety',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={21} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="More"
+          component={MoreScreen}
+          options={{
+            title: 'More',
+            tabBarIcon: ({ color }) => <Ionicons name="ellipsis-horizontal" size={21} color={color} />,
+          }}
+        />
+      </Tab.Navigator>
+      <ServiceAccountMenu
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        onProfile={() => stackNavigation.navigate('PassengerProfile')}
+        onAbout={() => stackNavigation.navigate('PassengerAbout')}
       />
-      <Tab.Screen
-        name="Fares"
-        component={FareScreen}
-        options={{ title: 'Fares', tabBarIcon: ({ color }) => <Ionicons name="calculator-outline" size={21} color={color} /> }}
+      <PassengerNotices
+        open={noticesOpen}
+        onClose={() => setNoticesOpen(false)}
+        onGuide={() => stackNavigation.navigate('PassengerTabs', { screen: 'Map', params: { showStopGuide: Date.now() } })}
       />
-      <Tab.Screen
-        name="Safety"
-        component={SafetyScreen}
-        options={{ title: 'Safety', tabBarIcon: ({ color }) => <Ionicons name="shield-checkmark-outline" size={21} color={color} /> }}
-      />
-      <Tab.Screen
-        name="More"
-        component={MoreScreen}
-        options={{ title: 'More', tabBarIcon: ({ color }) => <Ionicons name="ellipsis-horizontal" size={21} color={color} /> }}
-      />
-    </Tab.Navigator>
-    <ServiceAccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} onProfile={() => stackNavigation.navigate('PassengerProfile')} onAbout={() => stackNavigation.navigate('PassengerAbout')} />
-    <PassengerNotices open={noticesOpen} onClose={() => setNoticesOpen(false)} onGuide={() => stackNavigation.navigate('PassengerTabs', { screen: 'Map', params: { showStopGuide: Date.now() } })} />
     </View>
   );
 };
 
 const DriverTabs = ({ navigation: stackNavigation }: any) => {
-  const { t } = useTranslation();
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [accountOpen, setAccountOpen] = useState(false);
   const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
-  const tabHeight = Platform.OS === 'web' ? 66 : 56 + tabBottom;
+  const tabHeight = Platform.OS === 'web' ? 64 : 56 + tabBottom;
   const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.ink }}><Tab.Navigator safeAreaInsets={webSafeInsets} screenOptions={({ navigation }) => ({ ...commonScreenOptions, tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight }, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => setAccountOpen((value) => !value)} onAlerts={() => navigation.navigate('Alerts')} /> })}>
-      <Tab.Screen
-        name="Dashboard"
-        component={DriverDashboardScreen}
-        options={{ title: t('navigation.dashboard'), tabBarIcon: ({ color }) => <Ionicons name="car" size={21} color={color} /> }}
-      />
-      <Tab.Screen
-        name="Alerts"
-        component={NotificationsScreen}
-        options={{ title: t('navigation.alerts'), tabBarIcon: ({ color }) => <Ionicons name="notifications" size={21} color={color} /> }}
-      />
-      <Tab.Screen
-        name="Records"
-        component={DriverRecordsScreen}
-        options={{ title: 'Records', tabBarIcon: ({ color }) => <Ionicons name="document-text-outline" size={21} color={color} /> }}
-      />
-    </Tab.Navigator>
-    <ServiceAccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} onProfile={() => stackNavigation.navigate('DriverProfile')} />
+    <View style={{ flex: 1, backgroundColor: Colors.paper }}>
+      <Tab.Navigator
+        safeAreaInsets={webSafeInsets}
+        screenOptions={({ navigation }) => ({
+          ...commonScreenOptions,
+          tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight },
+          headerTitle: () => (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}>
+              <ESakayLogo compact roleLabel="Driver" roleSeparator="|" />
+            </TouchableOpacity>
+          ),
+          headerRight: () => (
+            <ServiceHeaderActions
+              open={accountOpen}
+              onAccount={() => setAccountOpen((value) => !value)}
+            />
+          ),
+        })}
+      >
+        <Tab.Screen
+          name="Dashboard"
+          component={DriverDashboardScreen}
+          options={{
+            title: 'Dashboard',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'grid' : 'grid-outline'} size={20} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="Alerts"
+          component={NotificationsScreen}
+          options={{
+            title: 'Alerts',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={21} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="Records"
+          component={DriverRecordsScreen}
+          options={{
+            title: 'Records',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={21} color={color} />,
+          }}
+        />
+      </Tab.Navigator>
+      <ServiceAccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} onProfile={() => stackNavigation.navigate('DriverProfile')} />
     </View>
   );
 };
 
-const PassengerStack = () => <PassengerJourneyProvider><Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.ink }, headerTintColor: Colors.white, headerTitleStyle: { fontWeight: '800', fontSize: 17 } }}><Stack.Screen name="PassengerTabs" component={PassengerTabs} options={{ headerShown: false }} /><Stack.Screen name="PassengerProfile" component={ProfileScreen} options={{ title: 'Account settings' }} /><Stack.Screen name="PassengerDirectory" component={DirectoryScreen} options={{ title: 'Route information' }} /><Stack.Screen name="PassengerAbout" component={AboutScreen} options={{ title: 'About eSAKAY' }} /><Stack.Screen name="PassengerWeather" component={WeatherScreen} options={{ title: 'Weather' }} /><Stack.Screen name="PassengerAssistant" component={HeroBotScreen} options={{ title: 'esakaybot' }} /></Stack.Navigator></PassengerJourneyProvider>;
-const DriverStack = () => <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.ink }, headerTintColor: Colors.white, headerTitleStyle: { fontWeight: '800', fontSize: 17 } }}><Stack.Screen name="DriverTabs" component={DriverTabs} options={{ headerShown: false }} /><Stack.Screen name="DriverProfile" component={ProfileScreen} options={{ title: 'Account settings' }} /></Stack.Navigator>;
+const stackScreenOptions = {
+  headerStyle: { backgroundColor: Colors.paper },
+  headerTintColor: Colors.ink,
+  headerShadowVisible: false,
+  headerTitleStyle: { fontWeight: '700' as const, fontSize: 18, color: Colors.ink },
+};
 
-function AdminHeaderActions({ onAlerts, onProfile, alertCount, activePanel }: { onAlerts: () => void; onProfile: () => void; alertCount: number; activePanel: AdminPanel }) {
+const PassengerStack = () => (
+  <PassengerJourneyProvider>
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen name="PassengerTabs" component={PassengerTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="PassengerProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
+      <Stack.Screen name="PassengerDirectory" component={DirectoryScreen} options={{ title: 'Routes & trip planner' }} />
+      <Stack.Screen name="PassengerAbout" component={AboutScreen} options={{ title: 'About ejeephero' }} />
+      <Stack.Screen name="PassengerWeather" component={WeatherScreen} options={{ title: 'Makati weather' }} />
+      <Stack.Screen name="PassengerAssistant" component={HeroBotScreen} options={{ title: 'ejeepherobot' }} />
+    </Stack.Navigator>
+  </PassengerJourneyProvider>
+);
+
+const DriverStack = () => (
+  <Stack.Navigator screenOptions={stackScreenOptions}>
+    <Stack.Screen name="DriverTabs" component={DriverTabs} options={{ headerShown: false }} />
+    <Stack.Screen name="DriverProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
+  </Stack.Navigator>
+);
+
+function AdminHeaderActions({
+  onAlerts,
+  onProfile,
+  alertCount,
+  activePanel,
+}: {
+  onAlerts: () => void;
+  onProfile: () => void;
+  alertCount: number;
+  activePanel: AdminPanel;
+}) {
   const { width } = useWindowDimensions();
   const compact = width < 520;
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 6 : 10, marginRight: 12 }}>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Violation alerts${alertCount ? `, ${alertCount} recent` : ''}`} accessibilityState={{ expanded: activePanel === 'alerts' }} onPress={onAlerts} style={{ minWidth: 40, height: 38, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: activePanel === 'alerts' ? Colors.brandMint : Colors.brandSurfaceDark, borderWidth: 1, borderColor: activePanel === 'alerts' ? Colors.brandMintLight : '#1E463E' }}>
-      <Ionicons name="notifications-outline" size={18} color={Colors.white} />
-      {alertCount > 0 && <View style={{ position: 'absolute', right: -2, top: -2, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 3, backgroundColor: Colors.primaryRed, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>{alertCount > 99 ? '99+' : alertCount}</Text></View>}
-    </TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open admin profile" accessibilityState={{ expanded: activePanel === 'profile' }} onPress={onProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 42, height: 38, paddingHorizontal: compact ? 10 : 12, borderRadius: 999, backgroundColor: activePanel === 'profile' ? Colors.brandMint : Colors.brandSurfaceDark, borderWidth: 1, borderColor: activePanel === 'profile' ? Colors.brandMintLight : '#1E463E' }}>
-      <Ionicons name="person-circle-outline" size={19} color={Colors.white} />{!compact && <Text style={{ color: Colors.white, fontWeight: '800', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={12} color={Colors.white} />
-    </TouchableOpacity>
-  </View>;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 8 : 10, marginRight: 16 }}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={`Violation alerts${alertCount ? `, ${alertCount} recent` : ''}`}
+        accessibilityState={{ expanded: activePanel === 'alerts' }}
+        onPress={onAlerts}
+        style={{
+          width: 38,
+          height: 38,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 19,
+          backgroundColor: activePanel === 'alerts' ? Colors.paleGreen : Colors.paper,
+          borderWidth: 1,
+          borderColor: activePanel === 'alerts' ? Colors.brandGreen : Colors.border,
+        }}
+      >
+        <Ionicons name="notifications-outline" size={18} color={activePanel === 'alerts' ? Colors.brandGreen : Colors.ink} />
+        {alertCount > 0 && (
+          <View
+            style={{
+              position: 'absolute',
+              right: -2,
+              top: -2,
+              minWidth: 17,
+              height: 17,
+              borderRadius: 9,
+              paddingHorizontal: 3,
+              backgroundColor: Colors.primaryRed,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>{alertCount > 99 ? '99+' : alertCount}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Open supervisor profile"
+        accessibilityState={{ expanded: activePanel === 'profile' }}
+        onPress={onProfile}
+        style={{
+          width: 38,
+          height: 38,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 19,
+          backgroundColor: activePanel === 'profile' ? Colors.paleGreen : Colors.paper,
+          borderWidth: 1,
+          borderColor: activePanel === 'profile' ? Colors.brandGreen : Colors.border,
+        }}
+      >
+        <Ionicons name="person-outline" size={18} color={activePanel === 'profile' ? Colors.brandGreen : Colors.ink} />
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 const AdminTabs = ({ navigation: stackNavigation }: any) => {
-  const { t } = useTranslation();
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [alertCount, setAlertCount] = useState(0);
   const [notice, setNotice] = useState('');
@@ -196,18 +387,29 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
     ]);
     if (speed.error || routes.error) return;
     const total = (speed.count ?? 0) + (routes.count ?? 0);
-    if (previousCount.current !== null && total > previousCount.current) setNotice(`${total - previousCount.current} new driver violation${total - previousCount.current === 1 ? '' : 's'} recorded`);
+    if (previousCount.current !== null && total > previousCount.current)
+      setNotice(`${total - previousCount.current} new driver violation${total - previousCount.current === 1 ? '' : 's'} recorded`);
     previousCount.current = total;
     setAlertCount(total);
   }, []);
   useEffect(() => {
     void loadAlertCount();
-    const timer = setInterval(() => { void loadAlertCount(); }, 15000);
-    const channel = supabase.channel('admin-header-violations')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'speed_events' }, () => { void loadAlertCount(); })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trip_violations' }, () => { void loadAlertCount(); })
+    const timer = setInterval(() => {
+      void loadAlertCount();
+    }, 15000);
+    const channel = supabase
+      .channel('admin-header-violations')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'speed_events' }, () => {
+        void loadAlertCount();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trip_violations' }, () => {
+        void loadAlertCount();
+      })
       .subscribe();
-    return () => { clearInterval(timer); void supabase.removeChannel(channel); };
+    return () => {
+      clearInterval(timer);
+      void supabase.removeChannel(channel);
+    };
   }, [loadAlertCount]);
   useEffect(() => {
     if (!notice) return;
@@ -215,63 +417,137 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
     return () => clearTimeout(timer);
   }, [notice]);
   const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
-  const tabHeight = Platform.OS === 'web' ? 66 : 56 + tabBottom;
+  const tabHeight = Platform.OS === 'web' ? 64 : 56 + tabBottom;
   const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.ink }}><Tab.Navigator safeAreaInsets={webSafeInsets} screenOptions={({ navigation }) => ({
-      ...commonScreenOptions,
-      tabBarActiveTintColor: Colors.brandMintLight,
-      tabBarInactiveTintColor: Colors.tabInactive,
-      tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight },
-      headerStyle: { backgroundColor: Colors.ink },
-      headerTintColor: Colors.white,
-      headerRight: () => <AdminHeaderActions alertCount={alertCount} activePanel={activePanel} onAlerts={() => setActivePanel((open) => open === 'alerts' ? null : 'alerts')} onProfile={() => setActivePanel((open) => open === 'profile' ? null : 'profile')} />,
-      headerTitle: () => <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Go to Monitor"
-        onPress={() => navigation.navigate('Fleet')}
-      ><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>,
-    })}>
-      <Tab.Screen
-        name="Fleet"
-        component={SupervisorDashboardScreen}
-        options={{ title: 'Monitor', tabBarIcon: ({ color }) => <Ionicons name="speedometer" size={21} color={color} /> }}
-      />
-      <Tab.Screen
-        name="Units"
-        component={AdminUnitsScreen}
-        options={{ title: t('navigation.units'), tabBarIcon: ({ color }) => <Ionicons name="bus" size={21} color={color} /> }}
-      />
-      <Tab.Screen
-        name="Drivers"
-        component={AdminDriversScreen}
-        options={{ title: t('navigation.drivers'), tabBarIcon: ({ color }) => <Ionicons name="people" size={21} color={color} /> }}
-      />
-    </Tab.Navigator>
-    {!!notice && !activePanel && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${notice}. Open violation alerts`} onPress={() => { setNotice(''); setActivePanel('alerts'); }} style={{ position: 'absolute', top: 68, right: 16, maxWidth: 320, zIndex: 20, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: Colors.primaryRed, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, elevation: 5 }}>
-      <Ionicons name="alert-circle" size={19} color="#FFFFFF" /><Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', flex: 1 }}>{notice}</Text>
-    </TouchableOpacity>}
-    <AdminHeaderPopover panel={activePanel} onClose={() => setActivePanel(null)} onManageProfile={() => stackNavigation.navigate('AdminProfile')} />
+    <View style={{ flex: 1, backgroundColor: Colors.paper }}>
+      <Tab.Navigator
+        safeAreaInsets={webSafeInsets}
+        screenOptions={({ navigation }) => ({
+          ...commonScreenOptions,
+          tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight },
+          headerRight: () => (
+            <AdminHeaderActions
+              alertCount={alertCount}
+              activePanel={activePanel}
+              onAlerts={() => setActivePanel((open) => (open === 'alerts' ? null : 'alerts'))}
+              onProfile={() => setActivePanel((open) => (open === 'profile' ? null : 'profile'))}
+            />
+          ),
+          headerTitle: () => (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to Fleet" onPress={() => navigation.navigate('Fleet')}>
+              <ESakayLogo compact roleLabel="Supervisor" roleSeparator="/" />
+            </TouchableOpacity>
+          ),
+        })}
+      >
+        <Tab.Screen
+          name="Fleet"
+          component={SupervisorDashboardScreen}
+          options={{
+            title: 'Fleet',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'location' : 'location-outline'} size={21} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="Drivers"
+          component={AdminDriversScreen}
+          options={{
+            title: 'Drivers',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'people' : 'people-outline'} size={21} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="Units"
+          component={AdminUnitsScreen}
+          options={{
+            title: 'Units',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'bus' : 'bus-outline'} size={21} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="Reports"
+          component={AdminReportsScreen}
+          options={{
+            title: 'Reports',
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={21} color={color} />,
+          }}
+        />
+      </Tab.Navigator>
+      {!!notice && !activePanel && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`${notice}. Open violation alerts`}
+          onPress={() => {
+            setNotice('');
+            setActivePanel('alerts');
+          }}
+          style={{
+            position: 'absolute',
+            top: 68,
+            right: 16,
+            maxWidth: 320,
+            zIndex: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 9,
+            backgroundColor: Colors.primaryRed,
+            borderRadius: 10,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            elevation: 5,
+          }}
+        >
+          <Ionicons name="alert-circle" size={19} color="#FFFFFF" />
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', flex: 1 }}>{notice}</Text>
+        </TouchableOpacity>
+      )}
+      <AdminHeaderPopover panel={activePanel} onClose={() => setActivePanel(null)} onManageProfile={() => stackNavigation.navigate('AdminProfile')} />
     </View>
   );
 };
 
-const AdminStack = () => <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.ink }, headerTintColor: Colors.white, headerTitleStyle: { fontWeight: '800', fontSize: 18 } }}>
-  <Stack.Screen name="AdminTabs" component={AdminTabs} options={{ headerShown: false }} />
-  <Stack.Screen name="AdminProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
-</Stack.Navigator>;
+const AdminStack = () => (
+  <Stack.Navigator screenOptions={stackScreenOptions}>
+    <Stack.Screen name="AdminTabs" component={AdminTabs} options={{ headerShown: false }} />
+    <Stack.Screen name="AdminProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
+  </Stack.Navigator>
+);
 
 export const AppNavigator = () => {
   const { user, role, status, isAdmin, loading, authError, refreshProfile, signOut } = useAuth();
 
-  if (authError) return <View style={{ flex: 1, backgroundColor: Colors.offWhite, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-    <View style={{ width: '100%', maxWidth: 480, gap: 16 }}>
-      <Text accessibilityRole="header" style={{ color: Colors.ink, fontSize: 24, fontWeight: '700' }}>Check your account</Text>
-      <Text accessibilityRole="alert" style={{ color: Colors.ink, fontSize: 16, lineHeight: 24 }}>{authError}</Text>
-      <TouchableOpacity accessibilityRole="button" onPress={() => { void refreshProfile(); }} style={{ minHeight: 44, padding: 12, borderRadius: 10, backgroundColor: Colors.primaryRed, alignItems: 'center' }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Retry</Text></TouchableOpacity>
-      <TouchableOpacity accessibilityRole="button" onPress={() => { void signOut(); }} style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: Colors.primaryRed, fontSize: 16 }}>Return to sign in</Text></TouchableOpacity>
-    </View>
-  </View>;
+  if (authError)
+    return (
+      <View style={{ flex: 1, backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <View style={{ width: '100%', maxWidth: 480, gap: 16 }}>
+          <Text accessibilityRole="header" style={{ color: Colors.ink, fontSize: 24, fontWeight: '700' }}>
+            Check your account
+          </Text>
+          <Text accessibilityRole="alert" style={{ color: Colors.ink, fontSize: 16, lineHeight: 24 }}>
+            {authError}
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => {
+              void refreshProfile();
+            }}
+            style={{ minHeight: 50, padding: 14, borderRadius: 12, backgroundColor: Colors.brandGreen, alignItems: 'center' }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => {
+              void signOut();
+            }}
+            style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <Text style={{ color: Colors.brandGreen, fontWeight: '700', fontSize: 16 }}>Return to sign in</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
 
   if (loading) {
     return <ScreenSkeleton preset="dashboard" />;

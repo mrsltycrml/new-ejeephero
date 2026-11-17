@@ -13,6 +13,7 @@ import { useSignIn } from '@clerk/clerk-expo';
 import { Colors } from '../../constants/theme';
 import { supabaseAuth } from '../../lib/supabase';
 import { isClerkConfigured } from '../../lib/clerk';
+import ESakayLogo from '../../components/ESakayLogo';
 import { FormScrollView } from '../../components/AppUI';
 
 function ClerkForgotPasswordContent() {
@@ -88,16 +89,16 @@ function ClerkForgotPasswordContent() {
   };
 
   return (
-    <View style={styles.formCard}>
+    <View style={styles.formSection}>
       {!!errorMessage && (
         <View style={styles.errorBanner} accessibilityRole="alert">
-          <Ionicons name="alert-circle" size={18} color="#B71C1C" />
+          <Ionicons name="alert-circle" size={18} color={Colors.primaryRed} />
           <Text style={styles.errorBannerText}>{errorMessage}</Text>
         </View>
       )}
       {!!infoMessage && (
         <View style={styles.infoBanner}>
-          <Ionicons name="checkmark-circle" size={18} color="#1B5E20" />
+          <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />
           <Text style={styles.infoBannerText}>{infoMessage}</Text>
         </View>
       )}
@@ -105,11 +106,12 @@ function ClerkForgotPasswordContent() {
       {step === 'request' ? (
         <>
           <Text style={styles.instructions}>
-            Enter your account email. Clerk will send a 6-digit verification code to reset your password.
+            Enter your account email. We will send a 6-digit verification code to reset your password.
           </Text>
+          <Text style={styles.fieldLabel}>Email address</Text>
           <TextInput
             style={styles.input}
-            placeholder="Email Address"
+            placeholder="you@example.com"
             placeholderTextColor={Colors.subtleGray}
             value={email}
             onChangeText={setEmail}
@@ -120,7 +122,7 @@ function ClerkForgotPasswordContent() {
             {loading ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={styles.buttonText}>Send Reset Code</Text>
+              <Text style={styles.buttonText}>Send reset code</Text>
             )}
           </TouchableOpacity>
         </>
@@ -131,7 +133,7 @@ function ClerkForgotPasswordContent() {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="6-Digit Verification Code"
+            placeholder="6-digit verification code"
             placeholderTextColor={Colors.subtleGray}
             value={code}
             onChangeText={setCode}
@@ -139,7 +141,7 @@ function ClerkForgotPasswordContent() {
           />
           <TextInput
             style={styles.input}
-            placeholder="New Password (min 15 characters)"
+            placeholder="New password (min 15 characters)"
             placeholderTextColor={Colors.subtleGray}
             value={newPassword}
             onChangeText={setNewPassword}
@@ -150,7 +152,7 @@ function ClerkForgotPasswordContent() {
             {loading ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={styles.buttonText}>Verify & Reset Password</Text>
+              <Text style={styles.buttonText}>Verify & reset password</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -199,25 +201,26 @@ function SupabaseForgotPasswordContent() {
   };
 
   return (
-    <View style={styles.formCard}>
+    <View style={styles.formSection}>
       {!!errorMessage && (
         <View style={styles.errorBanner} accessibilityRole="alert">
-          <Ionicons name="alert-circle" size={18} color="#B71C1C" />
+          <Ionicons name="alert-circle" size={18} color={Colors.primaryRed} />
           <Text style={styles.errorBannerText}>{errorMessage}</Text>
         </View>
       )}
       {!!infoMessage && (
         <View style={styles.infoBanner}>
-          <Ionicons name="checkmark-circle" size={18} color="#1B5E20" />
+          <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />
           <Text style={styles.infoBannerText}>{infoMessage}</Text>
         </View>
       )}
       <Text style={styles.instructions}>
-        Enter the email address associated with your eSAKAY account and we will send a password reset link.
+        Enter the email address associated with your ejeephero account and we will send a password reset link.
       </Text>
+      <Text style={styles.fieldLabel}>Email address</Text>
       <TextInput
         style={styles.input}
-        placeholder="Email Address"
+        placeholder="you@example.com"
         placeholderTextColor={Colors.subtleGray}
         value={email}
         onChangeText={setEmail}
@@ -228,7 +231,7 @@ function SupabaseForgotPasswordContent() {
         {loading ? (
           <ActivityIndicator color={Colors.white} />
         ) : (
-          <Text style={styles.buttonText}>Send Password Reset Email</Text>
+          <Text style={styles.buttonText}>Send password reset email</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -244,21 +247,19 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       contentContainerStyle={styles.scrollContainer}
       showsVerticalScrollIndicator={false}
     >
-        <TouchableOpacity style={[styles.backButton, { top: 12 + insets.top }]} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.ink} />
-        </TouchableOpacity>
+      <TouchableOpacity style={[styles.backButton, { top: 12 + insets.top }]} onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={24} color={Colors.ink} />
+      </TouchableOpacity>
 
-        <View style={styles.headerContainer}>
-          <View style={styles.iconBadge}>
-            <Ionicons name="key-outline" size={30} color={Colors.white} />
-          </View>
-          <Text style={styles.title}>Reset Password</Text>
-          <Text style={styles.subtitle}>
-            Recover access to your eSAKAY account
-          </Text>
-        </View>
+      <View style={styles.headerContainer}>
+        <ESakayLogo showIcon />
+        <Text style={styles.title}>Reset password</Text>
+        <Text style={styles.subtitle}>
+          Recover access to your ejeephero account.
+        </Text>
+      </View>
 
-        {isClerkConfigured ? <ClerkForgotPasswordContent /> : <SupabaseForgotPasswordContent />}
+      {isClerkConfigured ? <ClerkForgotPasswordContent /> : <SupabaseForgotPasswordContent />}
     </FormScrollView>
   );
 }
@@ -266,72 +267,66 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   outer: {
     flex: 1,
-    backgroundColor: Colors.canvas,
+    backgroundColor: Colors.paper,
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 56,
-    paddingBottom: 36,
+    paddingHorizontal: 20,
+    paddingTop: 52,
+    paddingBottom: 32,
     width: '100%',
-    maxWidth: 540,
+    maxWidth: 440,
     alignSelf: 'center',
   },
   backButton: {
     position: 'absolute',
     top: 16,
     left: 16,
-    padding: 10,
+    padding: 8,
     zIndex: 10,
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 24,
-  },
-  iconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    backgroundColor: Colors.ink,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 22,
+    gap: 6,
   },
   title: {
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '700',
-    letterSpacing: -0.6,
+    letterSpacing: -0.4,
     color: Colors.ink,
+    marginTop: 8,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 15,
     color: Colors.subtleGray,
-    marginTop: 6,
     textAlign: 'center',
   },
-  formCard: {
-    backgroundColor: Colors.paper,
-    borderRadius: 8,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  formSection: {
+    marginTop: 4,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.ink,
+    marginBottom: 8,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: '#FFEBEE',
+    backgroundColor: Colors.dangerBg,
     borderWidth: 1,
-    borderColor: '#FFCDD2',
-    borderRadius: 6,
+    borderColor: Colors.primaryRed,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 14,
   },
   errorBannerText: {
     flex: 1,
     fontSize: 13,
-    color: '#B71C1C',
+    color: Colors.primaryRed,
     fontWeight: '600',
     lineHeight: 18,
   },
@@ -339,46 +334,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: Colors.paleGreen,
     borderWidth: 1,
-    borderColor: '#C8E6C9',
-    borderRadius: 6,
+    borderColor: Colors.brandGreen,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 14,
   },
   infoBannerText: {
     flex: 1,
     fontSize: 13,
-    color: '#1B5E20',
+    color: Colors.ink,
     fontWeight: '600',
     lineHeight: 18,
   },
   instructions: {
-    fontSize: 13,
+    fontSize: 14,
     color: Colors.subtleGray,
-    lineHeight: 19,
+    lineHeight: 20,
     marginBottom: 16,
   },
   input: {
     backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: 14,
-    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    minHeight: 52,
+    borderRadius: 12,
     marginBottom: 16,
     fontSize: 16,
-    color: Colors.darkText,
+    color: Colors.ink,
   },
   button: {
-    backgroundColor: Colors.ink,
-    padding: 15,
-    borderRadius: 6,
+    backgroundColor: Colors.brandGreen,
+    minHeight: 52,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
   },
   buttonText: {
     color: Colors.white,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   secondaryBtn: {
@@ -386,8 +385,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryBtnText: {
-    color: Colors.ink,
-    fontSize: 13,
+    color: Colors.brandGreen,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform, Pressable } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s } from '../../components/PassengerUI';
@@ -11,9 +11,9 @@ import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { loadEmergencyContacts, saveEmergencyContact, removeEmergencyContact, type EmergencyContact } from '../../services/emergencyService';
 import { Colors } from '../../constants/theme';
 
-export default function SafetyScreen({ navigation }: any) {
+export default function SafetyScreen() {
   const { user, getAccessToken } = useAuth();
-  const { unit, signal } = usePassengerJourney();
+  const { unit } = usePassengerJourney();
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -40,8 +40,10 @@ export default function SafetyScreen({ navigation }: any) {
         }
       };
       void load();
-      return () => { active = false; };
-    }, [user?.id]),
+      return () => {
+        active = false;
+      };
+    }, [user?.id, getAccessToken]),
   );
 
   const save = async () => {
@@ -55,12 +57,12 @@ export default function SafetyScreen({ navigation }: any) {
         phone_number: phone,
         preset_message: preset.trim().slice(0, 300),
       });
-      setContacts(items => [...items.filter(c => c.phone_number !== saved.phone_number), saved]);
+      setContacts((items) => [...items.filter((c) => c.phone_number !== saved.phone_number), saved]);
       triggerHaptic('success');
       setFormOpen(false);
       setName('');
       setPhone('');
-      setFeedback(saved.localOnly ? 'Saved on this device. SOS can use this contact in Messages.' : 'Emergency contact saved.');
+      setFeedback(saved.localOnly ? 'Saved on this device. SOS can use this contact in Messages.' : 'Trusted contact saved.');
     } catch (e: any) {
       triggerHaptic('error');
       setFeedback(e.message || 'Could not save the contact. Try again.');
@@ -78,7 +80,7 @@ export default function SafetyScreen({ navigation }: any) {
   };
 
   const remove = (contact: EmergencyContact) =>
-    Alert.alert('Remove emergency contact?', `${contact.contact_name} will no longer receive your alerts.`, [
+    Alert.alert('Remove trusted contact?', `${contact.contact_name} will no longer receive your alerts.`, [
       { text: 'Keep contact', style: 'cancel' },
       {
         text: 'Remove',
@@ -107,129 +109,120 @@ export default function SafetyScreen({ navigation }: any) {
   };
 
   return (
-    <FormScrollView style={s.screen} contentContainerStyle={s.content}>
-      {/* DARK EMERGENCY COMMAND HERO */}
-      <View style={[s.heroBanner, { backgroundColor: '#1C0A0A', borderColor: '#7F1D1D' }]}>
-        <View style={[s.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.eyebrow, { color: '#FCA5A5' }]}>Emergency Dispatch Console</Text>
-            <Text style={s.heroTitle}>Safety & SOS</Text>
-          </View>
-          <View style={{ paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, backgroundColor: unit ? Colors.successBg : '#3F1515' }}>
-            <Text style={{ fontSize: 11, fontWeight: '800', color: unit ? Colors.success : '#FCA5A5' }}>
-              {unit ? `LINKED · ${unit.body_number}` : 'TRANSPONDER STANDBY'}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={{ fontSize: 14, lineHeight: 20, color: '#FECACA' }}>
-          Pressing Emergency SOS starts a 5-second cancellation window, then dispatches your GPS coordinates and boarded vehicle identity to your trusted contacts.
-        </Text>
-
-        <SOSButton
-          activeVehicleId={unit?.vehicle_id}
-          activeVehicleBody={unit?.body_number}
-          activeVehiclePlate={unit?.plate_number || undefined}
-          activeVehicleIsSample={unit?.source === 'sample'}
-        />
-
-        <View style={{ padding: 14, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(252,165,165,0.2)', gap: 4 }}>
-          <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.white }}>
-            {unit ? `${unit.source === 'sample' ? 'Sample ride' : 'Current ride'} · ${unit.body_number} (Plate ${unit.plate_number || 'N/A'})` : 'No active vehicle linked yet'}
-          </Text>
-          <Text style={{ fontSize: 12, color: '#FCA5A5' }}>
-            {unit ? signal : 'Select your destination on the cockpit map to link your ride automatically.'}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => navigation.navigate('Map')}
-          style={{ minHeight: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}
-        >
-          <Ionicons name="map-outline" size={17} color={Colors.white} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.white }}>Open live route map</Text>
-        </TouchableOpacity>
+    <FormScrollView style={s.screen} contentContainerStyle={styles.container}>
+      <View style={{ gap: 2 }}>
+        <Text style={s.title}>Safety</Text>
+        <Text style={s.subtitle}>Keep trusted people within reach.</Text>
       </View>
 
-      {/* TRUSTED CIRCLE CONTACTS */}
-      <View style={s.section}>
-        <View style={[s.row, { justifyContent: 'space-between' }]}>
-          <View>
-            <Text style={s.eyebrow}>Trusted Circle</Text>
-            <Text style={s.sectionTitle}>Emergency contacts</Text>
-          </View>
-          <View style={s.pill}>
-            <Text style={s.label}>{contacts.length} / 5 saved</Text>
-          </View>
+      {/* Trusted Contacts Section */}
+      <View style={{ gap: 4 }}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeading}>Trusted contacts</Text>
+          <Text style={styles.countText}>{contacts.length} of 5</Text>
         </View>
 
         {loading && (
           <View style={{ gap: 10, paddingVertical: 6 }}>
-            <SkeletonBlock height={58} />
-            <SkeletonBlock height={58} />
+            <SkeletonBlock height={56} />
+            <SkeletonBlock height={56} />
           </View>
         )}
 
         {!loading && !contacts.length && (
-          <View style={{ padding: 16, borderRadius: 14, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, gap: 4 }}>
-            <Text style={s.label}>Your Trusted Circle is empty</Text>
-            <Text style={s.muted}>Add up to 5 family members or friends to receive your live location during an emergency.</Text>
+          <View style={styles.emptyBox}>
+            <Text style={s.label}>No trusted contacts added yet</Text>
+            <Text style={s.muted}>Add up to 5 trusted contacts to receive your SOS location and ride details.</Text>
           </View>
         )}
 
-        {contacts.map(c => (
-          <Pressable
-            key={c.phone_number}
-            onLongPress={() => openContactActions(c)}
-            delayLongPress={350}
-            style={[
-              s.row,
-              {
-                padding: 14,
-                borderRadius: 16,
-                backgroundColor: Colors.sand,
-                borderWidth: 1,
-                borderColor: Colors.border,
-              },
-            ]}
-          >
-            <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 16, fontWeight: '900', color: Colors.brandMintLight }}>
-                {(c.contact_name || 'C').charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: Colors.ink }}>{c.contact_name}</Text>
-              <Text style={s.muted}>
-                {c.phone_number} · {c.localOnly ? 'On this device' : 'Cloud synced'}
-              </Text>
-            </View>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Edit ${c.contact_name}`} onPress={() => startEdit(c)} style={{ padding: 10 }}>
-              <Ionicons name="create-outline" size={20} color={Colors.ink} />
-            </TouchableOpacity>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove ${c.contact_name}`} onPress={() => remove(c)} style={{ padding: 10 }}>
-              <Ionicons name="trash-outline" size={20} color={Colors.primaryRed} />
-            </TouchableOpacity>
-          </Pressable>
-        ))}
+        <View style={styles.contactList}>
+          {contacts.map((c) => (
+            <Pressable
+              key={c.phone_number}
+              onLongPress={() => openContactActions(c)}
+              delayLongPress={350}
+              style={styles.contactRow}
+            >
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarText}>
+                  {(c.contact_name || 'C').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.contactName}>{c.contact_name}</Text>
+                <Text style={styles.contactPhone}>{c.phone_number}</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${c.contact_name}`}
+                onPress={() => startEdit(c)}
+                style={styles.iconBtn}
+              >
+                <Ionicons name="pencil-outline" size={19} color={Colors.brandGreen} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${c.contact_name}`}
+                onPress={() => remove(c)}
+                style={styles.iconBtn}
+              >
+                <Ionicons name="trash-outline" size={19} color={Colors.subtleGray} />
+              </TouchableOpacity>
+            </Pressable>
+          ))}
+        </View>
 
-        {feedback !== '' && <Text accessibilityRole="alert" style={s.body}>{feedback}</Text>}
+        {feedback !== '' && <Text accessibilityRole="alert" style={[s.muted, { color: Colors.brandGreen, fontWeight: '600' }]}>{feedback}</Text>}
 
         {formOpen ? (
-          <View style={{ gap: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
+          <View style={styles.formBox}>
             <Text style={s.label}>Contact name</Text>
-            <TextInput accessibilityLabel="Contact name" style={s.input} value={name} onChangeText={setName} maxLength={80} placeholder="Name" placeholderTextColor={Colors.subtleGray} />
+            <TextInput
+              accessibilityLabel="Contact name"
+              style={s.input}
+              value={name}
+              onChangeText={setName}
+              maxLength={80}
+              placeholder="Ana Santos"
+              placeholderTextColor={Colors.subtleGray}
+            />
             <Text style={s.label}>Mobile number</Text>
-            <TextInput accessibilityLabel="Contact mobile number" style={s.input} value={phone} editable={!editing} onChangeText={setPhone} keyboardType="phone-pad" maxLength={20} placeholder="09XXXXXXXXX or +639XXXXXXXXX" placeholderTextColor={Colors.subtleGray} />
+            <TextInput
+              accessibilityLabel="Contact mobile number"
+              style={s.input}
+              value={phone}
+              editable={!editing}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              maxLength={20}
+              placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+              placeholderTextColor={Colors.subtleGray}
+            />
             <Text style={s.label}>Emergency message</Text>
-            <TextInput accessibilityLabel="Emergency message" style={[s.input, { minHeight: 85, textAlignVertical: 'top' }]} multiline value={preset} onChangeText={setPreset} maxLength={300} />
-            <Text style={s.muted}>Your GPS location, body number, and plate number are added automatically.</Text>
+            <TextInput
+              accessibilityLabel="Emergency message"
+              style={[s.input, { minHeight: 80, textAlignVertical: 'top' }]}
+              multiline
+              value={preset}
+              onChangeText={setPreset}
+              maxLength={300}
+            />
             <View style={s.row}>
-              <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={save} style={[s.button, { flex: 1 }, saving && { opacity: 0.6 }]}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={saving}
+                onPress={save}
+                style={[s.button, { flex: 1 }, saving && { opacity: 0.6 }]}
+              >
                 {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={s.buttonText}>Save contact</Text>}
               </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={() => setFormOpen(false)} style={[s.button, s.secondary]}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={saving}
+                onPress={() => setFormOpen(false)}
+                style={[s.button, s.secondary]}
+              >
                 <Text style={s.label}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -238,19 +231,174 @@ export default function SafetyScreen({ navigation }: any) {
           contacts.length < 5 && (
             <TouchableOpacity
               accessibilityRole="button"
-              onPress={() => { setEditing(false); setName(''); setPhone(''); setFormOpen(true); setFeedback(''); }}
-              style={s.button}
+              onPress={() => {
+                setEditing(false);
+                setName('');
+                setPhone('');
+                setFormOpen(true);
+                setFeedback('');
+              }}
+              style={styles.addContactBtn}
             >
-              <Ionicons name="person-add-outline" size={18} color={Colors.brandMintLight} />
-              <Text style={s.buttonText}>Add emergency contact</Text>
+              <Ionicons name="add" size={20} color={Colors.brandGreen} />
+              <Text style={styles.addContactText}>Add contact</Text>
             </TouchableOpacity>
           )
         )}
       </View>
 
-      <View style={s.section}>
+      {/* Linked Unit Row */}
+      <View style={styles.linkedRideRow}>
+        <View style={styles.busIconBox}>
+          <Ionicons name="bus-outline" size={20} color={Colors.brandGreen} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.contactName}>
+            {unit ? `Linked unit ${unit.body_number}` : 'Linked unit EJ-024'}
+          </Text>
+          <Text style={styles.contactPhone}>
+            Plate {unit?.plate_number || 'ABC 1234'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Emergency SOS Button */}
+      <SOSButton
+        activeVehicleId={unit?.vehicle_id}
+        activeVehicleBody={unit?.body_number || 'EJ-024'}
+        activeVehiclePlate={unit?.plate_number || 'ABC 1234'}
+        activeVehicleIsSample={unit?.source === 'sample'}
+      />
+
+      <View style={{ gap: 6 }}>
+        <Text style={styles.helperCenter}>
+          Starts a 5-second countdown. You can cancel before it ends.
+        </Text>
+        <Text style={styles.helperCenter}>
+          Your location and linked unit details help identify your ride.
+        </Text>
+      </View>
+
+      <View style={[s.section, { marginTop: 8 }]}>
         <EmergencyHotlines />
       </View>
     </FormScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 36,
+    gap: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.ink,
+  },
+  countText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.subtleGray,
+  },
+  emptyBox: {
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+    gap: 4,
+  },
+  contactList: {
+    borderTopWidth: 1,
+    borderColor: Colors.border,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.paleGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.brandGreen,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.ink,
+  },
+  contactPhone: {
+    fontSize: 13,
+    color: Colors.subtleGray,
+    marginTop: 2,
+  },
+  iconBtn: {
+    padding: 8,
+  },
+  addContactBtn: {
+    minHeight: 50,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.brandGreen,
+    backgroundColor: Colors.paper,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  addContactText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.brandGreen,
+  },
+  formBox: {
+    gap: 10,
+    paddingTop: 12,
+  },
+  linkedRideRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  busIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.paleGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helperCenter: {
+    fontSize: 13,
+    color: Colors.subtleGray,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+});

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -10,18 +9,20 @@ import { Ionicons } from '@expo/vector-icons';
 type Message = { role: 'user' | 'assistant'; content: string };
 
 export default function HeroBotScreen() {
-  const { t } = useTranslation();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const SUGGESTIONS = [
-    t('herobot.suggestionMakatiLoop'),
-    t('herobot.suggestionFareInfo'),
-    t('herobot.suggestionNearestTerminal'),
-    t('herobot.suggestionOperatingHours'),
-    t('herobot.suggestionActiveJeeps')
+    'Where do I board at MRT Buendia?',
+    'Operating hours',
+    'Student discount',
+    'Route 1 stops',
+    'How does Emergency SOS work?',
   ];
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: t('herobot.greeting') }
+    {
+      role: 'assistant',
+      content: 'Use the marked loading bay near the station exit. Check the map in ejeephero to confirm the stop before boarding.',
+    },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,7 @@ export default function HeroBotScreen() {
     if (!messageContent.trim() || loading) return;
 
     const userMsg: Message = { role: 'user', content: messageContent };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg]);
     if (typeof textToSend !== 'string') {
       setInput('');
     }
@@ -44,46 +45,58 @@ export default function HeroBotScreen() {
         body: { message: userMsg.content, history: messages.slice(-10) },
       });
       if (error) throw error;
-      if (!data.reply) throw new Error('No reply received from esakaybot.');
+      if (!data.reply) throw new Error('No reply received from ejeepherobot.');
 
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
-    } catch (error: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'esakaybot is unavailable right now. Please try again shortly.' }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'ejeepherobot is unavailable right now. Please try again shortly.' },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <View style={styles.helperStrip}>
+        <Text style={styles.helperStripText}>Commuter assistant · Ask about routes, stops and using ejeephero.</Text>
+      </View>
+
       <ScrollView
         style={styles.chatArea}
-        contentContainerStyle={{ padding: 18, paddingBottom: 26, width: '100%', maxWidth: 900, alignSelf: 'center' }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 26, width: '100%', maxWidth: 680, alignSelf: 'center' }}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         {messages.map((msg, i) => (
-          <View key={i} style={[styles.bubbleContainer, msg.role === 'user' ? styles.userBubbleContainer : styles.botBubbleContainer]}>
+          <View
+            key={i}
+            style={[
+              styles.bubbleContainer,
+              msg.role === 'user' ? styles.userBubbleContainer : styles.botBubbleContainer,
+            ]}
+          >
             {msg.role === 'assistant' && (
               <View style={styles.botIcon}>
-                <Ionicons name="chatbubble-ellipses" size={15} color={Colors.navy} />
+                <Ionicons name="chatbubble-outline" size={16} color={Colors.brandGreen} />
               </View>
             )}
-            <View style={[
-              styles.bubble,
-              msg.role === 'user' ? styles.userBubble : styles.botBubble
-            ]}>
-              <Text style={msg.role === 'user' ? styles.userText : styles.botText}>
-                {msg.content}
-              </Text>
+            <View style={[styles.bubble, msg.role === 'user' ? styles.userBubble : styles.botBubble]}>
+              <Text style={msg.role === 'user' ? styles.userText : styles.botText}>{msg.content}</Text>
             </View>
           </View>
         ))}
         {loading && (
           <View style={styles.loadingBubble}>
-            <ActivityIndicator size="small" color={Colors.primaryRed} />
-            <Text style={styles.loadingText}>{t('herobot.thinking')}</Text>
+            <ActivityIndicator size="small" color={Colors.brandGreen} />
+            <Text style={styles.loadingText}>Thinking…</Text>
           </View>
         )}
       </ScrollView>
@@ -114,130 +127,149 @@ export default function HeroBotScreen() {
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          placeholder={t('herobot.inputPlaceholder')}
+          placeholder="Ask ejeepherobot..."
           placeholderTextColor={Colors.subtleGray}
           onSubmitEditing={() => sendMessage()}
           returnKeyType="send"
-          accessibilityLabel="Message esakaybot"
+          accessibilityLabel="Message ejeepherobot"
           maxLength={2000}
         />
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send message" style={[styles.sendButton, (loading || !input.trim()) && { opacity: 0.45 }]} onPress={() => sendMessage()} disabled={loading || !input.trim()}>
-          <Ionicons name="send" size={18} color={Colors.white} />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
+          style={[styles.sendButton, (loading || !input.trim()) && { opacity: 0.45 }]}
+          onPress={() => sendMessage()}
+          disabled={loading || !input.trim()}
+        >
+          <Ionicons name="arrow-up" size={20} color={Colors.white} />
         </TouchableOpacity>
       </View>
-
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.offWhite },
+  container: { flex: 1, backgroundColor: Colors.paper },
+  helperStrip: {
+    backgroundColor: Colors.canvas,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  helperStripText: {
+    fontSize: 13,
+    color: Colors.subtleGray,
+    fontWeight: '500',
+  },
   chatArea: { flex: 1 },
-  bubbleContainer: { flexDirection: 'row', marginBottom: 16, alignItems: 'flex-end', maxWidth: '100%', minWidth: 0 },
+  bubbleContainer: {
+    flexDirection: 'row',
+    marginBottom: 14,
+    alignItems: 'flex-start',
+    maxWidth: '100%',
+    minWidth: 0,
+  },
   userBubbleContainer: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
   botBubbleContainer: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
   botIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: Colors.mutedBackground,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.paleGreen,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    marginTop: 2,
   },
   bubble: {
     minWidth: 0,
     flexShrink: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 14,
   },
   userBubble: {
-    backgroundColor: Colors.navy,
-    borderBottomRightRadius: 2,
+    backgroundColor: Colors.paleGreen,
     borderWidth: 1,
-    borderColor: Colors.navy
+    borderColor: Colors.brandGreen,
   },
   botBubble: {
-    backgroundColor: Colors.white,
-    borderBottomLeftRadius: 3,
+    backgroundColor: Colors.canvas,
     borderWidth: 1,
-    borderColor: Colors.border
+    borderColor: Colors.border,
   },
-  userText: { color: Colors.white, fontSize: 15, lineHeight: 20, fontWeight: '500' },
-  botText: { color: Colors.darkText, fontSize: 15, lineHeight: 20 },
+  userText: { color: Colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '500' },
+  botText: { color: Colors.ink, fontSize: 15, lineHeight: 21 },
   loadingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: Colors.white,
-    paddingHorizontal: 16,
+    backgroundColor: Colors.canvas,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginLeft: 36,
+    marginLeft: 38,
     gap: 8,
   },
-  loadingText: { fontSize: 14, color: '#53666A' },
+  loadingText: { fontSize: 14, color: Colors.subtleGray },
   inputContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 12,
     backgroundColor: Colors.paper,
     borderTopWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
+    gap: 10,
   },
   input: {
     flex: 1,
-    minHeight: 46,
-    backgroundColor: Colors.canvas,
-    borderRadius: 8,
+    minHeight: 48,
+    backgroundColor: Colors.paper,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    marginRight: 10,
-    fontSize: 15,
-    color: Colors.darkText,
+    fontSize: 16,
+    color: Colors.ink,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   sendButton: {
-    backgroundColor: Colors.ink,
-    width: 46,
-    height: 46,
-    borderRadius: 8,
+    backgroundColor: Colors.brandGreen,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   suggestionsWrapper: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.paper,
     paddingVertical: 10,
     borderTopWidth: 1,
     borderColor: Colors.border,
   },
   suggestionsContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     gap: 8,
     flexDirection: 'row',
   },
   suggestionChip: {
-    minHeight: 44,
-    backgroundColor: Colors.offWhite,
-    paddingHorizontal: 16,
+    minHeight: 38,
+    backgroundColor: Colors.canvas,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   suggestionText: {
-    color: Colors.darkText,
-    fontSize: 14,
+    color: Colors.ink,
+    fontSize: 13,
     fontWeight: '600',
-  }
+  },
 });

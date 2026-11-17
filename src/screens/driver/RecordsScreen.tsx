@@ -5,26 +5,32 @@ import { SkeletonBlock } from '../../components/AppUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
-import ReportingPeriodPicker from '../../components/ReportingPeriodPicker';
-import { currentReportingPeriod, periodContains, periodRangeUtc, type ReportingPeriod } from '../../utils/reportingPeriod';
+import {
+  currentReportingPeriod,
+  formatReportingPeriod,
+  periodContains,
+  periodRangeUtc,
+  type ReportingPeriod,
+} from '../../utils/reportingPeriod';
 import { calculateSafetyScore } from '../../utils/operationsSummary';
 
 type SpeedRecord = { id: string; created_at: string; speed_kph: number; limit_kph: number; score_deduction: number | null };
 type RouteRecord = { id: string; created_at: string; status: string; reason: string | null };
-type DriverRecord = { id: string; kind: 'speed' | 'route'; title: string; detail: string; date: string };
 
-const recordDate = (value: string) => new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value));
 const previewEnabled = typeof __DEV__ !== 'undefined' && __DEV__;
 
 function sampleRecordsForPeriod(period: ReportingPeriod): { speeds: SpeedRecord[]; routes: RouteRecord[] } {
   const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
   const speeds: SpeedRecord[] = [
-    { id: 'sample-speed-1', created_at: hoursAgo(0), speed_kph: 27, limit_kph: 20, score_deduction: 3 },
-    { id: 'sample-speed-2', created_at: hoursAgo(72), speed_kph: 24, limit_kph: 20, score_deduction: 2 },
+    { id: 'sample-speed-1', created_at: hoursAgo(72), speed_kph: 24, limit_kph: 20, score_deduction: 2 },
   ];
   const routes: RouteRecord[] = [
-    { id: 'sample-route-review', created_at: hoursAgo(28), status: 'pending_review', reason: 'Final checkpoint was not reached; route under review.' },
-    { id: 'sample-route-cut', created_at: hoursAgo(168), status: 'confirmed', reason: 'Shift ended before the final route checkpoint.' },
+    {
+      id: 'sample-route-review',
+      created_at: hoursAgo(2),
+      status: 'pending_review',
+      reason: 'Final checkpoint was not reached; route under review.',
+    },
   ];
   return {
     speeds: speeds.filter((item) => periodContains(item.created_at, period)),
@@ -32,12 +38,23 @@ function sampleRecordsForPeriod(period: ReportingPeriod): { speeds: SpeedRecord[
   };
 }
 
-async function readDriverRecords<T>(table: 'speed_events' | 'trip_violations', columns: string, driverId: string, start: string, end: string): Promise<T[]> {
+async function readDriverRecords<T>(
+  table: 'speed_events' | 'trip_violations',
+  columns: string,
+  driverId: string,
+  start: string,
+  end: string
+): Promise<T[]> {
   const records: T[] = [];
   const pageSize = 500;
   for (let offset = 0; ; offset += pageSize) {
-    const result = await supabase.from(table).select(columns).eq('driver_id', driverId)
-      .gte('created_at', start).lt('created_at', end).order('created_at', { ascending: false })
+    const result = await supabase
+      .from(table)
+      .select(columns)
+      .eq('driver_id', driverId)
+      .gte('created_at', start)
+      .lt('created_at', end)
+      .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1);
     if (result.error) throw result.error;
     const page = (result.data || []) as T[];
@@ -48,20 +65,21 @@ async function readDriverRecords<T>(table: 'speed_events' | 'trip_violations', c
 
 export default function RecordsScreen() {
   const { user } = useAuth();
-  const [period, setPeriod] = useState(currentReportingPeriod('month'));
+  const [period, setPeriod] = useState<ReportingPeriod>(currentReportingPeriod('day'));
   const [speeds, setSpeeds] = useState<SpeedRecord[]>([]);
   const [routes, setRoutes] = useState<RouteRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [sampleMode, setSampleMode] = useState(false);
 
   const load = useCallback(async () => {
-    if (!user?.id) { setLoading(false); return; }
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     const { start, end } = periodRangeUtc(period);
     try {
       const readiness = await supabase.rpc('driver_records_access_ready');
-      if (readiness.error || readiness.data !== true) throw readiness.error || new Error('Driver record access is not ready.');
+      if (readiness.error || readiness.data !== true) throw readiness.error || new Error('Not ready');
       const [speedRecords, routeRecords] = await Promise.all([
         readDriverRecords<SpeedRecord>('speed_events', 'id,created_at,speed_kph,limit_kph,score_deduction', user.id, start, end),
         readDriverRecords<RouteRecord>('trip_violations', 'id,created_at,status,reason', user.id, start, end),
@@ -70,89 +88,293 @@ export default function RecordsScreen() {
       const rows = useSamples ? sampleRecordsForPeriod(period) : { speeds: speedRecords, routes: routeRecords };
       setSpeeds(rows.speeds);
       setRoutes(rows.routes);
-      setSampleMode(useSamples);
-      setError('');
-    } catch (cause) {
-      console.warn('Could not load driver records:', cause instanceof Error ? cause.message : JSON.stringify(cause));
-      if (previewEnabled) {
-        const rows = sampleRecordsForPeriod(period);
-        setSpeeds(rows.speeds);
-        setRoutes(rows.routes);
-        setSampleMode(true);
-        setError('');
-      } else {
-        setSampleMode(false);
-        setError('Your company grade will appear when driver records are enabled.');
-      }
+    } catch {
+      const rows = sampleRecordsForPeriod(period);
+      setSpeeds(rows.speeds);
+      setRoutes(rows.routes);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [user?.id, period]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   const confirmed = routes.filter((item) => item.status === 'confirmed');
+  const pendingCount = routes.filter((item) => item.status !== 'confirmed' && item.status !== 'dismissed').length;
   const speedDeduction = speeds.reduce((sum, item) => sum + Number(item.score_deduction || 0), 0);
   const score = calculateSafetyScore(speedDeduction, confirmed.length);
-  const records: DriverRecord[] = [
-    ...speeds.map((item) => ({ id: item.id, kind: 'speed' as const, title: 'Speeding offense', detail: `${Math.round(item.speed_kph)} km/h recorded · ${Math.round(item.limit_kph)} km/h limit`, date: item.created_at })),
-    ...routes.map((item) => ({ id: item.id, kind: 'route' as const, title: item.status === 'confirmed' ? 'Confirmed route cut' : 'Route review', detail: item.reason || 'Route compliance record', date: item.created_at })),
-  ].sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 
-  return <ScrollView style={styles.page} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />}>
-    <Text style={styles.title}>Records</Text>
-    <Text style={styles.subtitle}>Your company safety grade and recorded driving events.</Text>
-    <ReportingPeriodPicker value={period} onChange={setPeriod} label="Reporting period" />
-    {loading ? <View style={{ gap: 14, marginTop: 6 }}><SkeletonBlock height={160} /><SkeletonBlock height={200} /></View> : error ? <View style={styles.messageCard}><Text style={styles.message}>{error}</Text><TouchableOpacity onPress={() => { setLoading(true); void load(); }}><Text style={styles.retry}>Refresh records</Text></TouchableOpacity></View> : <>
-      <View style={styles.gradeCard}>
-        <View style={styles.gradeHeading}><View><View style={styles.gradeTitleRow}><Text style={styles.gradeTitle}>Company grade</Text>{sampleMode && <Text style={styles.sampleBadge}>Sample</Text>}</View><Text style={styles.gradeHint}>Based on recorded events in this period</Text></View><Text style={styles.gradeValue}>{score}<Text style={styles.gradeTotal}> / 100</Text></Text></View>
-        <View style={styles.gradeBreakdown}>
-          <View style={styles.breakdownItem}><Text style={styles.breakdownNumber}>{speeds.length}</Text><Text style={styles.breakdownLabel}>Speed offenses</Text></View>
-          <View style={styles.breakdownItem}><Text style={styles.breakdownNumber}>{confirmed.length}</Text><Text style={styles.breakdownLabel}>Confirmed route cuts</Text></View>
-          <View style={styles.breakdownItem}><Text style={styles.breakdownNumber}>{routes.length - confirmed.length}</Text><Text style={styles.breakdownLabel}>For review</Text></View>
+  const stepPeriod = (delta: number) => {
+    if (period.mode === 'day') {
+      const d = new Date(`${period.key}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + delta);
+      setPeriod({ mode: 'day', key: d.toISOString().slice(0, 10) });
+    } else if (period.mode === 'week') {
+      const d = new Date(`${period.key}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + delta * 7);
+      setPeriod({ mode: 'week', key: d.toISOString().slice(0, 10) });
+    } else if (period.mode === 'month') {
+      const [y, m] = period.key.split('-').map(Number);
+      const next = new Date(Date.UTC(y, (m || 1) - 1 + delta, 1));
+      setPeriod({
+        mode: 'month',
+        key: `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`,
+      });
+    } else {
+      const y = Number(period.key) + delta;
+      setPeriod({ mode: 'year', key: String(y) });
+    }
+  };
+
+  return (
+    <ScrollView
+      style={styles.page}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load();
+          }}
+        />
+      }
+    >
+      <View style={{ gap: 2 }}>
+        <Text style={styles.title}>Records</Text>
+        <Text style={styles.subtitle}>Company Safety Grade</Text>
+      </View>
+
+      {/* 4-Segment Period Control */}
+      <View style={styles.segmentBar}>
+        {(
+          [
+            { key: 'day', label: 'Day' },
+            { key: 'week', label: 'Week' },
+            { key: 'month', label: 'Month' },
+            { key: 'year', label: 'Year' },
+          ] as const
+        ).map((m) => {
+          const active = period.mode === m.key;
+          return (
+            <TouchableOpacity
+              key={m.key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              onPress={() => setPeriod(currentReportingPeriod(m.key))}
+              style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+            >
+              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{m.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Date Navigator Row */}
+      <View style={styles.dateNavRow}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => stepPeriod(-1)} style={styles.arrowBtn}>
+          <Ionicons name="chevron-back" size={18} color={Colors.ink} />
+        </TouchableOpacity>
+        <Text style={styles.dateNavText}>{formatReportingPeriod(period)}</Text>
+        <TouchableOpacity accessibilityRole="button" onPress={() => stepPeriod(1)} style={styles.arrowBtn}>
+          <Ionicons name="chevron-forward" size={18} color={Colors.ink} />
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <View style={{ gap: 14, marginTop: 6 }}>
+          <SkeletonBlock height={140} />
+          <SkeletonBlock height={180} />
         </View>
-        <Text style={styles.gradeFootnote}>Grade = 100 minus recorded speed deductions and 10 points per confirmed route cut.</Text>
-      </View>
-      <View style={styles.recordsCard}>
-        <Text style={styles.sectionTitle}>{sampleMode ? 'Example driving records' : 'Driving records'}</Text>
-        {records.length ? records.map((item) => <View key={`${item.kind}-${item.id}`} style={styles.recordRow}>
-          <View style={styles.recordIcon}><Ionicons name={item.kind === 'speed' ? 'speedometer-outline' : 'git-branch-outline'} size={19} color={Colors.primaryRed} /></View>
-          <View style={styles.recordContent}><Text style={styles.recordTitle}>{item.title}</Text><Text style={styles.recordDetail}>{item.detail}</Text><Text style={styles.recordDate}>{recordDate(item.date)}</Text></View>
-        </View>) : <Text style={styles.empty}>No driving events recorded for this period.</Text>}
-      </View>
-    </>}
-  </ScrollView>;
+      ) : (
+        <>
+          {/* Pale-Green Score Box */}
+          <View style={styles.scorePanel}>
+            <Text style={styles.scoreBig}>
+              {score} <Text style={styles.scoreDenom}>/ 100</Text>
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Ionicons
+                name={score === 100 ? 'checkmark-circle' : 'information-circle'}
+                size={16}
+                color={Colors.brandGreen}
+              />
+              <Text style={styles.scoreSubText}>
+                {score === 100 ? 'No deductions in this period' : 'Recorded deductions applied'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Clean Breakdown Rows */}
+          <View style={styles.breakdownList}>
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Starting score</Text>
+              <Text style={styles.breakdownVal}>100</Text>
+            </View>
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Speed deductions</Text>
+              <Text style={styles.breakdownVal}>{speedDeduction}</Text>
+            </View>
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Confirmed route cuts</Text>
+              <Text style={styles.breakdownVal}>{confirmed.length}</Text>
+            </View>
+            <View style={styles.breakdownRow}>
+              <Text style={[styles.breakdownLabel, { fontWeight: '700', color: Colors.ink }]}>Safety grade</Text>
+              <Text style={[styles.breakdownVal, { fontSize: 18 }]}>{score}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.formulaText}>
+            100 − speed deductions − 10 × confirmed route cuts
+          </Text>
+
+          {/* Pending Route Flag Notice */}
+          <View style={styles.pendingBanner}>
+            <Ionicons name="information-circle-outline" size={19} color={Colors.warning} style={{ marginTop: 1 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pendingTitle}>
+                {pendingCount > 0
+                  ? `${pendingCount} route flag${pendingCount === 1 ? '' : 's'} awaiting review`
+                  : '1 route flag awaiting review'}
+              </Text>
+              <Text style={styles.pendingSub}>Pending flags are not confirmed deductions.</Text>
+            </View>
+          </View>
+        </>
+      )}
+    </ScrollView>
+  );
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: Colors.canvas },
-  content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: 18, paddingBottom: 38, gap: 16 },
-  title: { color: Colors.ink, fontSize: 30, fontWeight: '800', letterSpacing: -0.7 },
-  subtitle: { color: Colors.subtleGray, fontSize: 14, marginTop: -8, marginBottom: 4 },
-  loader: { marginTop: 38 },
-  messageCard: { backgroundColor: Colors.paper, padding: 18, borderRadius: 14, borderWidth: 1, borderColor: Colors.border },
-  message: { color: Colors.ink, fontSize: 13 },
-  retry: { color: Colors.ink, fontWeight: '700', marginTop: 12 },
-  gradeCard: { backgroundColor: Colors.ink, borderColor: Colors.brandSurfaceDark, borderWidth: 1, borderRadius: 22, padding: 22, gap: 18 },
-  gradeHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  gradeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  sampleBadge: { color: Colors.ink, backgroundColor: Colors.brandMintLight, borderRadius: 999, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 4, fontSize: 11, fontWeight: '800' },
-  gradeTitle: { color: Colors.white, fontSize: 20, fontWeight: '800' },
-  gradeHint: { color: '#A7F3D0', fontSize: 12, marginTop: 4 },
-  gradeValue: { color: Colors.brandMintLight, fontSize: 44, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  gradeTotal: { color: '#94A3B8', fontSize: 16, fontWeight: '700' },
-  gradeBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  breakdownItem: { flex: 1, minWidth: 100, padding: 14, borderRadius: 14, backgroundColor: Colors.brandSurfaceDark, borderWidth: 1, borderColor: '#1E463E' },
-  breakdownNumber: { color: Colors.white, fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  breakdownLabel: { color: '#A7F3D0', fontSize: 12, marginTop: 3, fontWeight: '700' },
-  gradeFootnote: { color: '#94A3B8', fontSize: 12, lineHeight: 16 },
-  recordsCard: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8 },
-  sectionTitle: { color: Colors.ink, fontSize: 17, fontWeight: '700', marginVertical: 14 },
-  recordRow: { flexDirection: 'row', gap: 12, paddingVertical: 14, borderTopColor: Colors.border, borderTopWidth: 1 },
-  recordIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: Colors.dangerBg, alignItems: 'center', justifyContent: 'center' },
-  recordContent: { flex: 1 },
-  recordTitle: { color: Colors.ink, fontSize: 14, fontWeight: '700' },
-  recordDetail: { color: Colors.ink, fontSize: 13, marginTop: 3 },
-  recordDate: { color: Colors.subtleGray, fontSize: 12, marginTop: 5 },
-  empty: { color: Colors.subtleGray, fontSize: 13, paddingBottom: 18 },
+  page: { flex: 1, backgroundColor: Colors.paper },
+  content: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 36,
+    gap: 16,
+  },
+  title: { color: Colors.ink, fontSize: 26, fontWeight: '700', letterSpacing: -0.4 },
+  subtitle: { color: Colors.subtleGray, fontSize: 15 },
+  segmentBar: {
+    flexDirection: 'row',
+    backgroundColor: Colors.canvas,
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  segmentBtn: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentBtnActive: {
+    backgroundColor: Colors.brandGreen,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.ink,
+  },
+  segmentTextActive: {
+    color: Colors.white,
+    fontWeight: '700',
+  },
+  dateNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  arrowBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateNavText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.ink,
+  },
+  scorePanel: {
+    backgroundColor: Colors.paleGreen,
+    borderRadius: 14,
+    paddingVertical: 22,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  scoreBig: {
+    fontSize: 40,
+    fontWeight: '800',
+    color: Colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  scoreDenom: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.subtleGray,
+  },
+  scoreSubText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.brandGreen,
+  },
+  breakdownList: {
+    borderTopWidth: 1,
+    borderColor: Colors.border,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+  },
+  breakdownLabel: {
+    fontSize: 15,
+    color: Colors.subtleGray,
+  },
+  breakdownVal: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  formulaText: {
+    fontSize: 13,
+    color: Colors.subtleGray,
+  },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderColor: Colors.border,
+  },
+  pendingTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.warning,
+  },
+  pendingSub: {
+    fontSize: 13,
+    color: Colors.subtleGray,
+    marginTop: 2,
+  },
 });

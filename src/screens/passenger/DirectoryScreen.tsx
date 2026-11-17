@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, FlatList, Keyboard
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  FlatList,
 } from 'react-native';
 import { BottomSheetModal, ScreenSkeleton } from '../../components/AppUI';
-import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,44 +38,42 @@ type Terminal = {
   latitude: number;
   longitude: number;
   sequence_order: number;
-  regular_fare?: number;
-  student_fare?: number;
-  elderly_fare?: number;
-  disabled_fare?: number;
   routes?: Route;
 };
 
-type PassengerType = 'regular' | 'student' | 'elderly' | 'disabled';
-
-const normalizeConfiguredRouteFare = (route: Route): Route => (
+const normalizeConfiguredRouteFare = (route: Route): Route =>
   route.id === MAKATI_PRIMARY_ROUTE.id
-    ? { ...route, operating_hours: ESAKAY_OPERATIONS.serviceHours, base_fare: ESAKAY_OPERATIONS.regularBaseFare, per_km_rate: ESAKAY_OPERATIONS.additionalFarePerKm }
-    : route
-);
+    ? {
+        ...route,
+        operating_hours: ESAKAY_OPERATIONS.serviceHours,
+        base_fare: ESAKAY_OPERATIONS.regularBaseFare,
+        per_km_rate: ESAKAY_OPERATIONS.additionalFarePerKm,
+      }
+    : route;
 
-export default function DirectoryScreen({ driverMode = false }: { driverMode?: boolean }) {
-  const { t } = useTranslation();
+export default function DirectoryScreen({ navigation }: { navigation?: any; driverMode?: boolean }) {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [terminals, setTerminals] = useState<Terminal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'browse' | 'planner'>('browse');
-  const [passengerType, setPassengerType] = useState<PassengerType>('regular');
 
-  // Browse Routes state
-  const [expandedRoute, setExpandedRoute] = useState<string | null>(null);
-
-  // Trip Planner state
-  const [fromSelection, setFromSelection] = useState<string | 'gps'>('gps'); // 'gps' or terminal ID
-  const [toSelection, setToSelection] = useState<string | null>(null); // terminal ID
+  const [fromSelection, setFromSelection] = useState<string>('');
+  const [toSelection, setToSelection] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'from' | 'to'>('from');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAllStops, setShowAllStops] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data: routesData } = await supabase.from('routes').select('*').order('is_coming_soon', { ascending: true });
-        const { data: terminalsData } = await supabase.from('terminals').select('*, routes(*)').order('sequence_order');
+        const { data: routesData } = await supabase
+          .from('routes')
+          .select('*')
+          .order('is_coming_soon', { ascending: true });
+        const { data: terminalsData } = await supabase
+          .from('terminals')
+          .select('*, routes(*)')
+          .order('sequence_order');
 
         const fallbackRoute: Route = { ...MAKATI_PRIMARY_ROUTE, is_coming_soon: false };
         const fallbackRoutes: Route[] = OFFICIAL_TWO_ROUTES;
@@ -80,800 +82,484 @@ export default function DirectoryScreen({ driverMode = false }: { driverMode?: b
           routes: fallbackRoute,
         }));
 
-        // Ensure Route 1 (Active) and Route 2 (Coming Soon) are both present
         const resolvedRoutes: Route[] = routesData?.length
           ? routesData.map(normalizeConfiguredRouteFare)
           : fallbackRoutes;
-        setRoutes([...resolvedRoutes.filter((route) => !route.is_coming_soon && route.id !== MAKATI_ROUTE_2_COMING_SOON.id && !/ayala\s*[-–]?\s*circuit/i.test(route.name)), MAKATI_ROUTE_2_COMING_SOON]);
-        setTerminals(terminalsData?.length
+        setRoutes([
+          ...resolvedRoutes.filter(
+            (route) =>
+              !route.is_coming_soon &&
+              route.id !== MAKATI_ROUTE_2_COMING_SOON.id &&
+              !/ayala\s*[-–]?\s*circuit/i.test(route.name)
+          ),
+          MAKATI_ROUTE_2_COMING_SOON,
+        ]);
+
+        const resolvedTerminals = terminalsData?.length
           ? terminalsData
               .filter((terminal: Terminal) => terminal.route_id === MAKATI_PRIMARY_ROUTE.id)
               .map((terminal: Terminal) => ({
                 ...terminal,
                 routes: terminal.routes ? normalizeConfiguredRouteFare(terminal.routes) : fallbackRoute,
               }))
-          : fallbackTerminals);
-      } catch (err) {
-        console.error('Error fetching directory data:', err);
+          : fallbackTerminals;
+
+        setTerminals(resolvedTerminals);
+        if (resolvedTerminals.length > 0) {
+          setFromSelection(resolvedTerminals[0].id);
+          setToSelection(resolvedTerminals[resolvedTerminals.length - 1].id);
+        }
+      } catch {
         const fallbackRoute: Route = { ...MAKATI_PRIMARY_ROUTE, is_coming_soon: false };
         setRoutes(OFFICIAL_TWO_ROUTES);
-        setTerminals(MAKATI_OFFICIAL_TERMINALS.map((terminal) => ({ ...terminal, routes: fallbackRoute })));
+        const list = MAKATI_OFFICIAL_TERMINALS.map((terminal) => ({ ...terminal, routes: fallbackRoute }));
+        setTerminals(list);
+        if (list.length > 0) {
+          setFromSelection(list[0].id);
+          setToSelection(list[list.length - 1].id);
+        }
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
+    void fetchData();
   }, []);
 
-  const getFromText = () => {
-    if (fromSelection === 'gps') return t('directory.currentLocation');
-    return terminals.find((terminal) => terminal.id === fromSelection)?.name || t('directory.selectOrigin');
-  };
+  if (loading) {
+    return <ScreenSkeleton preset="cards" />;
+  }
 
-  const getToText = () =>
-    terminals.find((terminal) => terminal.id === toSelection)?.name || t('directory.selectDestination');
+  const fromStop = terminals.find((t) => t.id === fromSelection) || terminals[0];
+  const toStop = terminals.find((t) => t.id === toSelection) || terminals[terminals.length - 1];
+  const fromIdx = Math.max(0, terminals.findIndex((t) => t.id === fromStop?.id));
+  const toIdx = Math.max(0, terminals.findIndex((t) => t.id === toStop?.id));
+  const intermediateCount = Math.max(0, Math.abs(toIdx - fromIdx) - 1);
 
-  const getRouteTerminals = (routeId: string) =>
-    terminals.filter((terminal) => terminal.route_id === routeId);
-
-  // Picker Modal list rendering
   const handleOpenPicker = (type: 'from' | 'to') => {
     setModalType(type);
     setSearchQuery('');
     setModalVisible(true);
   };
 
-  const selectItem = (id: string | 'gps') => {
-    if (modalType === 'from') {
-      setFromSelection(id);
-    } else {
-      setToSelection(id === 'gps' ? null : id);
-    }
+  const selectItem = (id: string) => {
+    if (modalType === 'from') setFromSelection(id);
+    else setToSelection(id);
     setModalVisible(false);
   };
 
-  // Filter terminals for search inside picker
-  const filteredTerminals = terminals.filter(t =>
-    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.routes?.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTerminals = terminals.filter((t) =>
+    t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  if (loading) {
-    return <ScreenSkeleton preset="cards" />;
-  }
 
   return (
     <View style={styles.container}>
-      {/* Tab Selector */}
-      {!driverMode && <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'browse' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('browse')}
-        >
-          <Ionicons name="list" size={18} color={activeTab === 'browse' ? Colors.white : Colors.darkText} />
-          <Text style={[styles.tabButtonText, activeTab === 'browse' && styles.tabButtonTextActive]}>{t('directory.browseRoutes')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'planner' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('planner')}
-        >
-          <Ionicons name="navigate" size={18} color={activeTab === 'planner' ? Colors.white : Colors.darkText} />
-          <Text style={[styles.tabButtonText, activeTab === 'planner' && styles.tabButtonTextActive]}>{t('directory.tripPlanner')}</Text>
-        </TouchableOpacity>
-      </View>}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* From & To Selectors */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>From</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.selectorBox}
+            onPress={() => handleOpenPicker('from')}
+          >
+            <Text style={styles.selectorText}>{fromStop?.name || 'MRT Buendia'}</Text>
+            <Ionicons name="chevron-down" size={18} color={Colors.subtleGray} />
+          </TouchableOpacity>
+        </View>
 
-      {driverMode || activeTab === 'browse' ? (
-        /* ─── BROWSE ROUTES TAB ─── */
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.sectionTitle}>Routes & fares</Text>
-          <Text style={styles.sectionDesc}>Service details and fares for available routes.</Text>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>To</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.selectorBox}
+            onPress={() => handleOpenPicker('to')}
+          >
+            <Text style={styles.selectorText}>{toStop?.name || 'Mandaluyong City Hall'}</Text>
+            <Ionicons name="chevron-down" size={18} color={Colors.subtleGray} />
+          </TouchableOpacity>
+        </View>
 
-          {routes.map(route => {
-            const isComingSoon = Boolean(route.is_coming_soon || route.id === MAKATI_ROUTE_2_COMING_SOON.id);
-            const isExpanded = expandedRoute === route.id;
-            const routeTerminals = getRouteTerminals(route.id);
+        <View style={styles.divider} />
 
-            return (
-              <View key={route.id} style={styles.routeCard}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={styles.routeHeader}
-                  disabled={isComingSoon}
-                  onPress={() => {
-                    setExpandedRoute(isExpanded ? null : route.id);
-                  }}
-                >
-                  <View style={styles.routeIcon}><Ionicons name="bus-outline" size={21} color={Colors.subtleGray} /></View>
-                  <View style={styles.routeInfo}>
-                    <Text style={styles.routeName}>{route.name}</Text>
-                    <View style={styles.routeMeta}>
-                      {isComingSoon ? (
-                        <View style={styles.metaBadge}>
-                          <Text style={styles.metaText}>Coming soon</Text>
-                        </View>
-                      ) : (
-                        <>
-                          <View style={styles.metaBadge}>
-                            <Ionicons name="time-outline" size={12} color="#666" />
-                            <Text style={styles.metaText}>{route.operating_hours}</Text>
-                          </View>
-                          <View style={[styles.metaBadge, { backgroundColor: '#FFEBEE' }]}>
-                            <Text style={styles.fareText}>₱15 regular · ₱12 discounted</Text>
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  </View>
-                  <Ionicons
-                    name={isComingSoon ? "time-outline" : isExpanded ? "chevron-up" : "chevron-down"}
-                    size={22}
-                    color={Colors.subtleGray}
-                  />
-                </TouchableOpacity>
+        {/* Route 1 Timeline */}
+        <Text style={styles.routeTitle}>Route 1</Text>
 
-                {!isComingSoon && isExpanded && (
-                  <View style={styles.expandedContent}>
-                    <Text style={styles.routeDesc}>{route.description}</Text>
-                    <Text style={styles.routeDesc}>Landmarks are listed in the supplied order. Boarding positions and road access are under review.</Text>
-
-                    <Text style={styles.stopsHeader}>{t('directory.sequenceOfStops')}</Text>
-                    {routeTerminals.map((stop, idx) => (
-                      <View key={stop.id} style={styles.stopRow}>
-                        <View style={styles.stopTimeline}>
-                          <View style={[styles.stopNode, { borderColor: route.color_code }]} />
-                          {idx !== routeTerminals.length - 1 && (
-                            <View style={[styles.stopLine, { backgroundColor: route.color_code }]} />
-                          )}
-                        </View>
-                        <Text style={[styles.stopName, { flex: 1 }]}>{stop.name}</Text>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.subtleGray }}>Point unverified</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
+        <View style={styles.timelineBlock}>
+          {/* Origin Stop */}
+          <View style={styles.timelineRow}>
+            <View style={styles.timelineAxis}>
+              <View style={styles.timelineDotActive} />
+              <View style={styles.timelineLine} />
+            </View>
+            <View style={styles.timelineContent}>
+              <View style={styles.stopBadge}>
+                <Text style={styles.stopBadgeText}>STOP {String(fromIdx + 1).padStart(2, '0')}</Text>
               </View>
-            );
-          })}
-        </ScrollView>
-      ) : (
-        /* ─── TRIP PLANNER TAB ─── */
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.sectionTitle}>{t('directory.planYourTrip')}</Text>
-          <Text style={styles.sectionDesc}>{t('directory.planTripDesc')}</Text>
-          <View style={{ backgroundColor: '#FFF8E7', borderColor: '#F3D58A', borderWidth: 1, borderRadius: 8, padding: 11, marginBottom: 12 }}>
-            <Text style={{ color: '#684B05', fontSize: 12, lineHeight: 17 }}>
-              Operator-reported fare: ₱15 regular or ₱12 for students, PWDs, and seniors for the first 4 km, then ₱1 for each additional km for everyone. Trip estimates are paused until road distances and the posted fare matrix are verified.
-            </Text>
-          </View>
-
-          {/* Passenger Type Selector */}
-          <View style={styles.passengerTypeCard}>
-            <Text style={styles.passengerTypeLabel}>{t('directory.passengerType')}</Text>
-            <View style={styles.passengerTypeButtons}>
-              {(['regular', 'student', 'elderly', 'disabled'] as PassengerType[]).map(type => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.passengerTypeButton,
-                    passengerType === type && styles.passengerTypeButtonActive
-                  ]}
-                  onPress={() => setPassengerType(type)}
-                >
-                  <Text style={[
-                    styles.passengerTypeButtonText,
-                    passengerType === type && styles.passengerTypeButtonTextActive
-                  ]}>
-                    {t(`directory.${type}`)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              <Text style={styles.stopNameText}>{fromStop?.name || 'MRT Buendia'}</Text>
             </View>
           </View>
 
-          <View style={styles.plannerCard}>
-            {/* Origin Select */}
-            <Text style={styles.pickerLabel}>{t('directory.from')}</Text>
-            <TouchableOpacity
-              style={styles.pickerSelector}
-              onPress={() => handleOpenPicker('from')}
-            >
-              <Ionicons
-                name={fromSelection === 'gps' ? "location" : "bus"}
-                size={18}
-                color={fromSelection === 'gps' ? Colors.ink : Colors.subtleGray}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={[styles.pickerSelectorText, fromSelection === 'gps' && { color: Colors.ink, fontWeight: '700' }]}>
-                {getFromText()}
+          {/* Intermediate Stops */}
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => setShowAllStops(!showAllStops)}
+            style={styles.timelineRow}
+          >
+            <View style={styles.timelineAxis}>
+              <View style={styles.timelineDotMuted} />
+              <View style={styles.timelineLine} />
+            </View>
+            <View style={styles.timelineContent}>
+              <Text style={styles.intermediateText}>
+                {intermediateCount > 0
+                  ? `${intermediateCount} intermediate stop${intermediateCount === 1 ? '' : 's'}`
+                  : 'Direct stop sequence'}{' '}
+                · {showAllStops ? 'Hide stops' : 'View all stops'}
               </Text>
-              <Ionicons name="chevron-down" size={16} color={Colors.subtleGray} style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
-
-            <View style={styles.plannerConnector}>
-              <View style={styles.connectorDot} />
-              <View style={styles.connectorLine} />
-              <View style={[styles.connectorDot, { backgroundColor: Colors.ink }]} />
             </View>
+          </TouchableOpacity>
 
-            {/* Destination Select */}
-            <Text style={styles.pickerLabel}>{t('directory.toDestination')}</Text>
-            <TouchableOpacity
-              style={styles.pickerSelector}
-              onPress={() => handleOpenPicker('to')}
-            >
-              <Ionicons name="flag" size={18} color={Colors.subtleGray} style={{ marginRight: 8 }} />
-              <Text style={[styles.pickerSelectorText, toSelection && { color: Colors.darkText, fontWeight: '700' }]}>
-                {getToText()}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={Colors.subtleGray} style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
+          {showAllStops &&
+            terminals.map((st, idx) => (
+              <View key={st.id} style={styles.timelineRowCompact}>
+                <View style={styles.timelineAxis}>
+                  <View style={styles.timelineDotSmall} />
+                  {idx < terminals.length - 1 && <View style={styles.timelineLine} />}
+                </View>
+                <Text style={styles.compactStopText}>
+                  {String(idx + 1).padStart(2, '0')} · {st.name}
+                </Text>
+              </View>
+            ))}
+
+          {/* Destination Stop */}
+          <View style={styles.timelineRow}>
+            <View style={styles.timelineAxis}>
+              <View style={styles.timelineDotActive} />
+            </View>
+            <View style={styles.timelineContent}>
+              <View style={styles.stopBadge}>
+                <Text style={styles.stopBadgeText}>STOP {String(toIdx + 1).padStart(2, '0')}</Text>
+              </View>
+              <Text style={styles.stopNameText}>{toStop?.name || 'Mandaluyong City Hall'}</Text>
+            </View>
           </View>
+        </View>
 
-          {toSelection && (
-            <View style={styles.errorCard}>
-              <Ionicons name="map-outline" size={24} color={Colors.subtleGray} style={{ marginRight: 8 }} />
-              <Text style={styles.errorText}>Road-following trip distance, travel time, and fare estimates are unavailable while the boarding points and route are being checked.</Text>
+        <View style={styles.infoNoteRow}>
+          <Ionicons name="information-circle-outline" size={18} color={Colors.subtleGray} />
+          <Text style={styles.infoNoteText}>Check the map for active units.</Text>
+        </View>
+
+        {routes.some((r) => r.is_coming_soon) && (
+          <View style={styles.comingSoonRow}>
+            <Text style={styles.comingSoonTitle}>Route 2 · Ayala – Circuit Loop</Text>
+            <View style={styles.comingSoonPill}>
+              <Text style={styles.comingSoonPillText}>Coming soon</Text>
             </View>
-          )}
-        </ScrollView>
-      )}
+          </View>
+        )}
 
-      {/* CUSTOM DROPDOWN PICKER BOTTOM SHEET */}
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => navigation?.navigate('PassengerTabs', { screen: 'Map' })}
+          style={styles.primaryButton}
+        >
+          <Text style={styles.primaryButtonText}>View route on map</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Stop Picker Bottom Sheet */}
       <BottomSheetModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         scrollable={false}
-        sheetStyle={{ height: '78%' }}
+        sheetStyle={{ height: '72%' }}
         contentContainerStyle={{ flex: 1 }}
       >
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>
-            {modalType === 'from' ? t('directory.selectDeparturePoint') : t('directory.selectDestinationPoint')}
+            {modalType === 'from' ? 'Select origin stop' : 'Select destination stop'}
           </Text>
-          <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
-            <Ionicons name="close" size={24} color={Colors.darkText} />
+          <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
+            <Ionicons name="close" size={24} color={Colors.ink} />
           </TouchableOpacity>
         </View>
 
-        {/* Search Input inside Picker */}
         <View style={styles.modalSearchWrapper}>
-          <Ionicons name="search" size={20} color={Colors.subtleGray} style={{ marginRight: 8 }} />
+          <Ionicons name="search-outline" size={19} color={Colors.subtleGray} />
           <TextInput
             style={styles.modalSearchInput}
-            placeholder={t('directory.searchTerminals')}
+            placeholder="Search stops..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#999"
-            returnKeyType="search"
-            enterKeyHint="search"
-            clearButtonMode="while-editing"
+            placeholderTextColor={Colors.subtleGray}
           />
         </View>
 
         <FlatList
           data={filteredTerminals}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-          ListHeaderComponent={
-            modalType === 'from' ? (
-              <TouchableOpacity
-                style={styles.gpsOption}
-                onPress={() => selectItem('gps')}
-              >
-                <View style={styles.gpsOptionIconBg}>
-                  <Ionicons name="location" size={20} color={Colors.white} />
-                </View>
-                <View style={{ marginLeft: 14 }}>
-                  <Text style={styles.gpsOptionTitle}>{t('directory.currentGpsLocation')}</Text>
-                  <Text style={styles.gpsOptionSub}>{t('directory.autoLocateNearest')}</Text>
-                </View>
-              </TouchableOpacity>
-            ) : undefined
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.modalItem}
-              onPress={() => selectItem(item.id)}
-            >
-              <View style={[styles.modalItemColorBar, { backgroundColor: item.routes?.color_code || Colors.primaryRed }]} />
-              <View style={{ flex: 1, paddingLeft: 12 }}>
-                <Text style={styles.modalItemName}>{item.name}</Text>
-                <Text style={styles.modalItemSub}>{item.routes?.name}</Text>
+          renderItem={({ item, index }) => (
+            <TouchableOpacity style={styles.modalItem} onPress={() => selectItem(item.id)}>
+              <View style={styles.modalNumBox}>
+                <Text style={styles.modalNumText}>{String(index + 1).padStart(2, '0')}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="#CCC" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalItemName}>{item.name}</Text>
+                <Text style={styles.modalItemSub}>Route 1</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
             </TouchableOpacity>
           )}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 16 }}
         />
       </BottomSheetModal>
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.canvas
-  },
   container: {
     flex: 1,
-    backgroundColor: Colors.canvas
-  },
-  tabBar: {
-    flexDirection: 'row',
     backgroundColor: Colors.paper,
-    padding: 8,
-    gap: 6,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    gap: 6,
-  },
-  tabButtonActive: {
-    backgroundColor: Colors.ink,
-  },
-  tabButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.darkText,
-  },
-  tabButtonTextActive: {
-    color: Colors.white,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 36,
     width: '100%',
-    maxWidth: 960,
+    maxWidth: 560,
     alignSelf: 'center',
+    gap: 14,
   },
-  sectionTitle: {
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -0.7,
-    color: Colors.ink,
-    marginBottom: 4,
+  fieldGroup: {
+    gap: 6,
   },
-  sectionDesc: {
+  fieldLabel: {
     fontSize: 14,
-    color: Colors.subtleGray,
-    lineHeight: 20,
-    marginBottom: 20,
+    fontWeight: '600',
+    color: Colors.ink,
   },
-
-  // ── Route Directory Styling ──
-  routeCard: {
+  selectorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 50,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
     backgroundColor: Colors.paper,
-    borderRadius: 14,
-    marginBottom: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  routeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  routeIcon: { width: 44, height: 44, borderRadius: 10, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  routeInfo: {
-    flex: 1,
-  },
-  routeName: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: Colors.darkText,
-    marginBottom: 6,
-  },
-  routeMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    maxWidth: '100%',
-    gap: 8,
-  },
-  metaBadge: {
-    maxWidth: '100%',
-    flexShrink: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.offWhite,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#555',
+  selectorText: {
+    fontSize: 16,
     fontWeight: '600',
-  },
-  fareText: {
-    fontSize: 12,
     color: Colors.ink,
-    fontWeight: 'bold',
-  },
-  expandedContent: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderColor: '#F0E6D8',
-    backgroundColor: '#FAF5EE',
-  },
-  routeDesc: {
-    fontSize: 13,
-    color: '#555',
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  stopsHeader: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.subtleGray,
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  stopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 36,
-  },
-  stopTimeline: {
-    width: 24,
-    alignItems: 'center',
-    height: '100%',
-    justifyContent: 'center',
-  },
-  stopNode: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.white,
-    borderWidth: 2.5,
-    zIndex: 2,
-  },
-  stopLine: {
-    width: 2,
-    position: 'absolute',
-    top: 18,
-    bottom: -18,
-    zIndex: 1,
-  },
-  stopName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.darkText,
-    marginLeft: 8,
-  },
-
-  // ── Trip Planner Styling ──
-  plannerCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 20,
-  },
-  pickerLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.subtleGray,
-    letterSpacing: 0.8,
-    marginBottom: 6,
-  },
-  pickerSelector: {
-    flexDirection: 'row',
-    backgroundColor: Colors.offWhite,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-  },
-  pickerSelectorText: {
-    fontSize: 14,
-    color: '#888',
-  },
-  plannerConnector: {
-    height: 40,
-    paddingLeft: 20,
-    marginVertical: 4,
-    justifyContent: 'center',
-  },
-  connectorDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.subtleGray,
-  },
-  connectorLine: {
-    width: 2,
-    height: 20,
-    backgroundColor: '#E8DFD3',
-    marginLeft: 2,
-    marginVertical: 2,
-  },
-
-  // ── Results Display ──
-  errorCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFEBEE',
-    borderWidth: 1,
-    borderColor: '#FFCDD2',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-  },
-  errorText: {
-    color: Colors.ink,
-    fontWeight: 'bold',
-    flex: 1,
-    fontSize: 14,
-  },
-  resultCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  routeBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  routeBadgeText: {
-    color: Colors.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  resultRouteName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.darkText,
   },
   divider: {
     height: 1,
-    backgroundColor: '#F0E6D8',
-    marginVertical: 16,
+    backgroundColor: Colors.border,
+    marginVertical: 4,
   },
-  boardingSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  boardingDetails: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  boardingLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.primaryYellow,
-    letterSpacing: 0.8,
-  },
-  boardingTerminalName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.darkText,
-    marginTop: 2,
-  },
-  boardingDistance: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  metricsRow: {
-    flexDirection: 'row',
-  },
-  metricItem: {
-    flex: 1,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-  },
-  metricLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.subtleGray,
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 22,
-    fontWeight: '600',
+  routeTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: Colors.ink,
   },
-  metricSub: {
-    fontSize: 12,
-    color: '#888',
+  timelineBlock: {
+    paddingLeft: 4,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    minHeight: 62,
+  },
+  timelineRowCompact: {
+    flexDirection: 'row',
+    minHeight: 34,
+    alignItems: 'center',
+  },
+  timelineAxis: {
+    width: 24,
+    alignItems: 'center',
+  },
+  timelineDotActive: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.brandGreen,
+    marginTop: 4,
+  },
+  timelineDotMuted: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: Colors.brandGreen,
+    backgroundColor: Colors.paper,
+    marginTop: 6,
+  },
+  timelineDotSmall: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: Colors.brandGreen,
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: Colors.brandGreen,
+    marginVertical: 2,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingLeft: 12,
+    paddingBottom: 14,
+    gap: 4,
+  },
+  stopBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.paleGreen,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  stopBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.brandGreen,
+  },
+  stopNameText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.ink,
+  },
+  intermediateText: {
+    fontSize: 14,
+    color: Colors.subtleGray,
+    fontWeight: '600',
     marginTop: 2,
   },
-  guidanceFlow: {
-    marginTop: 20,
-    backgroundColor: Colors.offWhite,
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  compactStopText: {
+    fontSize: 13,
+    color: Colors.ink,
+    paddingLeft: 12,
+    paddingBottom: 8,
   },
-  guidanceStep: {
+  infoNoteRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
   },
-  guidanceText: {
-    fontSize: 13,
-    color: Colors.darkText,
+  infoNoteText: {
+    fontSize: 14,
+    color: Colors.subtleGray,
   },
-  guidanceConnector: {
-    width: 1.5,
-    height: 12,
-    backgroundColor: '#DDD',
-    marginLeft: 7,
-    marginVertical: 2,
+  comingSoonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
   },
-
-  // ── Custom Modal Picker ──
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  comingSoonTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.subtleGray,
   },
-  modalContent: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '75%',
-    padding: 20,
+  comingSoonPill: {
+    backgroundColor: Colors.canvas,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  comingSoonPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.subtleGray,
+  },
+  primaryButton: {
+    minHeight: 52,
+    borderRadius: 12,
+    backgroundColor: Colors.brandGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.white,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: Colors.darkText,
-  },
-  modalCloseBtn: {
-    padding: 4,
+    fontWeight: '700',
+    color: Colors.ink,
   },
   modalSearchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.offWhite,
-    borderRadius: 8,
+    gap: 8,
+    backgroundColor: Colors.canvas,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
     paddingHorizontal: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   modalSearchInput: {
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
-    color: Colors.darkText,
-  },
-  gpsOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFF2F2',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FFCDD2',
-    marginBottom: 16,
-  },
-  gpsOptionIconBg: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.ink,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gpsOptionTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
     color: Colors.ink,
-  },
-  gpsOptionSub: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 2,
   },
   modalItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    gap: 12,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderColor: '#F0E6D8',
+    borderColor: Colors.border,
   },
-  modalItemColorBar: {
-    width: 4,
+  modalNumBox: {
+    width: 32,
     height: 32,
-    borderRadius: 2,
+    borderRadius: 8,
+    backgroundColor: Colors.paleGreen,
+    borderWidth: 1,
+    borderColor: Colors.brandGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalNumText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.brandGreen,
   },
   modalItemName: {
     fontSize: 15,
-    fontWeight: 'bold',
-    color: Colors.darkText,
+    fontWeight: '700',
+    color: Colors.ink,
   },
   modalItemSub: {
     fontSize: 12,
-    color: '#888',
+    color: Colors.subtleGray,
     marginTop: 2,
-  },
-
-  // ── Passenger Type Selector ──
-  passengerTypeCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  passengerTypeLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.subtleGray,
-    letterSpacing: 0.8,
-    marginBottom: 12,
-  },
-  passengerTypeButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  passengerTypeButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    backgroundColor: Colors.offWhite,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    alignItems: 'center',
-  },
-  passengerTypeButtonActive: {
-    backgroundColor: Colors.ink,
-    borderColor: Colors.ink,
-  },
-  passengerTypeButtonText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.subtleGray,
-  },
-  passengerTypeButtonTextActive: {
-    color: Colors.white,
   },
 });

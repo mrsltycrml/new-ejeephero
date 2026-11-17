@@ -41,7 +41,6 @@ function ClerkRegisterForm() {
   const [infoMessage, setInfoMessage] = useState('');
 
   const finalizeClerkUser = async (_clerkUserId: string | null | undefined, sessionId: string | null | undefined) => {
-    // AuthContext securely bootstraps the profile after Clerk activates the session.
     if (sessionId && setActive) {
       await setActive({ session: sessionId });
     }
@@ -67,7 +66,7 @@ function ClerkRegisterForm() {
       return;
     }
     if (!isLoaded || !signUp) {
-      setErrorMessage('Authentication service is still initializing. Please wait a moment and tap Create Account again.');
+      setErrorMessage('Authentication service is still initializing. Please wait a moment and tap Create account again.');
       return;
     }
 
@@ -151,22 +150,22 @@ function ClerkRegisterForm() {
 
   if (pendingVerification) {
     return (
-      <View style={styles.formCard}>
-        <Text style={styles.sectionLabel}>Enter Email Verification Code</Text>
+      <View style={styles.formSection}>
+        <Text style={styles.sectionLabel}>Enter verification code</Text>
         <Text style={[styles.noteText, { marginBottom: 14, flex: 0 }]}>
           Enter the 6-digit code sent to <Text style={{ fontWeight: '700' }}>{email.trim().toLowerCase()}</Text>.
         </Text>
 
         {!!errorMessage && (
           <View style={styles.errorBanner} accessibilityRole="alert">
-            <Ionicons name="alert-circle" size={18} color="#B71C1C" />
+            <Ionicons name="alert-circle" size={18} color={Colors.primaryRed} />
             <Text style={styles.errorBannerText}>{errorMessage}</Text>
           </View>
         )}
 
         {!!infoMessage && (
           <View style={styles.infoBanner}>
-            <Ionicons name="checkmark-circle" size={18} color="#1B5E20" />
+            <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />
             <Text style={styles.infoBannerText}>{infoMessage}</Text>
           </View>
         )}
@@ -189,13 +188,13 @@ function ClerkRegisterForm() {
           {loading ? (
             <ActivityIndicator color={Colors.white} />
           ) : (
-            <Text style={styles.buttonText}>Verify Email & Continue</Text>
+            <Text style={styles.buttonText}>Verify email & continue</Text>
           )}
         </TouchableOpacity>
 
         <View style={styles.verifyActionsRow}>
           <TouchableOpacity onPress={handleResendCode} disabled={resending} style={styles.secondaryLinkBtn}>
-            <Text style={styles.secondaryLinkText}>{resending ? 'Sending…' : 'Resend Code'}</Text>
+            <Text style={styles.secondaryLinkText}>{resending ? 'Sending…' : 'Resend code'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
@@ -206,7 +205,7 @@ function ClerkRegisterForm() {
             }}
             style={styles.secondaryLinkBtn}
           >
-            <Text style={[styles.secondaryLinkText, { color: '#666' }]}>Change Email</Text>
+            <Text style={[styles.secondaryLinkText, { color: Colors.subtleGray }]}>Change email</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -214,26 +213,26 @@ function ClerkRegisterForm() {
   }
 
   return (
-    <View style={styles.formCard}>
+    <View style={styles.formSection}>
       {!!errorMessage && (
         <View style={styles.errorBanner} accessibilityRole="alert">
-          <Ionicons name="alert-circle" size={18} color="#B71C1C" />
+          <Ionicons name="alert-circle" size={18} color={Colors.primaryRed} />
           <Text style={styles.errorBannerText}>{errorMessage}</Text>
         </View>
       )}
 
       {!isLoaded && (
         <View style={styles.loadingAuthRow}>
-          <ActivityIndicator size="small" color={Colors.navy} />
+          <ActivityIndicator size="small" color={Colors.brandGreen} />
           <Text style={styles.loadingAuthText}>Connecting to secure sign-up…</Text>
         </View>
       )}
 
-      <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Full name</Text>
+      <Text style={styles.fieldLabel}>Full name</Text>
       <TextInput
         style={styles.input}
         accessibilityLabel="Full name"
-        placeholder={t('auth.fullNamePlaceholder')}
+        placeholder="Juan Dela Cruz"
         placeholderTextColor={Colors.subtleGray}
         value={fullName}
         onChangeText={(val) => {
@@ -243,11 +242,11 @@ function ClerkRegisterForm() {
         autoCapitalize="words"
         autoComplete="name"
       />
-      <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Email address</Text>
+      <Text style={styles.fieldLabel}>Email address</Text>
       <TextInput
         style={styles.input}
         accessibilityLabel="Email address"
-        placeholder={t('auth.emailPlaceholder')}
+        placeholder="you@example.com"
         placeholderTextColor={Colors.subtleGray}
         value={email}
         onChangeText={(val) => {
@@ -258,12 +257,12 @@ function ClerkRegisterForm() {
         keyboardType="email-address"
         autoComplete="email"
       />
-      <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Password</Text>
+      <Text style={styles.fieldLabel}>Password</Text>
       <View style={styles.passwordWrapper}>
         <TextInput
           style={styles.passwordInput}
           accessibilityLabel="Password"
-          placeholder={t('auth.passwordPlaceholder')}
+          placeholder="Minimum 15 characters"
           placeholderTextColor={Colors.subtleGray}
           value={password}
           onChangeText={(val) => {
@@ -279,28 +278,28 @@ function ClerkRegisterForm() {
           onPress={() => setShowPassword((prev) => !prev)}
           accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
         >
-          <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#666" />
+          <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.subtleGray} />
         </TouchableOpacity>
       </View>
-      <Text style={[styles.passwordHint, password.length >= 15 && { color: '#2E7D32', fontWeight: '700' }]}>
+      <Text style={[styles.passwordHint, password.length >= 15 && { color: Colors.brandGreen, fontWeight: '700' }]}>
         {password.length >= 15
           ? `Strong passphrase length (${password.length} characters)`
           : `Minimum 15 characters required (${password.length}/15) — e.g. MakatiCommute2026!`}
       </Text>
 
-      <Text style={styles.sectionLabel}>{t('auth.selectRole')}</Text>
+      <Text style={styles.sectionLabel}>Role</Text>
       <View style={styles.roleContainer}>
         <TouchableOpacity
           style={[
             styles.roleButton,
-            role === 'passenger' ? styles.roleActivePassenger : styles.roleInactive,
+            role === 'passenger' ? styles.roleActive : styles.roleInactive,
           ]}
           onPress={() => setLocalRole('passenger')}
         >
           <Ionicons
-            name="people"
-            size={22}
-            color={role === 'passenger' ? Colors.white : Colors.darkText}
+            name="person-outline"
+            size={18}
+            color={role === 'passenger' ? Colors.brandGreen : Colors.ink}
           />
           <Text
             style={[
@@ -308,21 +307,22 @@ function ClerkRegisterForm() {
               role === 'passenger' ? styles.roleTextActive : styles.roleTextInactive,
             ]}
           >
-            {t('auth.passenger')}
+            Passenger
           </Text>
+          {role === 'passenger' && <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />}
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.roleButton,
-            role === 'driver' ? styles.roleActiveDriver : styles.roleInactive,
+            role === 'driver' ? styles.roleActive : styles.roleInactive,
           ]}
           onPress={() => setLocalRole('driver')}
         >
           <Ionicons
-            name="car"
-            size={22}
-            color={role === 'driver' ? Colors.white : Colors.darkText}
+            name="bus-outline"
+            size={18}
+            color={role === 'driver' ? Colors.brandGreen : Colors.ink}
           />
           <Text
             style={[
@@ -330,14 +330,17 @@ function ClerkRegisterForm() {
               role === 'driver' ? styles.roleTextActive : styles.roleTextInactive,
             ]}
           >
-            {t('auth.driver')}
+            Driver
           </Text>
+          {role === 'driver' && <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />}
         </TouchableOpacity>
       </View>
 
       <View style={styles.noteContainer}>
-        <Ionicons name="information-circle-outline" size={16} color={Colors.ink} />
-        <Text style={styles.noteText}>{t('auth.approvalRequiredNote')}</Text>
+        <Ionicons name="information-circle-outline" size={17} color={Colors.subtleGray} />
+        <Text style={styles.noteText}>
+          Passenger accounts are ready immediately. Driver accounts require supervisor approval.
+        </Text>
       </View>
 
       <TouchableOpacity
@@ -348,7 +351,7 @@ function ClerkRegisterForm() {
         {loading ? (
           <ActivityIndicator color={Colors.white} />
         ) : (
-          <Text style={styles.buttonText}>{t('auth.register')}</Text>
+          <Text style={styles.buttonText}>Create account</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -387,7 +390,7 @@ export default function RegisterScreen({ navigation }: any) {
       setErrorMessage(error.message);
     } else {
       Alert.alert(
-        'Registration Submitted',
+        'Registration submitted',
         'Check your inbox and confirm your email to start using your account.',
         [{ text: 'OK' }]
       );
@@ -402,135 +405,142 @@ export default function RegisterScreen({ navigation }: any) {
       contentContainerStyle={styles.scrollContainer}
       showsVerticalScrollIndicator={false}
     >
-        <TouchableOpacity style={[styles.backButton, { top: 12 + insets.top }]} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.ink} />
-        </TouchableOpacity>
+      <TouchableOpacity style={[styles.backButton, { top: 12 + insets.top }]} onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={24} color={Colors.ink} />
+      </TouchableOpacity>
 
-        <View style={styles.logoContainer}>
-          <ESakayLogo width={188} />
-          <Text style={styles.title}>{t('auth.createAccount')}</Text>
-          <Text style={styles.subtitle}>{t('auth.joinNetwork')}</Text>
-        </View>
+      <View style={styles.logoHeader}>
+        <ESakayLogo showIcon />
+      </View>
 
-        {isClerkConfigured ? (
-          <ClerkRegisterForm />
-        ) : (
-          <View style={styles.formCard}>
-            {!!errorMessage && (
-              <View style={styles.errorBanner} accessibilityRole="alert">
-                <Ionicons name="alert-circle" size={18} color="#B71C1C" />
-                <Text style={styles.errorBannerText}>{errorMessage}</Text>
-              </View>
-            )}
+      <View style={styles.headingBlock}>
+        <Text style={styles.title}>Create account</Text>
+        <Text style={styles.subtitle}>Join the ejeephero transit network.</Text>
+      </View>
 
-            <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Full name</Text>
+      {isClerkConfigured ? (
+        <ClerkRegisterForm />
+      ) : (
+        <View style={styles.formSection}>
+          {!!errorMessage && (
+            <View style={styles.errorBanner} accessibilityRole="alert">
+              <Ionicons name="alert-circle" size={18} color={Colors.primaryRed} />
+              <Text style={styles.errorBannerText}>{errorMessage}</Text>
+            </View>
+          )}
+
+          <Text style={styles.fieldLabel}>Full name</Text>
+          <TextInput
+            style={styles.input}
+            accessibilityLabel="Full name"
+            placeholder="Juan Dela Cruz"
+            placeholderTextColor={Colors.subtleGray}
+            value={fullName}
+            onChangeText={setFullName}
+            autoCapitalize="words"
+          />
+          <Text style={styles.fieldLabel}>Email address</Text>
+          <TextInput
+            style={styles.input}
+            accessibilityLabel="Email address"
+            placeholder="you@example.com"
+            placeholderTextColor={Colors.subtleGray}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <Text style={styles.fieldLabel}>Password</Text>
+          <View style={styles.passwordWrapper}>
             <TextInput
-              style={styles.input}
-              accessibilityLabel="Full name"
-              placeholder={t('auth.fullNamePlaceholder')}
+              style={styles.passwordInput}
+              accessibilityLabel="Password"
+              placeholder="Enter password"
               placeholderTextColor={Colors.subtleGray}
-              value={fullName}
-              onChangeText={setFullName}
-              autoCapitalize="words"
-            />
-            <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Email address</Text>
-            <TextInput
-              style={styles.input}
-              accessibilityLabel="Email address"
-              placeholder={t('auth.emailPlaceholder')}
-              placeholderTextColor={Colors.subtleGray}
-              value={email}
-              onChangeText={setEmail}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
               autoCapitalize="none"
-              keyboardType="email-address"
             />
-            <Text style={{ fontSize: 14, color: Colors.ink, marginBottom: 8, fontWeight: '500' }}>Password</Text>
-      <View style={styles.passwordWrapper}>
-              <TextInput
-                style={styles.passwordInput}
-          accessibilityLabel="Password"
-                placeholder={t('auth.passwordPlaceholder')}
-                placeholderTextColor={Colors.subtleGray}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword((prev) => !prev)}
-              >
-                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.sectionLabel}>{t('auth.selectRole')}</Text>
-            <View style={styles.roleContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.roleButton,
-                  role === 'passenger' ? styles.roleActivePassenger : styles.roleInactive,
-                ]}
-                onPress={() => setLocalRole('passenger')}
-              >
-                <Ionicons
-                  name="people"
-                  size={22}
-                  color={role === 'passenger' ? Colors.white : Colors.darkText}
-                />
-                <Text
-                  style={[
-                    styles.roleText,
-                    role === 'passenger' ? styles.roleTextActive : styles.roleTextInactive,
-                  ]}
-                >
-                  {t('auth.passenger')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.roleButton,
-                  role === 'driver' ? styles.roleActiveDriver : styles.roleInactive,
-                ]}
-                onPress={() => setLocalRole('driver')}
-              >
-                <Ionicons
-                  name="car"
-                  size={22}
-                  color={role === 'driver' ? Colors.white : Colors.darkText}
-                />
-                <Text
-                  style={[
-                    styles.roleText,
-                    role === 'driver' ? styles.roleTextActive : styles.roleTextInactive,
-                  ]}
-                >
-                  {t('auth.driver')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.noteContainer}>
-              <Ionicons name="information-circle-outline" size={16} color={Colors.ink} />
-              <Text style={styles.noteText}>{t('auth.approvalRequiredNote')}</Text>
-            </View>
-
-            <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color={Colors.white} />
-              ) : (
-                <Text style={styles.buttonText}>{t('auth.register')}</Text>
-              )}
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setShowPassword((prev) => !prev)}
+            >
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.subtleGray} />
             </TouchableOpacity>
           </View>
-        )}
 
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.linkButton}>
-          <Text style={styles.linkText}>
-            {t('auth.alreadyHaveAccount')} <Text style={styles.linkAction}>{t('auth.logIn')}</Text>
-          </Text>
-        </TouchableOpacity>
+          <Text style={styles.sectionLabel}>Role</Text>
+          <View style={styles.roleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.roleButton,
+                role === 'passenger' ? styles.roleActive : styles.roleInactive,
+              ]}
+              onPress={() => setLocalRole('passenger')}
+            >
+              <Ionicons
+                name="person-outline"
+                size={18}
+                color={role === 'passenger' ? Colors.brandGreen : Colors.ink}
+              />
+              <Text
+                style={[
+                  styles.roleText,
+                  role === 'passenger' ? styles.roleTextActive : styles.roleTextInactive,
+                ]}
+              >
+                Passenger
+              </Text>
+              {role === 'passenger' && <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.roleButton,
+                role === 'driver' ? styles.roleActive : styles.roleInactive,
+              ]}
+              onPress={() => setLocalRole('driver')}
+            >
+              <Ionicons
+                name="bus-outline"
+                size={18}
+                color={role === 'driver' ? Colors.brandGreen : Colors.ink}
+              />
+              <Text
+                style={[
+                  styles.roleText,
+                  role === 'driver' ? styles.roleTextActive : styles.roleTextInactive,
+                ]}
+              >
+                Driver
+              </Text>
+              {role === 'driver' && <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.noteContainer}>
+            <Ionicons name="information-circle-outline" size={17} color={Colors.subtleGray} />
+            <Text style={styles.noteText}>
+              Passenger accounts are ready immediately. Driver accounts require supervisor approval.
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color={Colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>Create account</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.linkButton}>
+        <Text style={styles.linkText}>
+          Already have an account? <Text style={styles.linkAction}>Sign in</Text>
+        </Text>
+      </TouchableOpacity>
     </FormScrollView>
   );
 }
@@ -538,70 +548,68 @@ export default function RegisterScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   outer: {
     flex: 1,
-    backgroundColor: Colors.canvas,
+    backgroundColor: Colors.paper,
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 56,
-    paddingBottom: 36,
+    paddingHorizontal: 20,
+    paddingTop: 52,
+    paddingBottom: 32,
     width: '100%',
-    maxWidth: 580,
+    maxWidth: 440,
     alignSelf: 'center',
   },
   backButton: {
     position: 'absolute',
     top: 16,
     left: 16,
-    padding: 10,
+    padding: 8,
     zIndex: 10,
   },
-  logoContainer: {
-    backgroundColor: Colors.ink,
-    borderRadius: 22,
-    padding: 24,
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    gap: 8,
+  logoHeader: {
+    alignItems: 'center',
+    marginBottom: 22,
+  },
+  headingBlock: {
+    marginBottom: 18,
+    gap: 4,
   },
   title: {
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-    color: Colors.white,
-    marginTop: 4,
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    color: Colors.ink,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#A7F3D0',
-    marginTop: 2,
-    fontWeight: '600',
-    textAlign: 'left',
+    fontSize: 15,
+    color: Colors.subtleGray,
+    lineHeight: 21,
   },
-  formCard: {
-    backgroundColor: Colors.paper,
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  formSection: {
+    marginBottom: 14,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.ink,
+    marginBottom: 8,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: '#FFEBEE',
+    backgroundColor: Colors.dangerBg,
     borderWidth: 1,
-    borderColor: '#FFCDD2',
-    borderRadius: 6,
+    borderColor: Colors.primaryRed,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 14,
   },
   errorBannerText: {
     flex: 1,
     fontSize: 13,
-    color: '#B71C1C',
+    color: Colors.primaryRed,
     fontWeight: '600',
     lineHeight: 18,
   },
@@ -609,17 +617,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: Colors.paleGreen,
     borderWidth: 1,
-    borderColor: '#C8E6C9',
-    borderRadius: 6,
+    borderColor: Colors.brandGreen,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 14,
   },
   infoBannerText: {
     flex: 1,
     fontSize: 13,
-    color: '#1B5E20',
+    color: Colors.ink,
     fontWeight: '600',
     lineHeight: 18,
   },
@@ -630,19 +638,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   loadingAuthText: {
-    fontSize: 12,
-    color: Colors.navy,
+    fontSize: 13,
+    color: Colors.ink,
     fontWeight: '600',
   },
   input: {
     backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: 13,
-    borderRadius: 6,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    minHeight: 52,
+    borderRadius: 12,
+    marginBottom: 14,
     fontSize: 16,
-    color: Colors.darkText,
+    color: Colors.ink,
   },
   passwordWrapper: {
     flexDirection: 'row',
@@ -650,32 +660,34 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 6,
+    borderRadius: 12,
+    minHeight: 52,
     marginBottom: 6,
   },
   passwordInput: {
     flex: 1,
     minWidth: 0,
     flexShrink: 1,
-    padding: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     fontSize: 16,
-    color: Colors.darkText,
+    color: Colors.ink,
   },
   eyeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   passwordHint: {
     fontSize: 12,
-    color: '#777',
+    color: Colors.subtleGray,
     marginBottom: 14,
     marginLeft: 2,
   },
   sectionLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.darkText,
-    marginBottom: 10,
+    fontWeight: '600',
+    color: Colors.ink,
+    marginBottom: 8,
   },
   roleContainer: {
     flexDirection: 'row',
@@ -685,63 +697,57 @@ const styles = StyleSheet.create({
   roleButton: {
     flex: 1,
     flexDirection: 'row',
+    minHeight: 50,
     paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   },
   roleInactive: {
-    backgroundColor: Colors.offWhite,
+    backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  roleActivePassenger: {
-    backgroundColor: Colors.ink,
-    borderWidth: 1,
-    borderColor: Colors.ink,
-  },
-  roleActiveDriver: {
-    backgroundColor: Colors.ink,
-    borderWidth: 1,
-    borderColor: Colors.ink,
+  roleActive: {
+    backgroundColor: Colors.paleGreen,
+    borderWidth: 1.5,
+    borderColor: Colors.brandGreen,
   },
   roleText: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
   },
   roleTextInactive: {
-    color: Colors.darkText,
+    color: Colors.ink,
   },
   roleTextActive: {
-    color: Colors.white,
+    color: Colors.ink,
   },
   noteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.sand,
-    padding: 11,
-    borderRadius: 6,
-    marginBottom: 14,
+    backgroundColor: Colors.canvas,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
     gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   noteText: {
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.subtleGray,
     flex: 1,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   button: {
-    backgroundColor: Colors.ink,
-    padding: 15,
-    borderRadius: 6,
+    backgroundColor: Colors.brandGreen,
+    minHeight: 52,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: Colors.ink,
+    justifyContent: 'center',
   },
   buttonText: {
     color: Colors.white,
@@ -758,20 +764,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   secondaryLinkText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: Colors.ink,
+    color: Colors.brandGreen,
   },
   linkButton: {
-    padding: 10,
+    paddingVertical: 10,
   },
   linkText: {
-    color: Colors.subtleGray,
+    color: Colors.ink,
     textAlign: 'center',
     fontSize: 15,
   },
   linkAction: {
-    color: Colors.ink,
+    color: Colors.brandGreen,
     fontWeight: '700',
   },
 });
