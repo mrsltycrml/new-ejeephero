@@ -72,6 +72,10 @@ Requests are limited to two points in the existing Metro Manila search area,
 claim. Provider paths must be at most 10 km/4 hours, have matching endpoints
 within 30 m, finite geometry, complete contiguous step indices, text directions,
 coherent measured step totals, and a recent provider response timestamp.
+For both stored and provider paths, the sum of geodesic distances between
+consecutive geometry points must agree with the sourced walking distance within
+the larger of 10 m or 5% of that distance, in either direction. This allows small
+rounding/projection differences; a short endpoint chord cannot replace a detour.
 No computed line or assumed walking speed is substituted.
 
 Request bodies are capped at 8 KiB with a 5-second read deadline. Provider

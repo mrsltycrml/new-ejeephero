@@ -51,8 +51,8 @@ test('walking savings use sourced walking time and road distance, and respect ac
   const stops = ['a', 'b', 'c'].map((id, i) => ({ id, name: id, route_id: 'r', latitude: 14.56, longitude: 121.03 + i * .001, sequence_order: i, location_source_url: 'https://example.test/stop', location_verified_at: '2026-10-27' }));
   const args = { originId: 'a', destinationId: 'c', routeId: 'r', type: 'regular' as const, route, segments, stops,
     date: '2026-10-27', matrix: { route_id: 'r', currency: 'PHP', source_url: 'https://example.test/matrix', verified_at: '2026-10-27', effective_from: '2026-10-01', effective_to: null, brackets: [{ up_to_km: 4, regular: 15, discounted: 12 }, { up_to_km: 8, regular: 18, discounted: 14 }] },
-    walks: [{ from_stop_id: 'a', to_stop_id: 'b', distance_meters: 140, duration_seconds: 120, source_url: 'https://example.test/footpath', verified_at: '2026-10-27', accessible: false,
-      coordinates: stops.slice(0, 2), steps: [{ instruction: 'Follow the marked path', distance_meters: 140, duration_seconds: 120 }] }] };
+    walks: [{ from_stop_id: 'a', to_stop_id: 'b', distance_meters: 108, duration_seconds: 120, source_url: 'https://example.test/footpath', verified_at: '2026-10-27', accessible: false,
+      coordinates: stops.slice(0, 2), steps: [{ instruction: 'Follow the marked path', distance_meters: 108, duration_seconds: 120 }] }] };
   const suggestion = findVerifiedSavings(args).suggestions[0];
   assert.equal(suggestion.minutes, 2); assert.equal(suggestion.savings, 3);
   assert.equal(findVerifiedSavings({ ...args, stepFreeOnly: true }).status, 'unavailable');

@@ -7,7 +7,7 @@ const evidence = { source_url: 'https://example.test/source', verified_at: '2026
 const matrix: FareMatrix = { ...evidence, route_id: 'r', currency: 'PHP', effective_from: '2026-11-01', effective_to: null, brackets: [{ up_to_km: 4, regular: 15, discounted: 11 }, { up_to_km: 8, regular: 20, discounted: 14 }] };
 const stops = ['a', 'b', 'c', 'branch'].map((id, i) => ({ id, name: id, route_id: 'r', latitude: 14.56, longitude: 121.03 + i * .001, sequence_order: i, location_source_url: evidence.source_url, location_verified_at: evidence.verified_at }));
 const segments = [{ ...evidence, route_id: 'r', from_stop_id: 'a', to_stop_id: 'b', distance_meters: 3000 }, { ...evidence, route_id: 'r', from_stop_id: 'b', to_stop_id: 'c', distance_meters: 4000 }];
-const walk = { ...evidence, from_stop_id: 'a', to_stop_id: 'b', distance_meters: 140, duration_seconds: 120, accessible: null, accessibility_source_url: null, accessibility_verified_at: null, coordinates: stops.slice(0, 2).map(({latitude, longitude}) => ({latitude, longitude})), steps: [{ instruction: 'Follow the marked path', distance_meters: 140, duration_seconds: 120, fromIndex: 0, toIndex: 1 }] };
+const walk = { ...evidence, from_stop_id: 'a', to_stop_id: 'b', distance_meters: 108, duration_seconds: 120, accessible: null, accessibility_source_url: null, accessibility_verified_at: null, coordinates: stops.slice(0, 2).map(({latitude, longitude}) => ({latitude, longitude})), steps: [{ instruction: 'Follow the marked path', distance_meters: 108, duration_seconds: 120, fromIndex: 0, toIndex: 1 }] };
 const input = { originId: 'a', destinationId: 'c', routeId: 'r', type: 'regular' as const, stops, segments, walks: [walk], matrix, date, maxWalkMeters: 500 };
 
 test('fare requires a current selected-route matrix; no formula or authority inference', () => {
@@ -57,7 +57,7 @@ test('equal sourced fares explicitly mean no saving among evaluated paths', () =
   assert.equal(result.suggestions.length, 0);
 });
 test('a cheaper branch outside the baseline ride path is not a recommendation', () => {
-  const branch = { ...walk, to_stop_id: 'branch', coordinates: [walk.coordinates[0], stops[3]], distance_meters: 350, steps: [{ ...walk.steps[0], distance_meters: 350 }] };
+  const branch = { ...walk, to_stop_id: 'branch', coordinates: [walk.coordinates[0], stops[3]], distance_meters: 323, steps: [{ ...walk.steps[0], distance_meters: 323 }] };
   const result = findVerifiedSavings({ ...input, walks: [branch], segments: [...segments, { ...segments[0], from_stop_id: 'branch', to_stop_id: 'c', distance_meters: 1000 }] });
   assert.equal(result.status, 'unavailable');
 });

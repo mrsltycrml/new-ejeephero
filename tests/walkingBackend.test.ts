@@ -22,7 +22,7 @@ test('walking auth accepts active Supabase or signed Clerk sessions only', async
 });
 const now = Date.now();
 function providerBody() {
-  return { type: 'FeatureCollection', metadata: { timestamp: now }, features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[from.longitude, from.latitude], [to.longitude, to.latitude]] }, properties: { summary: { distance: 140, duration: 120 }, segments: [{ steps: [{ instruction: 'Continue ahead', distance: 140, duration: 120, way_points: [0, 1] }] }] } }] };
+  return { type: 'FeatureCollection', metadata: { timestamp: now }, features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[from.longitude, from.latitude], [to.longitude, to.latitude]] }, properties: { summary: { distance: 108, duration: 120 }, segments: [{ steps: [{ instruction: 'Continue ahead', distance: 108, duration: 120, way_points: [0, 1] }] }] } }] };
 }
 test('walking handler authenticates and rate limits before requesting a bounded real route', async () => {
   const calls: any[] = [];
@@ -33,7 +33,7 @@ test('walking handler authenticates and rate limits before requesting a bounded 
   const result = await response.json();
   assert.equal(result.status, 'available');
   assert.equal(result.route.accessible, null);
-  assert.equal(result.route.distance_meters, 140);
+  assert.equal(result.route.distance_meters, 108);
   assert.equal(calls[0].url, 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson');
   const body = JSON.parse(calls[0].init.body);
   assert.deepEqual(body.coordinates, [[121.03, 14.56], [121.031, 14.56]]);

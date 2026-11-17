@@ -37,7 +37,8 @@ export function parseWalkingRoute(value: any, from: Point, to: Point, now = Date
     steps.push({ instruction: s.instruction.trim(), distance_meters: s.distance_meters, duration_seconds: s.duration_seconds });
   }
   const length = points.slice(1).reduce((sum, p, i) => sum + distanceMeters(points[i], p), 0);
-  if (length < 1 || length > value.distance_meters * 1.15 + 30 || value.distance_meters < distanceMeters(from, to) - 60
+  // Allow 10 m or 5% for rounding/projection differences, never a missing detour.
+  if (length < 1 || Math.abs(length - value.distance_meters) > Math.max(10, value.distance_meters * .05) || value.distance_meters < distanceMeters(from, to) - 60
     || !coherent(value.distance_meters, steps.reduce((sum, s) => sum + s.distance_meters, 0))
     || !coherent(value.duration_seconds, steps.reduce((sum, s) => sum + s.duration_seconds, 0))) return null;
   return { coordinates: points.map(p => ({ latitude: p.latitude, longitude: p.longitude })), steps,
