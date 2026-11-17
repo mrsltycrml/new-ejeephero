@@ -65,3 +65,11 @@ test('source refresh removes deleted or reordered selections, and malformed geom
     assert.deepEqual(buildJourneyMap({ routes: [{ ...route, coordinates }], terminals: [] }).routes, []);
   }
 });
+
+test('an archived route cannot retain selected stops or map geometry even if other flags remain active', () => {
+  const archived = { ...route, is_archived: true, is_active: true, is_published: true };
+  const selection = { selectedRouteId: route.id, boardingStop: origin, alightingStop: end };
+  assert.deepEqual(reconcileJourneySelection(selection, [archived], [origin, end]), { selectedRouteId: null, boardingStop: null, alightingStop: null });
+  const map = buildJourneyMap({ ...selection, routes: [archived], terminals: [origin, end] });
+  assert.deepEqual(map.routes, []); assert.deepEqual(map.terminals, []); assert.deepEqual(map.rideCoordinates, []);
+});

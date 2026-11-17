@@ -7,7 +7,7 @@ export type WalkingRouteGeometry = { id: string; coordinates: Point[]; source: s
 export type JourneySelection = { selectedRouteId: string | null; boardingStop: TerminalData | null; alightingStop: TerminalData | null };
 const verifiedEvidence = (date: string | null | undefined, source: string | null | undefined) => Number.isFinite(Date.parse(date || '')) && /^https?:\/\/\S+$/.test(source?.trim() || '');
 export const verifiedStop = (stop: TerminalData) => !stop.is_sample && stop.is_active !== false && !stop.deleted_at && verifiedEvidence(stop.location_verified_at, stop.location_source_url) && validPoint(stop);
-export const activeRoute = (route: RouteData) => !route.is_sample && route.is_active !== false && route.is_published !== false && !route.deleted_at && !route.is_coming_soon && (!route.status || ['active', 'published'].includes(route.status));
+export const activeRoute = (route: RouteData) => !route.is_sample && !route.is_archived && route.is_active !== false && route.is_published !== false && !route.deleted_at && !route.is_coming_soon && (!route.status || ['active', 'published'].includes(route.status));
 export const verifiedRoute = (route: RouteData) => activeRoute(route) && verifiedEvidence(route.geometry_verified_at, route.geometry_source_url) && Array.isArray(route.coordinates) && route.coordinates.length > 1 && route.coordinates.every(validPoint);
 
 export function selectJourneyRoute(state: JourneySelection, id: string | null, routes: RouteData[]): JourneySelection {

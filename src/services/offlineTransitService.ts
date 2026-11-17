@@ -8,6 +8,7 @@ import { activeRoute, verifiedRoute, verifiedStop } from './routeMap';
 export interface RouteData {
   id: string;
   is_sample?: boolean;
+  is_archived?: boolean;
   is_active?: boolean;
   is_published?: boolean;
   deleted_at?: string | null;
