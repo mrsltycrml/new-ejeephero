@@ -51,14 +51,41 @@ test('registry-only deleted units remain reachable for restoration', () => {
   assert.equal(rows[0].activeShiftId, undefined);
 });
 
-test('matching by plate keeps renamed units editable without swallowing deleted duplicates', () => {
+test('matching by plate keeps uniquely matched renamed units editable', () => {
   const rows = merge([{ ...shift, plate_number: 'real-1' }], [
-    { ...registry, id: 'archived', plate_number: 'REAL-1', deleted_at: '2026-11-18T02:00:00Z' },
     { ...registry, id: 'current', body_number: 'Renamed unit', plate_number: 'REAL-1' },
   ]);
   assert.equal(rows[0].registryId, 'current');
   assert.equal(rows[0].body, 'Renamed unit');
-  assert.equal(rows.length, 2);
-  assert.equal(rows[1].registryId, 'archived');
-  assert.equal(rows[1].registryDeletedAt, '2026-11-18T02:00:00Z');
+  assert.equal(rows.length, 1);
+});
+
+test('conflicting identifiers keep registry candidates separate in either order', () => {
+  const activeShift = { ...shift, plate_number: 'A-PLATE', is_active: true, ended_at: null };
+  const deletionStates = [null, '2026-11-18T02:00:00Z'];
+  for (const deletedA of deletionStates) {
+    for (const deletedB of deletionStates) {
+      const unitA = { ...registry, id: 'unit-a', body_number: 'Renamed unit', plate_number: 'A-PLATE', deleted_at: deletedA };
+      const unitB = { ...registry, id: 'unit-b', plate_number: 'B-PLATE', deleted_at: deletedB, created_at: '2026-11-18T03:00:00Z' };
+      for (const candidates of [[unitB, unitA], [unitA, unitB]]) {
+        const rows = merge([activeShift], candidates);
+        const shiftRow = rows[0];
+        assert.equal(shiftRow.registryId, undefined);
+        assert.equal(shiftRow.registryDeletedAt, null);
+        assert.equal(shiftRow.activeShiftId, activeShift.id);
+        assert.equal(shiftRow.body, activeShift.body_number);
+        assert.equal(shiftRow.plate, activeShift.plate_number);
+        assert.equal(rows.length, 3);
+        for (const candidate of candidates) {
+          const row = rows.find(item => item.registryId === candidate.id);
+          assert.ok(row);
+          assert.equal(row.key, `registry-${candidate.id}`);
+          assert.equal(row.body, candidate.body_number);
+          assert.equal(row.plate, candidate.plate_number);
+          assert.equal(row.registryDeletedAt, candidate.deleted_at);
+          assert.equal(row.activeShiftId, undefined);
+        }
+      }
+    }
+  }
 });

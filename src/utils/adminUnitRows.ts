@@ -23,7 +23,9 @@ export function mergeAdminUnits(dbUnits: UnitSummary[], driversMap: Map<string, 
     const matches = (r: ManagedUnit) =>
       (!!normalized(u.bodyNumber) && normalized(r.body_number) === normalized(u.bodyNumber)) ||
       (!!normalized(u.plateNumber) && normalized(r.plate_number) === normalized(u.plateNumber));
-    const registry = registryUnits.find(r => !r.deleted_at && matches(r)) ?? registryUnits.find(matches);
+    const candidates = registryUnits.filter(matches);
+    // Reused identifiers cannot establish identity; leave ambiguous records separate.
+    const registry = candidates.length === 1 ? candidates[0] : undefined;
     if (registry) matchedRegistryIds.add(registry.id);
     return {
       key: u.key,

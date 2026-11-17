@@ -97,3 +97,21 @@ Regression evidence and verification:
 Round files: src/services/offlineTransitService.ts, src/screens/admin/AdminOperationsScreens.tsx, src/utils/adminUnitRows.ts (new pure production merge), tests/realData.test.ts, tests/adminUnitRows.test.ts (new), tests/run.ts, and this report.
 
 No remote writes, deployments, subagents, authenticated UI actions, or real registry mutations were performed. The original unapplied-migration and device/UI verification limitations remain. A storage failure still means the new snapshot is not persisted for a later session; it no longer overrides the successful source response.
+
+## Fix round 2 - conflicting registry identifiers
+
+Addressed the ambiguous body/plate merge. A shift-derived row now receives registry identity and current registry values only when exactly one registry record matches. If multiple records match, its original shift identifiers and activeShiftId remain intact, registryId stays absent, and candidate registry records remain separate rows with their own values and deletion state. Existing caller guards therefore disable registry edits/deactivation on the ambiguous shift row while retaining force-end for that shift and independent registry management on the candidate rows.
+
+This supersedes round 1's preference for an undeleted match over archived matches: deletion status does not establish identity. The decision is independent of source ordering. No types, function signatures, or callers changed.
+
+Regression evidence and bounded verification:
+
+- Before the fix, `rtk node --experimental-strip-types tests/adminUnitRows.test.ts` failed the new conflict regression (5 passed, 1 failed): the shift incorrectly acquired registryId unit-b.
+- After the fix, the same command passed 6/6 tests, including both candidate orders and all four active/deleted combinations. Assertions cover withheld registry mutation identity, preserved shift identity/identifiers, and separate candidate registry values/identities.
+- The unique plate-match regression still confirms that a renamed unit with one matching record remains editable.
+- `rtk git diff --check`: PASS.
+- TypeScript and the full suite were not rerun, per the requested bounded verification; no types or callers changed. The existing MODULE_TYPELESS_PACKAGE_JSON warning remains.
+
+Files: src/utils/adminUnitRows.ts, tests/adminUnitRows.test.ts, and this report.
+
+No new unresolved implementation concern. Ambiguous records intentionally require choosing their separate registry row for registry management; the merge cannot infer a canonical identity from reused identifiers. Authenticated UI and remote mutations were not exercised. No database/network writes, deployments, or subagents were used; prior integration limitations remain.
