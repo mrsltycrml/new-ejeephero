@@ -3,14 +3,17 @@ import { View, Text, TextInput, ScrollView, TouchableOpacity, Linking, Platform,
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap, { type LeafletMapRef } from '../../components/LeafletMap';
 import PassengerStopGuide from '../../components/PassengerStopGuide';
-import { passengerStyles as s } from '../../components/PassengerUI';
+import { passengerStyles as s, PassengerSelect } from '../../components/PassengerUI';
+import WalkingDirectionsPanel from '../../components/WalkingDirectionsPanel';
 import { FormScrollView, triggerHaptic } from '../../components/AppUI';
 import { useLocation } from '../../contexts/LocationContext';
 import { useNetwork } from '../../contexts/NetworkContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { type TerminalData, type VehicleData } from '../../services/offlineTransitService';
 import { loadLoadingZones } from '../../services/passengerDataService';
-import { evaluateBoardingLocation, type LoadingZone } from '../../services/passengerSafety';
+import { distanceMeters, evaluateBoardingLocation, type LoadingZone } from '../../services/passengerSafety';
+import { getWalkingDirections, type WalkingRoute } from '../../services/walkingDirections';
 import { searchPassengerPlaces } from '../../services/placeSearchService';
 import { type PassengerPlace } from '../../services/passengerPlaces';
 import { locationDescription, locationQuality } from '../../services/locationQuality';
@@ -20,7 +23,8 @@ import { Colors } from '../../constants/theme';
 export default function PassengerHomeScreen({ route, navigation }: any) {
   const { fix, quality, errorMsg, foreground, enableLocation } = useLocation();
   const { isConnected } = useNetwork();
-  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, endRide, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, walkingRoutes, transit } = usePassengerJourney();
+  const { user, getAccessToken } = useAuth();
+  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, endRide, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const map = useRef<LeafletMapRef>(null);
 
@@ -40,6 +44,16 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const [now, setNow] = useState(Date.now());
   const [zonesLoading, setZonesLoading] = useState(false);
   const [zonesError, setZonesError] = useState(false);
+  const zoneRequest = useRef(0);
+  const [walkingBusy, setWalkingBusy] = useState(false);
+  const [walkingError, setWalkingError] = useState('');
+  const [destinationWalks, setDestinationWalks] = useState<Record<string, WalkingRoute>>({});
+  const walkingRequest = useRef(0);
+  useEffect(() => {
+    walkingRequest.current++;
+    setWalkingBusy(false); setWalkingError(''); setDestinationWalks({});
+    return () => { walkingRequest.current++; searchVersion.current++; };
+  }, [user?.id, selectedRouteId, boardingStop?.id, alightingStop?.id, place?.id, transit.syncedAt]);
 
   useEffect(() => {
     if (route?.params?.showStopGuide) {
@@ -49,37 +63,41 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   }, [route?.params?.showStopGuide]);
 
   const refreshZones = async () => {
+    const request = ++zoneRequest.current;
     setZonesLoading(true);
     setZonesError(false);
     try {
-      setZones(await loadLoadingZones());
+      const [data] = await Promise.all([loadLoadingZones(), refreshTransit()]);
+      if (request === zoneRequest.current) setZones(data);
     } catch {
-      setZonesError(true);
+      if (request === zoneRequest.current) setZonesError(true);
     } finally {
-      setZonesLoading(false);
+      if (request === zoneRequest.current) setZonesLoading(false);
     }
   };
 
   const lastWarning = useRef<string | null>(null);
   useEffect(() => {
+    const request = ++zoneRequest.current;
     let active = true;
     setZonesLoading(true);
     loadLoadingZones()
       .then((data) => {
-        if (active) {
+        if (active && request === zoneRequest.current) {
           setZones(data);
           setZonesError(false);
         }
       })
       .catch(() => {
-        if (active) setZonesError(true);
+        if (active && request === zoneRequest.current) setZonesError(true);
       })
       .finally(() => {
-        if (active) setZonesLoading(false);
+        if (active && request === zoneRequest.current) setZonesLoading(false);
       });
     const timer = setInterval(() => setNow(Date.now()), 5000);
     return () => {
       active = false;
+      zoneRequest.current++;
       clearInterval(timer);
     };
   }, [isConnected]);
@@ -109,6 +127,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const locationFresh = foreground && !errorMsg && quality === 'live';
 
   const chooseDestination = (stop: TerminalData) => {
+    walkingRequest.current++; setWalkingBusy(false); setWalkingError('');
     triggerHaptic('light');
     setInspectedStop(stop);
     setSearchOpen(false);
@@ -134,6 +153,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   };
 
   const choosePlace = (value: PassengerPlace) => {
+    searchVersion.current++;
     triggerHaptic('light');
     setPlace(value);
     setDestination(null);
@@ -162,18 +182,49 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const selectedRoute = routes.find(r => r.id === selectedRouteId);
   const selection = { selectedRouteId, boardingStop, alightingStop };
   const canChooseStop = (role: 'boarding' | 'alighting') => activeStop && selectJourneyStop(selection, activeStop, role, routes, stops) !== selection;
+  const destinationCandidates = place ? routeStops.filter(stop => selectJourneyStop(selection, stop, 'alighting', routes, stops) !== selection)
+    .map(stop => ({ stop, distance: distanceMeters(stop, place) })).filter(item => item.distance <= 2000)
+    .sort((a, b) => a.distance - b.distance).slice(0, 3) : [];
+  const requestWalk = async (stop: TerminalData, toPlace = false) => {
+    const request = ++walkingRequest.current;
+    const journeyVersion = getJourneyVersion();
+    setWalkingError('');
+    const origin = toPlace ? stop : fix;
+    const target = toPlace ? place : stop;
+    if (!origin || !target || (!toPlace && (!locationFresh || locationQuality(fix) !== 'live'))) {
+      setWalkingError('A fresh, accurate location is needed to walk from your position. Enable location and try again.');
+      return;
+    }
+    if (!isConnected) { setWalkingError('Walking directions are unavailable offline. Reconnect and try again.'); return; }
+    setWalkingBusy(true);
+    try {
+      const token = await getAccessToken();
+      if (request !== walkingRequest.current || journeyVersion !== getJourneyVersion()) return;
+      if (!toPlace && locationQuality(fix) !== 'live') { setWalkingError('Your location is no longer current. Try again after GPS updates.'); return; }
+      const result = await getWalkingDirections(origin, target, token);
+      if (request !== walkingRequest.current || journeyVersion !== getJourneyVersion()) return;
+      if (result.status !== 'available') { setWalkingError(result.reason); return; }
+      if (toPlace) setDestinationWalks(current => ({ ...current, [stop.id]: result.route }));
+      showWalk(result.route, toPlace ? stop.name : 'Your location when requested', toPlace ? place!.name : stop.name, journeyVersion);
+    } catch { if (request === walkingRequest.current) setWalkingError('Walking directions unavailable. Please try again.'); }
+    finally { if (request === walkingRequest.current) setWalkingBusy(false); }
+  };
   const transitNotice = transit.status === 'ready'
     ? (routes.length ? `Routes read ${transit.syncedAt ? new Date(transit.syncedAt).toLocaleString() : 'at an unknown time'}.` : 'No published active routes.')
     : transit.syncedAt ? `Cached routes from ${new Date(transit.syncedAt).toLocaleString()}; refresh unavailable.` : transit.error || 'Route data unavailable.';
   const journeyControls = <View style={{ padding: 16, gap: 10 }}>
     <Text style={s.muted}>{transitNotice}</Text>
-    <ScrollView horizontal contentContainerStyle={{ gap: 8 }}>
-      <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: !selectedRouteId }} onPress={() => { setSelectedRouteId(null); setInspectedStop(null); }} style={s.input}><Text>All routes</Text></TouchableOpacity>
-      {routes.map(r => <TouchableOpacity key={r.id} accessibilityRole="button" accessibilityState={{ selected: r.id === selectedRouteId }} onPress={() => { setSelectedRouteId(r.id); setInspectedStop(null); setSelected(null); }} style={[s.input, r.id === selectedRouteId && { backgroundColor: Colors.paleGreen }]}><Text>{r.name}</Text></TouchableOpacity>)}
-    </ScrollView>
-    {!(selectedRoute ? selectedRoute.coordinates.length > 1 : routes.some(r => r.coordinates.length > 1)) && <Text style={s.muted}>Verified route geometry unavailable. No route line can be shown.</Text>}
-    {!routeStops.length && <Text style={s.muted}>Verified stop locations unavailable for this selection.</Text>}
-    <Text style={s.muted}>Boarding: {boardingStop?.name || 'Not selected'} · Alighting: {alightingStop?.name || 'Not selected'}</Text>
+    <Text style={s.sectionTitle}>Your journey</Text>
+    <PassengerSelect label="Route" value={selectedRouteId || ''} options={[{ value: '', label: 'All published routes' }, ...routes.map(r => ({ value: r.id, label: r.name }))]}
+      onSelect={id => { setSelectedRouteId(id || null); setInspectedStop(null); setSelected(null); }} />
+    {!(selectedRoute ? selectedRoute.coordinates.length > 1 : routes.some(r => r.coordinates.length > 1)) && <Text style={s.muted}>Route path unavailable.</Text>}
+    {!routeStops.length && <Text style={s.muted}>Verified stop locations unavailable.</Text>}
+    <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!routeStops.length}
+      options={routeStops.filter(stop => !alightingStop || stop.sequence_order < alightingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
+      onSelect={id => setBoardingStop(routeStops.find(stop => stop.id === id) || null)} />
+    <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!routeStops.length}
+      options={routeStops.filter(stop => !boardingStop || stop.sequence_order > boardingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
+      onSelect={id => setDestination(routeStops.find(stop => stop.id === id) || null)} />
     <Text style={s.muted}>Destination place: {place?.name || 'Not selected'}</Text>
     {boardingStop && alightingStop && !rideLeg(selectedRoute, boardingStop, alightingStop).length && <Text style={s.muted}>Ride leg unavailable: verified geometry must connect these stops in route order.</Text>}
     {!!selectedRoute?.coordinates.length && <Text style={s.muted}>Arrows follow published geometry order. Green highlights the selected ride leg.</Text>}
@@ -187,9 +238,31 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     </View>}
     {(boardingStop || alightingStop) && <TouchableOpacity accessibilityRole="button" onPress={() => { setBoardingStop(null); setDestination(null); }}><Text style={s.muted}>Clear boarding and alighting stops</Text></TouchableOpacity>}
     <Text style={s.muted}>{errorMsg || locationDescription(fix, now)}</Text>
-    <Text style={s.muted}>Foreground GPS only. The regional map center is not your location.</Text>
+    <Text style={s.muted}>GPS updates while the app is open.</Text>
     <TouchableOpacity accessibilityRole="button" onPress={() => void enableLocation()} style={s.input}><Text>Enable location</Text></TouchableOpacity>
     {locationFresh && fix && <TouchableOpacity accessibilityRole="button" onPress={() => map.current?.centerOn(fix.latitude, fix.longitude)} style={s.input}><Text>Center on my location</Text></TouchableOpacity>}
+    {place && <View style={s.section}>
+      <Text style={s.sectionTitle}>Stops near {place.name}</Text>
+      <Text style={s.muted}>Nearby distances are straight-line proximity. Check a walking path before choosing where to alight.</Text>
+      {!destinationCandidates.length && <Text style={s.muted}>No compatible verified stops within 2 km are available.</Text>}
+      {destinationCandidates.map(({ stop, distance }) => <View key={stop.id} style={{ gap: 8 }}>
+        <Text style={s.label}>{stop.name}</Text>
+        <Text style={s.muted}>{Math.round(distance)} m in a straight line · {destinationWalks[stop.id] ? 'Walking path available' : 'Walking availability unconfirmed'}</Text>
+        <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} onPress={() => void requestWalk(stop, true)} style={[s.button, s.secondary]}>
+          <Text style={s.label}>Check walk to destination</Text>
+        </TouchableOpacity>
+        {destinationWalks[stop.id] && <TouchableOpacity accessibilityRole="button" onPress={() => {
+          setDestination(stop); showWalk(destinationWalks[stop.id], stop.name, place.name); setInspectedStop(stop);
+        }} style={s.button}><Text style={s.buttonText}>Use this alighting stop</Text></TouchableOpacity>}
+      </View>)}
+    </View>}
+    {alightingStop && place && <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} onPress={() => void requestWalk(alightingStop, true)} style={[s.button, s.secondary]}><Text style={s.label}>Walk from alighting stop to destination</Text></TouchableOpacity>}
+    {walkingBusy && <Text accessibilityRole="alert" style={s.muted}>Finding a real walking path…</Text>}
+    {!!walkingError && <Text accessibilityRole="alert" style={s.muted}>{walkingError}</Text>}
+    {walk && <WalkingDirectionsPanel {...walk} />}
+    <PassengerStopGuide boarding={boarding} landmarks={routeStops} selectedStop={activeStop} onSelectStop={chooseDestination}
+      onWalk={stop => void requestWalk(stop)} walkingBusy={walkingBusy} onRefresh={refreshZones} loading={zonesLoading}
+      loadError={zonesError || transit.status !== 'ready'} openRequest={route?.params?.showStopGuide} />
   </View>;
   const journeyMapProps = { routes, terminals: routeStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes, selectedTerminal: activeStop, onSelectTerminal: chooseDestination, vehicleSelectionKey: selected?.id ?? null };
 
@@ -235,6 +308,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
               accessibilityRole="button"
               accessibilityLabel="Clear search"
               onPress={() => {
+                searchVersion.current++;
+                setSearching(false);
+                setSearchError('');
                 setQuery('');
                 setPlaces([]);
                 setSearched(false);
@@ -427,15 +503,6 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
 
         {!canBoardLive && <Text style={s.muted}>Select a nearby unit with current GPS to confirm your ride.</Text>}
 
-        <PassengerStopGuide
-          openRequest={route?.params?.showStopGuide}
-          boarding={boarding}
-          zones={zones}
-          landmarks={stops}
-          onRefresh={refreshZones}
-          loading={zonesLoading}
-          loadError={zonesError}
-        />
       </FormScrollView>
     );
   }

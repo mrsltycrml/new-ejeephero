@@ -3,119 +3,68 @@ import { Image, Linking, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s, PassengerSelect } from './PassengerUI';
 import { Colors } from '../constants/theme';
-import { BOARDING_EDUCATION, isVerifiedLoadingZone, type BoardingStatus, type LoadingZone } from '../services/passengerSafety';
+import { BOARDING_EDUCATION, type BoardingStatus } from '../services/passengerSafety';
+import { stopLandmarks } from '../services/stopLandmarks';
+import { LANDMARK_REFERENCE } from '../constants/esakayOperations';
 import type { TerminalData } from '../services/offlineTransitService';
 
-export default function PassengerStopGuide({
-  boarding,
-  zones,
-  landmarks,
-  onRefresh,
-  loading,
-  loadError,
-  openRequest,
-}: {
-  boarding: BoardingStatus;
-  zones: LoadingZone[];
-  landmarks: TerminalData[];
-  onRefresh: () => void;
-  loading: boolean;
-  loadError: boolean;
-  openRequest?: number;
+export default function PassengerStopGuide({ boarding, landmarks, selectedStop, onSelectStop, onWalk, walkingBusy,
+  onRefresh, loading, loadError, openRequest }: {
+  boarding: BoardingStatus; landmarks: TerminalData[]; selectedStop: TerminalData | null;
+  onSelectStop: (stop: TerminalData) => void; onWalk: (stop: TerminalData) => void; walkingBusy: boolean;
+  onRefresh: () => void; loading: boolean; loadError: boolean; openRequest?: number;
 }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (openRequest) setOpen(true);
-  }, [openRequest]);
-  const [selected, setSelected] = useState('');
-  const [preview, setPreview] = useState(false);
+  const [referenceOpen, setReferenceOpen] = useState(false);
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
-  const official = zones.filter((z) => z.kind === 'loading' && isVerifiedLoadingZone(z));
-  const options = official.length ? official : landmarks;
-  const activeId = options.some((o) => o.id === selected) ? selected : options[0]?.id || '';
-  const active = official.find((o) => o.id === activeId);
-  const activeName = options.find((o) => o.id === activeId)?.name;
-  const photo =
-    active?.photo_url && /^https:\/\//.test(active.photo_url) && /^https:\/\//.test(active.photo_source_url || '')
-      ? active.photo_url
-      : null;
-
-  useEffect(() => {
-    setPreview(false);
-  }, [boarding.kind, boarding.zone?.id]);
-
-  const prohibited = boarding.kind === 'prohibited';
-
-  if (!open && !prohibited) {
-    return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
-        <Text style={s.muted}>{boarding.title}</Text>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Open stop details"
-          onPress={() => setOpen(true)}
-          style={{ flexDirection: 'row', gap: 4, alignItems: 'center', paddingVertical: 6 }}
-        >
-          <Text style={s.link}>Stop details</Text>
-          <Ionicons name="chevron-down" size={15} color={Colors.brandGreen} />
+  useEffect(() => { if (openRequest || selectedStop) setOpen(true); }, [openRequest, selectedStop?.id]);
+  const active = landmarks.find(stop => stop.id === selectedStop?.id) || null;
+  const details = stopLandmarks(active);
+  return <View style={s.section}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Stop details" accessibilityState={{ expanded: open }}
+      onPress={() => setOpen(!open)} style={[s.row, { minHeight: 48, justifyContent: 'space-between' }]}>
+      <Text style={s.sectionTitle}>Stop landmarks</Text>
+      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.brandGreen} />
+    </TouchableOpacity>
+    {open && <>
+      <PassengerSelect label="Inspect a stop" value={active?.id || ''} disabled={!landmarks.length}
+        options={landmarks.map(stop => ({ value: stop.id, label: stop.name }))}
+        onSelect={id => { const stop = landmarks.find(item => item.id === id); if (stop) onSelectStop(stop); }} />
+      {!landmarks.length && <Text style={s.muted}>Verified stop locations are unavailable. You can still read the historical landmark reference below.</Text>}
+      {active && <>
+        <Text style={s.label}>{active.name}</Text>
+        {details?.photo && failedPhoto !== details.photo ? <>
+          <Image source={{ uri: details.photo }} accessibilityLabel={`Recorded landmark at ${active.name}`} resizeMode="contain"
+            style={{ width: '100%', height: 180, backgroundColor: Colors.canvas, borderRadius: 10 }} onError={() => setFailedPhoto(details.photo)} />
+          <TouchableOpacity accessibilityRole="link" style={{ minHeight: 48, justifyContent: 'center' }} onPress={() => void Linking.openURL(details.photoSource!)}><Text style={s.link}>Photo source</Text></TouchableOpacity>
+        </> : <Text style={s.muted}>Stop photo unavailable.</Text>}
+        <Text style={s.body}>{details?.description || 'Landmark description unavailable.'}</Text>
+        <Text style={s.muted}>Boarding side: {details?.boardingSide || 'Unavailable'}</Text>
+        <Text style={s.muted}>Travel direction: {details?.direction || 'Unavailable'}</Text>
+        <Text style={s.muted}>Entrance: {details?.entrance || 'Unavailable'}</Text>
+        {details && <TouchableOpacity accessibilityRole="link" style={{ minHeight: 48, justifyContent: 'center' }} onPress={() => void Linking.openURL(details.source)}>
+          <Text style={s.link}>Stop details source · verified {new Date(details.verifiedAt).toLocaleDateString()}</Text>
+        </TouchableOpacity>}
+        <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} accessibilityState={{ disabled: walkingBusy }} onPress={() => onWalk(active)} style={s.button}>
+          <Text style={s.buttonText}>{walkingBusy ? 'Finding a walking route…' : 'Walk to this stop'}</Text>
         </TouchableOpacity>
+      </>}
+      <View style={{ gap: 4 }}>
+        <Text style={s.label}>Your current waiting area</Text>
+        <Text accessibilityRole={boarding.kind === 'prohibited' ? 'alert' : undefined} style={s.muted}>{boarding.title}. {boarding.detail}</Text>
       </View>
-    );
-  }
-
-  return (
-    <View style={[s.section, prohibited && { borderColor: Colors.primaryRed }]}>
-      <View style={[s.row, { justifyContent: 'space-between' }]}>
-        <Text style={s.sectionTitle}>Stops & waiting areas</Text>
-        <TouchableOpacity accessibilityRole="button" onPress={() => setOpen(!open)} style={{ padding: 4 }}>
-          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
-        </TouchableOpacity>
-      </View>
-      <PassengerSelect
-        label={official.length ? 'Official stop' : 'Route stop'}
-        value={activeId}
-        options={options.map((o) => ({ value: o.id, label: o.name }))}
-        onSelect={setSelected}
-      />
-      {photo && failedPhoto !== photo ? (
-        <View style={{ gap: 8 }}>
-          <Image
-            source={{ uri: photo }}
-            accessibilityLabel={active?.photo_caption || `Waiting area at ${activeName}`}
-            resizeMode="contain"
-            style={{ width: '100%', height: 180, backgroundColor: Colors.canvas, borderRadius: 10 }}
-            onError={() => setFailedPhoto(photo)}
-          />
-          <Text style={s.muted}>{active?.photo_caption || activeName}</Text>
-          <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL(active!.photo_source_url!)}>
-            <Text style={s.link}>Photo source</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
       <Text style={s.muted}>{BOARDING_EDUCATION}</Text>
-      <View style={s.row}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          disabled={loading}
-          onPress={onRefresh}
-          style={[s.button, s.secondary, { flex: 1 }]}
-        >
-          <Text style={s.label}>{loading ? 'Refreshing…' : loadError ? 'Retry stops' : 'Refresh stops'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => setPreview(!preview)}
-          style={[s.button, s.secondary, { flex: 1 }]}
-        >
-          <Text style={s.label}>{preview ? 'Hide alert' : 'Preview zone alert'}</Text>
-        </TouchableOpacity>
-      </View>
-      {preview && (
-        <View style={{ gap: 6, paddingTop: 10, borderTopWidth: 1, borderColor: Colors.border }}>
-          <Text style={[s.label, { color: Colors.primaryRed }]}>No loading in this area (example)</Text>
-          <Text style={s.muted}>Move to a designated loading bay before boarding.</Text>
-        </View>
-      )}
-    </View>
-  );
+      <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={onRefresh} style={[s.button, s.secondary]}>
+        <Text style={s.label}>{loading ? 'Refreshing…' : loadError ? 'Retry stops and routes' : 'Refresh stops and routes'}</Text>
+      </TouchableOpacity>
+    </>}
+    <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: referenceOpen }} onPress={() => setReferenceOpen(!referenceOpen)} style={{ minHeight: 48, justifyContent: 'center' }}>
+      <Text style={s.link}>Landmark reference · {LANDMARK_REFERENCE.date}</Text>
+    </TouchableOpacity>
+    {referenceOpen && <View style={{ gap: 10 }}>
+      <Text style={s.muted}>From the photographed sheet. These printed kilometres are historical labels, not current travel distances or verified boarding points.</Text>
+      {LANDMARK_REFERENCE.stops.map(stop => <Text key={stop.printedKm} style={s.body}>{stop.printedKm} km · {stop.name}</Text>)}
+      <Text style={s.muted}>Exact stop coordinates, boarding side and entrances still require verification.</Text>
+    </View>}
+  </View>;
 }

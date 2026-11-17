@@ -45,6 +45,12 @@ export interface TerminalData {
   is_esakay_hub?: boolean;
   landmark_photo?: string;
   landmark_desc?: string;
+  landmark_photo_source_url?: string | null;
+  boarding_side?: string | null;
+  travel_direction?: string | null;
+  entrance_instructions?: string | null;
+  stop_details_source_url?: string | null;
+  stop_details_verified_at?: string | null;
   is_well_lit?: boolean;
   cctv_monitored?: boolean;
 }

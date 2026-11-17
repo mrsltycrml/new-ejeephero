@@ -6,7 +6,7 @@ import { formatReportingPeriod, periodRangeUtc, type ReportingPeriod } from '../
 import { calculateSafetyScore } from '../utils/operationsSummary';
 import { SimplePdf } from '../utils/simplePdf';
 import { loadRegistry } from './fleetRegistryService';
-import { ESAKAY_OPERATIONS, ROUTE_WAYPOINT_REVIEW } from '../constants/esakayOperations';
+import { ESAKAY_OPERATIONS, LANDMARK_REFERENCE } from '../constants/esakayOperations';
 
 type Shift = { id: string; driver_id: string; route_id: string; body_number: string | null; plate_number: string | null; created_at: string; ended_at: string | null; is_active: boolean };
 type Profile = { id: string; full_name: string | null; email: string | null; status: string | null };
@@ -86,9 +86,9 @@ export async function openAdminPeriodReport(period: ReportingPeriod, liveUnits: 
   report.table(['Unit', 'Plate', 'Route', 'Assigned driver', 'Notes'], [80, 75, 160, 95, 100], activeUnitRegistry.map((entry) => [entry.body_number, entry.plate_number || '-', entry.route_name, entry.assigned_driver || '-', entry.notes || '-']));
 
   report.section('Service and route context');
-  report.paragraph(`Operator-reported service: ${ESAKAY_OPERATIONS.serviceHours}; ${ESAKAY_OPERATIONS.reportedFleetSize} units; target ${ESAKAY_OPERATIONS.fullRoutesPerUnitTarget} full routes per unit. eSAKAY speed policy: ${ESAKAY_OPERATIONS.operatorSpeedCapKph} km/h. Base fares: PHP ${ESAKAY_OPERATIONS.regularBaseFare} regular and PHP ${ESAKAY_OPERATIONS.discountedBaseFare} discounted for ${ESAKAY_OPERATIONS.includedDistanceKm} km, then PHP ${ESAKAY_OPERATIONS.additionalFarePerKm} per extra km.`);
-  report.paragraph('The following waypoint findings are provisional map references. They do not establish a verified road-following route.');
-  report.table(['Waypoint', 'Status', 'Finding'], [135, 105, 270], ROUTE_WAYPOINT_REVIEW.map((waypoint) => [waypoint.name, waypoint.confidence, waypoint.finding]));
+  report.paragraph(`eSAKAY speed policy: ${ESAKAY_OPERATIONS.operatorSpeedCapKph} km/h. Current fare matrix and operating timetable are not included in this report. Fleet counts above use the registry and recorded shifts.`);
+  report.paragraph(`Landmark reference from the photographed sheet dated ${LANDMARK_REFERENCE.date}. Printed kilometres are historical labels, not verified stop coordinates or current ride distances.`);
+  report.table(['Printed km', 'Landmark reference'], [75, 435], LANDMARK_REFERENCE.stops.map(stop => [String(stop.printedKm), stop.name]));
 
   report.keepTogether(105);
   report.section('Shift history');

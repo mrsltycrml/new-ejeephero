@@ -1,439 +1,132 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Switch, Linking, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Switch, Linking } from 'react-native';
 import { passengerStyles as s, PassengerSelect } from '../../components/PassengerUI';
-import { FormScrollView, SkeletonBlock, triggerHaptic } from '../../components/AppUI';
+import { FormScrollView } from '../../components/AppUI';
 import { Colors } from '../../constants/theme';
+import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useLocation } from '../../contexts/LocationContext';
 import { loadPassengerPlanningData } from '../../services/passengerDataService';
-import { findVerifiedSavings, quotePassengerFare, verifiedRideDistance } from '../../services/passengerFare';
+import { findVerifiedSavings, quotePassengerFare, validFareMatrix, verifiedRideDistance } from '../../services/passengerFare';
 import type { FarePassengerType } from '../../services/fareCalculator';
+import { manilaDateKey } from '../../utils/reportingPeriod';
 
-const TYPES: { id: FarePassengerType; name: string; helper: string }[] = [
-  { id: 'regular', name: 'Regular', helper: 'Standard regular fare (no discount)' },
-  { id: 'student', name: 'Student', helper: 'Student discount: 20%' },
-  { id: 'senior', name: 'Senior', helper: 'Senior citizen discount: 20%' },
-  { id: 'pwd', name: 'PWD', helper: 'PWD discount: 20%' },
+const TYPES: { id: FarePassengerType; name: string }[] = [
+  { id: 'regular', name: 'Regular' }, { id: 'student', name: 'Student' }, { id: 'senior', name: 'Senior' }, { id: 'pwd', name: 'PWD' },
 ];
-const peso = (n: number) => `₱${n.toFixed(2)}`;
+const peso = (amount: number) => `₱${amount.toFixed(2)}`;
 
-export default function FareScreen() {
+export default function FareScreen({ navigation }: any) {
+  const { transit, refreshTransit, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setAlightingStop, destinationPlace, showWalk } = usePassengerJourney();
+  const { user } = useAuth();
+  const { now } = useLocation();
   const [data, setData] = useState<Awaited<ReturnType<typeof loadPassengerPlanningData>> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<'distance' | 'stops'>('distance');
+  const [error, setError] = useState('');
+  const [mode, setMode] = useState<'distance' | 'stops'>('stops');
   const [type, setType] = useState<FarePassengerType>('regular');
   const [distance, setDistance] = useState('');
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
   const [stepFree, setStepFree] = useState(false);
   const [walkExpanded, setWalkExpanded] = useState(false);
-  const [showEstimate, setShowEstimate] = useState(true);
-
+  const [maxWalk, setMaxWalk] = useState(500);
+  const [reload, setReload] = useState(0);
+  const request = useRef(0);
   useEffect(() => {
-    let active = true;
-    loadPassengerPlanningData()
-      .then((value) => {
-        if (active) setData(value);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+    const version = ++request.current;
+    setLoading(true); setError(''); setData(null);
+    void loadPassengerPlanningData(transit).then(value => { if (version === request.current) setData(value); })
+      .catch(() => { if (version === request.current) setError('Fare and walking information could not be refreshed. Try again.'); })
+      .finally(() => { if (version === request.current) setLoading(false); });
+    return () => { request.current++; };
+  }, [transit.syncedAt, transit.status, user?.id, reload]);
+  const planning = data?.syncedAt === transit.syncedAt ? data : null;
+  const route = transit.routes.find(item => item.id === selectedRouteId);
+  const stops = transit.terminals.filter(stop => stop.route_id === selectedRouteId).sort((a, b) => a.sequence_order - b.sequence_order);
+  const today = manilaDateKey(new Date(now));
+  const matrix = planning?.matrices.find(item => route && validFareMatrix(item, route.id, today));
+  const km = mode === 'distance' ? (distance.trim() ? Number(distance) : null)
+    : boardingStop && alightingStop && route && boardingStop.sequence_order < alightingStop.sequence_order
+      ? verifiedRideDistance(boardingStop.id, alightingStop.id, route.id, planning?.segments || []) : null;
+  const quote = route && km != null ? quotePassengerFare(km, type, route, matrix, today) : null;
+  const savings = mode === 'stops' && route && boardingStop && alightingStop && planning
+    ? findVerifiedSavings({ originId: boardingStop.id, destinationId: alightingStop.id, routeId: route.id, type, stops,
+      segments: planning.segments, walks: planning.walks, matrix, stepFreeOnly: stepFree, maxWalkMeters: maxWalk, date: today }) : null;
+  const category = TYPES.find(item => item.id === type)!.name;
+  const refresh = async () => { setLoading(true); setError(''); await refreshTransit(); setReload(value => value + 1); };
 
-  const route = data?.routes[0];
-  const stops = useMemo(
-    () => (data?.terminals || []).filter((t) => t.route_id === route?.id && t.location_source_url && t.location_verified_at),
-    [data, route?.id]
-  );
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-  const matrix = data?.matrices.find(
-    (m) => m.route_id === route?.id && m.effective_from <= today && (!m.effective_to || m.effective_to >= today)
-  );
-  const km =
-    mode === 'distance'
-      ? distance.trim()
-        ? Number(distance)
-        : NaN
-      : origin && destination && route
-        ? verifiedRideDistance(origin, destination, route?.id, data?.segments || [])
-        : null;
-  const validDistance = km != null && Number.isFinite(km) && Number(km) > 0 && Number(km) <= 200;
-  const quoted = validDistance && route && matrix ? quotePassengerFare(Number(km), type, route, matrix, today) : null;
-  const quote = quoted?.official ? quoted : null;
-  const savings =
-    mode === 'stops' && data && route && matrix && quote
-      ? findVerifiedSavings({
-          originId: origin,
-          destinationId: destination,
-          routeId: route?.id,
-          type,
-          route,
-          stops,
-          segments: data.segments,
-          walks: data.walks,
-          matrix,
-          stepFreeOnly: stepFree,
-          date: today,
-        })
-      : [];
-
-  const activeTypeInfo = TYPES.find((t) => t.id === type) || TYPES[0];
-
-  return (
-    <FormScrollView style={s.screen} contentContainerStyle={styles.container}>
-      <View style={styles.headerBlock}>
-        <Text style={s.title}>Fare</Text>
-        <Text style={s.subtitle}>Estimate the cost of your ride.</Text>
+  return <FormScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 600 }]}>
+    <View style={{ gap: 4 }}><Text style={s.title}>Fare & walking options</Text><Text style={s.subtitle}>Compare a sourced fare for your selected journey.</Text></View>
+    <PassengerSelect label="Route" value={selectedRouteId || ''} disabled={!transit.routes.length}
+      options={transit.routes.map(item => ({ value: item.id, label: item.name }))} onSelect={setSelectedRouteId} />
+    {transit.status !== 'ready' && <Text style={s.muted}>{transit.syncedAt ? `Using route records read ${new Date(transit.syncedAt).toLocaleString()}. Refresh unavailable.` : 'Route information unavailable.'}</Text>}
+    <View style={[s.row, { gap: 8 }]}>
+      {(['stops', 'distance'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: mode === value }}
+        onPress={() => setMode(value)} style={[s.input, { flex: 1, alignItems: 'center' }, mode === value && { backgroundColor: Colors.paleGreen, borderColor: Colors.brandGreen }]}>
+        <Text style={s.label}>{value === 'stops' ? 'Selected stops' : 'Enter distance'}</Text>
+      </TouchableOpacity>)}
+    </View>
+    {mode === 'stops' ? <View style={{ gap: 14 }}>
+      <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!stops.length}
+        options={stops.filter(stop => !alightingStop || stop.sequence_order < alightingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
+        onSelect={id => setBoardingStop(stops.find(stop => stop.id === id) || null)} />
+      <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!stops.length}
+        options={stops.filter(stop => !boardingStop || stop.sequence_order > boardingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
+        onSelect={id => setAlightingStop(stops.find(stop => stop.id === id) || null)} />
+      {!stops.length && <Text style={s.muted}>Verified stops unavailable for this route.</Text>}
+      {destinationPlace && <Text style={s.muted}>Final destination: {destinationPlace.name}. Fare covers the ride to the alighting stop.</Text>}
+    </View> : <View style={{ gap: 6 }}>
+      <Text style={s.label}>Known ride distance (km)</Text>
+      <TextInput accessibilityLabel="Journey distance in kilometres" style={s.input} keyboardType="decimal-pad" value={distance} onChangeText={setDistance} placeholder="Enter a known distance" placeholderTextColor={Colors.subtleGray} />
+      <Text style={s.muted}>Uses the distance you enter, not a measured journey. A current fare source is still required.</Text>
+      {!!distance && (km == null || !Number.isFinite(km) || km <= 0 || km > 200) && <Text accessibilityRole="alert" style={s.muted}>Enter a distance greater than 0 and up to 200 km.</Text>}
+    </View>}
+    <View style={{ gap: 8 }}>
+      <Text style={s.label}>Passenger category</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {TYPES.map(item => <TouchableOpacity key={item.id} accessibilityRole="button" accessibilityState={{ selected: type === item.id }} onPress={() => setType(item.id)}
+          style={[s.input, { flexBasis: '46%', flexGrow: 1 }, type === item.id && { backgroundColor: Colors.paleGreen, borderColor: Colors.brandGreen }]}><Text style={s.label}>{item.name}</Text></TouchableOpacity>)}
       </View>
-
-      {/* 2-Segment Mode Control */}
-      <View style={styles.segmentContainer}>
-        {(['distance', 'stops'] as const).map((value) => {
-          const active = mode === value;
-          return (
-            <TouchableOpacity
-              key={value}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              onPress={() => {
-                triggerHaptic('light');
-                setMode(value);
-              }}
-              style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-            >
-              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                {value === 'distance' ? 'Distance' : 'Stops'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Distance or Stops Input */}
-      {mode === 'distance' ? (
-        <View style={{ gap: 6 }}>
-          <Text style={s.label}>Distance (km)</Text>
-          <TextInput
-            accessibilityLabel="Journey distance in kilometres"
-            style={s.input}
-            keyboardType="decimal-pad"
-            value={distance}
-            onChangeText={(val) => {
-              setDistance(val);
-              setShowEstimate(true);
-            }}
-            placeholder="e.g. 4.0"
-            placeholderTextColor={Colors.subtleGray}
-          />
-          {distance !== '' && !validDistance && (
-            <Text accessibilityRole="alert" style={[s.muted, { color: Colors.primaryRed, fontWeight: '600' }]}>
-              Enter a distance greater than 0 and up to 200 km.
-            </Text>
-          )}
-        </View>
-      ) : loading ? (
-        <SkeletonBlock height={76} />
-      ) : stops.length < 2 ? (
-        <Text style={s.body}>
-          Stop-to-stop distances are being verified. Use Distance mode to estimate your fare.
-        </Text>
-      ) : (
-        <View style={{ gap: 12 }}>
-          <PassengerSelect
-            label="Boarding stop"
-            value={origin}
-            options={stops.map((t) => ({ value: t.id, label: t.name }))}
-            onSelect={(val) => {
-              setOrigin(val);
-              setShowEstimate(true);
-            }}
-          />
-          <PassengerSelect
-            label="Destination"
-            value={destination}
-            options={stops.filter((t) => t.id !== origin).map((t) => ({ value: t.id, label: t.name }))}
-            onSelect={(val) => {
-              setDestination(val);
-              setShowEstimate(true);
-            }}
-          />
-        </View>
-      )}
-
-      {/* Passenger Type 2x2 Grid */}
-      <View style={{ gap: 8 }}>
-        <Text style={s.label}>Passenger type</Text>
-        <View style={styles.typeGrid}>
-          {TYPES.map((item) => {
-            const selected = type === item.id;
-            return (
-              <TouchableOpacity
-                key={item.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() => {
-                  triggerHaptic('light');
-                  setType(item.id);
-                  setShowEstimate(true);
-                }}
-                style={[styles.typeCard, selected && styles.typeCardSelected]}
-              >
-                <Text style={[styles.typeCardText, selected && styles.typeCardTextSelected]}>
-                  {item.name}
-                </Text>
-                {selected && <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        <Text style={s.muted}>{activeTypeInfo.helper}</Text>
-      </View>
-
-      {/* Calculate Fare Button */}
-      <TouchableOpacity
-        accessibilityRole="button"
-        disabled={!validDistance}
-        onPress={() => {
-          triggerHaptic('light');
-          setShowEstimate(true);
-        }}
-        style={[
-          styles.calculateBtn,
-          !validDistance && styles.calculateBtnDisabled,
-        ]}
-      >
-        <Text style={[styles.calculateBtnText, !validDistance && styles.calculateBtnTextDisabled]}>
-          Calculate fare
-        </Text>
+      <Text style={s.muted}>{type === 'regular' ? 'Regular fare. No concession selected.' : `${category} fare uses the concession amount in the current source. Bring the required proof of eligibility.`}</Text>
+    </View>
+    {loading ? <Text accessibilityRole="alert" style={s.muted}>Refreshing fare information…</Text> : error ? <Text accessibilityRole="alert" style={s.body}>{error}</Text> : quote ? <View style={[s.section, { backgroundColor: Colors.paleGreen }]}>
+      <Text style={s.sectionTitle}>{category} fare</Text>
+      <Text style={s.muted}>{km!.toFixed(2)} km · {route!.name}</Text>
+      <View style={[s.row, { justifyContent: 'space-between' }]}><Text style={s.body}>Regular</Text><Text style={s.body}>{peso(quote.regular)}</Text></View>
+      <View style={[s.row, { justifyContent: 'space-between' }]}><Text style={s.body}>{type === 'regular' ? 'Discount' : `${category} discount`}</Text><Text style={s.body}>{peso(quote.discount)}</Text></View>
+      <View style={[s.row, { justifyContent: 'space-between' }]}><Text style={s.label}>Payable fare</Text><Text style={[s.title, { color: Colors.brandGreen }]}>{peso(quote.amount)}</Text></View>
+      <Text style={s.muted}>Effective {quote.effective_from}{quote.effective_to ? ` through ${quote.effective_to}` : ''}. Verified {new Date(quote.verified_at).toLocaleDateString()}.</Text>
+      <TouchableOpacity accessibilityRole="link" style={{ minHeight: 48, justifyContent: 'center' }} onPress={() => void Linking.openURL(quote.source)}><Text style={s.link}>Fare source</Text></TouchableOpacity>
+    </View> : <View style={s.section}>
+      <Text style={s.sectionTitle}>Fare unavailable</Text>
+      <Text style={s.muted}>{!route ? 'Choose a published route.' : !matrix ? 'A current verified fare source is unavailable for this route.' : 'Choose a connected stop pair or enter a distance covered by the fare source.'}</Text>
+    </View>}
+    <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={() => void refresh()} style={[s.button, s.secondary]}><Text style={s.label}>Refresh fares, stops and routes</Text></TouchableOpacity>
+    <View style={s.section}>
+      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: walkExpanded }} onPress={() => setWalkExpanded(!walkExpanded)} style={{ minHeight: 48, justifyContent: 'center', gap: 3 }}>
+        <Text style={s.sectionTitle}>Walk & Save</Text><Text style={s.muted}>Compare later boarding stops on the same ride.</Text>
       </TouchableOpacity>
-
-      {!loading && !quote && <Text style={s.muted}>Fare unavailable. A route, current sourced fare matrix and trip distance are required.</Text>}
-      {/* Estimated Fare Output Card */}
-      {showEstimate && quote && (
-        <View style={styles.quoteCard}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.quoteLabel}>Estimated fare · {activeTypeInfo.name}</Text>
-            <Text style={s.muted}>
-              {Number(km).toFixed(1)} km on {route?.name}
-            </Text>
-          </View>
-          <Text style={styles.quoteAmount}>{peso(quote.amount)}</Text>
-        </View>
-      )}
-
-      <View style={s.divider} />
-
-      {/* Walk & Save Row */}
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityState={{ expanded: walkExpanded }}
-        onPress={() => setWalkExpanded(!walkExpanded)}
-        style={styles.walkRow}
-      >
-        <View style={styles.walkIconBox}>
-          <Ionicons name="walk-outline" size={20} color={Colors.brandGreen} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.walkTitle}>Walk & save</Text>
-          <Text style={s.muted}>Explore nearby boarding stops</Text>
-        </View>
-        <Ionicons name={walkExpanded ? 'chevron-up' : 'chevron-forward'} size={18} color={Colors.subtleGray} />
-      </TouchableOpacity>
-
-      {walkExpanded && (
-        <View style={styles.walkExpandedBox}>
-          <View style={[s.row, { justifyContent: 'space-between' }]}>
-            <Text style={[s.label, { flex: 1 }]}>Step-free walking routes only</Text>
-            <Switch
-              accessibilityLabel="Step-free walking routes only"
-              value={stepFree}
-              onValueChange={setStepFree}
-              trackColor={{ true: Colors.brandGreen }}
-            />
-          </View>
-          {savings.length ? (
-            savings.map((item) => (
-              <View key={item.stop.id} style={styles.savingItem}>
-                <Text style={[s.label, { color: Colors.brandGreen }]}>
-                  Walk {item.minutes} min, save {peso(item.savings)}
-                </Text>
-                <Text style={s.body}>
-                  Board at {item.stop.name}. Your fare becomes {peso(item.fare)}.
-                </Text>
-                <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL(item.walk.source_url)}>
-                  <Text style={s.link}>View walking route</Text>
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : (
-            <Text style={s.muted}>
-              {mode !== 'stops' || !origin || !destination
-                ? 'Switch to Stops mode and choose your boarding and destination stops to compare nearby walking options.'
-                : 'Verified walking savings unavailable for this stop pair.'}
-            </Text>
-          )}
-        </View>
-      )}
-
-      <Text style={styles.bottomNote}>
-        Estimate only. Confirm your fare with the driver.
-      </Text>
-    </FormScrollView>
-  );
+      {walkExpanded && <>
+        <Text style={s.muted}>Extra walking starts at your selected boarding stop. The alighting stop, final destination and passenger category stay the same.</Text>
+        <PassengerSelect label="Maximum extra walking" value={String(maxWalk)} options={[100, 250, 500, 1000, 2000].map(value => ({ value: String(value), label: `${value} m` }))} onSelect={value => setMaxWalk(Number(value))} />
+        <View style={[s.row, { justifyContent: 'space-between' }]}><Text style={[s.label, { flex: 1 }]}>Step-free paths only</Text><Switch accessibilityLabel="Step-free walking routes only" value={stepFree} onValueChange={setStepFree} trackColor={{ true: Colors.brandGreen }} /></View>
+        {!savings ? <Text style={s.muted}>Choose a route, boarding stop and alighting stop in Selected stops mode.</Text> : <>
+          <Text style={s.label}>{savings.status === 'available' ? 'Lower fares found' : savings.status === 'no-saving' ? 'No saving on the compared paths' : 'Walking comparison unavailable'}</Text>
+          <Text style={s.muted}>{savings.reason}</Text>
+          {savings.suggestions.map(item => <View key={`${item.stop.id}:${item.walk.source_url}`} style={[s.section, { backgroundColor: Colors.paleGreen }]}>
+            <Text style={s.sectionTitle}>Save {peso(item.savings)}</Text>
+            <Text style={s.body}>Walk to {item.stop.name}</Text>
+            <Text style={s.muted}>{Math.round(item.walk.distance_meters)} m · about {item.minutes} min from {boardingStop!.name}</Text>
+            <Text style={s.body}>{category}: {peso(item.currentFare)} → {peso(item.fare)}</Text>
+            <Text style={s.muted}>{item.walk.accessible === true ? 'Step-free access verified.' : 'Accessibility unconfirmed or not step-free.'}</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => {
+              const stop = stops.find(value => value.id === item.stop.id);
+              if (!stop || !boardingStop || !matrix || !validFareMatrix(matrix, route!.id, manilaDateKey(new Date()))) return;
+              const fromLabel = boardingStop.name;
+              setBoardingStop(stop); showWalk(item.walk, fromLabel, stop.name); navigation.navigate('Map');
+            }} style={s.button}><Text style={s.buttonText}>Use stop & show walking directions</Text></TouchableOpacity>
+          </View>)}
+        </>}
+      </>}
+    </View>
+  </FormScrollView>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 36,
-    gap: 16,
-  },
-  headerBlock: {
-    gap: 2,
-  },
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.canvas,
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  segmentBtn: {
-    flex: 1,
-    minHeight: 42,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentBtnActive: {
-    backgroundColor: Colors.brandGreen,
-  },
-  segmentText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  segmentTextActive: {
-    color: Colors.white,
-    fontWeight: '700',
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  typeCard: {
-    flexGrow: 1,
-    flexBasis: '46%',
-    minHeight: 52,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: Colors.paper,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  typeCardSelected: {
-    backgroundColor: Colors.paleGreen,
-    borderColor: Colors.brandGreen,
-    borderWidth: 1.5,
-  },
-  typeCardText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  typeCardTextSelected: {
-    fontWeight: '700',
-  },
-  calculateBtn: {
-    minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: Colors.brandGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-  },
-  calculateBtnDisabled: {
-    backgroundColor: '#D5DBD6',
-  },
-  calculateBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  calculateBtnTextDisabled: {
-    color: Colors.subtleGray,
-  },
-  quoteCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.paleGreen,
-    borderWidth: 1,
-    borderColor: Colors.brandGreen,
-    borderRadius: 12,
-    padding: 16,
-  },
-  quoteLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  quoteAmount: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.brandGreen,
-    fontVariant: ['tabular-nums'],
-  },
-  walkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 6,
-  },
-  walkIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  walkTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  walkExpandedBox: {
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.canvas,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 10,
-  },
-  savingItem: {
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: Colors.paleGreen,
-    gap: 4,
-  },
-  bottomNote: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-});
