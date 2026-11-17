@@ -138,3 +138,15 @@ TypeScript:
 
 The scoped commit includes the ten implementation/test files above and this report. The commit hash is supplied in the handoff response.
 
+## Controller resolution after the single scoped re-review
+
+Mendel confirmed all four original findings addressed at3aea80e (and accepted test-only follow-up98a928c), but reproduced a new P2: normalization of a malformed disk envelope had moved outside error handling. This is a valid load-bearing gap in the required unavailable behavior.
+
+The controller traced all getTransitData callers and reproduced `routes:[null]` with a new isolated regression: `rtk proxy node --experimental-strip-types --test --test-name-pattern="malformed cached rows" tests/realData.test.ts` exited1 with `TypeError: Cannot read properties of null (reading 'is_sample')` at offlineTransitService.ts:146. The same regression also covers `terminals:[null]` and asserts unavailable status, no cached/source timestamp, empty records and the original offline error.
+
+Restored protected normalization with a try/catch around that single operation. The newest-memory recheck, ordered writes, filtering and source timestamps are unchanged. Assignment occurs only after normalization succeeds, so a failure leaves the original unavailable result intact. No additional fix agent or broad review was dispatched.
+
+`rtk npm test` then exited0:96tests,96pass,0fail,0skip. Fresh app TypeScript and web export were started for this production adjustment; their final result is recorded in the integration report/ledger. This final two-line guard was controller-reviewed and regression-tested, not independently re-reviewed. No review findings are intentionally deferred.
+
+Final checks completed: app TypeScript exit0/no output; web export exit0,1482modules,31assets,3.5MB bundle `index-3f923727e40a222ac2fe058c7d0eb0cb.js`, manifest postprocess complete; `git diff --check` exit0. Existing module-type/color warnings only.
+

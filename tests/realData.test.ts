@@ -110,6 +110,20 @@ test('old seeded cache cannot reappear after an unavailable read', async () => {
   failed = false;
 });
 
+test('malformed cached rows return unavailable while preserving the source error', async () => {
+  failed = true;
+  for (const records of [{ routes: [null], terminals: [] }, { routes: [route], terminals: [null] }]) {
+    cache.set('@ejeephero_real_transit_v1', JSON.stringify({ ...records, syncedAt: new Date(Date.now() - 60000).toISOString() }));
+    const result = await offlineTransit.getTransitData();
+    assert.equal(result.status, 'unavailable');
+    assert.equal(result.isFromCache, false);
+    assert.equal(result.syncedAt, null);
+    assert.equal(result.error, 'offline');
+    assert.deepEqual(result.routes, []);
+    assert.deepEqual(result.terminals, []);
+  }
+});
+
 test('successful empty source reads stay empty when the cache cannot be written', async () => {
   tables = { routes: [route], terminals: [stop] };
   await offlineTransit.syncWithRemote();

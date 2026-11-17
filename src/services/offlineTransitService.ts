@@ -143,7 +143,9 @@ export class OfflineTransitService {
       } catch { /* A corrupt cache must never become a successful empty read. */ }
       // A successful source read can supersede disk while getItem is pending.
       cached = this.snapshot ?? cached;
-      if (cached) result = { ...normalizeTransit(cached.routes, cached.terminals), syncedAt: cached.syncedAt, isFromCache: true, status: 'cached', error };
+      try {
+        if (cached) result = { ...normalizeTransit(cached.routes, cached.terminals), syncedAt: cached.syncedAt, isFromCache: true, status: 'cached', error };
+      } catch { /* Malformed cached rows leave the original unavailable result intact. */ }
     }
     this.lastLatencyMs = Math.round(performance.now() - start);
     return { ...result, latencyMs: this.lastLatencyMs };
