@@ -89,3 +89,5 @@ Publish the verified reference records and refresh the shared route/stop catalog
 The local preview at `http://localhost:8091` uses the application's existing sign-in flow and connected data. There is no generated test login. A successful local preview or web export is not a deployment of database migrations, routing functions, or the public application.
 
 Redeploy `herobot-chat` with its updated context builder before using the assistant in production. It no longer supplies default fares, unsourced safety labels or active-shift counts as current GPS information. The chat directs operational quotations and navigation to the sourced Fare and Map screens; its generated prose is not a new source of verified operational data.
+
+See [walking directions setup](walking-directions-setup.md) for the additional migration, server-only routing configuration, authentication, quota limits and exact source-data fields.
