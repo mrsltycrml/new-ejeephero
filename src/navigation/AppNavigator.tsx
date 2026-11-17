@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Platform, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenSkeleton } from '../components/AppUI';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -48,19 +48,31 @@ const Tab = createBottomTabNavigator();
 
 const commonScreenOptions = {
   headerTitleAlign: 'left' as const,
+  headerStatusBarHeight: Platform.OS === 'web' ? 0 : undefined,
   tabBarActiveTintColor: Colors.brandMintLight,
   tabBarInactiveTintColor: Colors.tabInactive,
   tabBarStyle: {
     backgroundColor: Colors.ink,
     borderTopWidth: 1,
     borderTopColor: Colors.brandSurfaceDark,
-    paddingTop: 8,
-    paddingBottom: 6,
-    height: 64,
+    paddingTop: 6,
+    paddingBottom: 8,
+    height: 66,
     elevation: 12,
   },
-  tabBarLabelStyle: { fontSize: 11, fontWeight: '800' as const, letterSpacing: 0.3 },
-  tabBarIconStyle: { marginTop: 1 },
+  tabBarItemStyle: {
+    paddingVertical: 2,
+    height: 52,
+  },
+  tabBarLabelStyle: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800' as const,
+    letterSpacing: 0.2,
+    marginTop: 2,
+    paddingBottom: 2,
+  },
+  tabBarIconStyle: { marginTop: 0 },
   headerStyle: {
     backgroundColor: Colors.ink,
   },
@@ -88,8 +100,11 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
   const insets = useSafeAreaInsets();
   const [accountOpen, setAccountOpen] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
+  const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
+  const tabHeight = Platform.OS === 'web' ? 66 : 56 + tabBottom;
+  const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
-    <View style={{ flex: 1 }}><Tab.Navigator screenOptions={({ navigation }) => ({ ...commonScreenOptions, tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: Math.max(6, insets.bottom), height: 60 + insets.bottom }, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => { setNoticesOpen(false); setAccountOpen((value) => !value); }} onAlerts={() => { setAccountOpen(false); setNoticesOpen(value => !value); }} alertsLabel="Boarding notices" onBot={() => { setAccountOpen(false); setNoticesOpen(false); stackNavigation.navigate('PassengerAssistant'); }} /> })}>
+    <View style={{ flex: 1, backgroundColor: Colors.ink }}><Tab.Navigator safeAreaInsets={webSafeInsets} screenOptions={({ navigation }) => ({ ...commonScreenOptions, tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight }, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => { setNoticesOpen(false); setAccountOpen((value) => !value); }} onAlerts={() => { setAccountOpen(false); setNoticesOpen(value => !value); }} alertsLabel="Boarding notices" onBot={() => { setAccountOpen(false); setNoticesOpen(false); stackNavigation.navigate('PassengerAssistant'); }} /> })}>
       <Tab.Screen
         name="Map"
         component={PassengerHomeScreen}
@@ -122,8 +137,11 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [accountOpen, setAccountOpen] = useState(false);
+  const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
+  const tabHeight = Platform.OS === 'web' ? 66 : 56 + tabBottom;
+  const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
-    <View style={{ flex: 1 }}><Tab.Navigator screenOptions={({ navigation }) => ({ ...commonScreenOptions, tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: Math.max(6, insets.bottom), height: 60 + insets.bottom }, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => setAccountOpen((value) => !value)} onAlerts={() => navigation.navigate('Alerts')} /> })}>
+    <View style={{ flex: 1, backgroundColor: Colors.ink }}><Tab.Navigator safeAreaInsets={webSafeInsets} screenOptions={({ navigation }) => ({ ...commonScreenOptions, tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight }, headerTitle: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}><ESakayLogo width={width < 520 ? 100 : 132} compact /></TouchableOpacity>, headerRight: () => <ServiceHeaderActions open={accountOpen} onAccount={() => setAccountOpen((value) => !value)} onAlerts={() => navigation.navigate('Alerts')} /> })}>
       <Tab.Screen
         name="Dashboard"
         component={DriverDashboardScreen}
@@ -196,12 +214,15 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
     const timer = setTimeout(() => setNotice(''), 6500);
     return () => clearTimeout(timer);
   }, [notice]);
+  const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
+  const tabHeight = Platform.OS === 'web' ? 66 : 56 + tabBottom;
+  const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
-    <View style={{ flex: 1 }}><Tab.Navigator screenOptions={({ navigation }) => ({
+    <View style={{ flex: 1, backgroundColor: Colors.ink }}><Tab.Navigator safeAreaInsets={webSafeInsets} screenOptions={({ navigation }) => ({
       ...commonScreenOptions,
       tabBarActiveTintColor: Colors.brandMintLight,
       tabBarInactiveTintColor: Colors.tabInactive,
-      tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: Math.max(6, insets.bottom), height: 62 + insets.bottom },
+      tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight },
       headerStyle: { backgroundColor: Colors.ink },
       headerTintColor: Colors.white,
       headerRight: () => <AdminHeaderActions alertCount={alertCount} activePanel={activePanel} onAlerts={() => setActivePanel((open) => open === 'alerts' ? null : 'alerts')} onProfile={() => setActivePanel((open) => open === 'profile' ? null : 'profile')} />,

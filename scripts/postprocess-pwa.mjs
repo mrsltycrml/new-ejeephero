@@ -20,8 +20,12 @@ if (!fs.existsSync(distDir)) {
 
 const appleIconSrc = path.join(rootDir, 'assets', 'esakay-app-icon.png');
 if (fs.existsSync(appleIconSrc)) {
-  for (const [name,size] of [['apple-touch-icon.png',180],['icon-192.png',192],['icon-512.png',512]]) {
-    await sharp(appleIconSrc).resize(size,size).png().toFile(path.join(distDir,name));
+  for (const [name, size] of [
+    ['apple-touch-icon.png', 180],
+    ['icon-192.png', 192],
+    ['icon-512.png', 512],
+  ]) {
+    await sharp(appleIconSrc).resize(size, size).png().toFile(path.join(distDir, name));
   }
 }
 
@@ -34,8 +38,8 @@ const manifest = {
   scope: '/',
   display: 'standalone',
   orientation: 'portrait',
-  background_color: '#F5F4F1',
-  theme_color: '#FFFFFF',
+  background_color: '#071A17',
+  theme_color: '#071A17',
   icons: [
     {
       src: '/icon-512.png',
@@ -59,20 +63,25 @@ if (fs.existsSync(indexPath)) {
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="eSAKAY" />
-    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="theme-color" content="#071A17" />
     <style>
-      html,body,#root{min-width:0;height:100%}body{background:#F5F4F1;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box}
-      input,textarea{font-size:16px!important;caret-color:#B63D32}::selection{background:#F3DED2;color:#18282E}
-      button:focus-visible,[role=button]:focus-visible,[role=tab]:focus-visible,a:focus-visible{outline:2px solid #B63D32;outline-offset:2px}
+      html,body{margin:0!important;padding:0!important;width:100%!important;height:100vh!important;height:100dvh!important;background:#071A17!important;overflow:hidden!important;overscroll-behavior:none!important}
+      #root{position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;display:flex!important;flex-direction:column!important;min-width:0!important;width:100%!important;height:100vh!important;height:100dvh!important;background:#071A17!important;padding-top:env(safe-area-inset-top,0px)!important;padding-right:env(safe-area-inset-right,0px)!important;padding-bottom:env(safe-area-inset-bottom,0px)!important;padding-left:env(safe-area-inset-left,0px)!important;box-sizing:border-box!important;overflow:hidden!important}
+      input,textarea{font-size:16px!important;caret-color:#10B981}::selection{background:#D1FAE5;color:#071A17}
+      button:focus-visible,[role=button]:focus-visible,[role=tab]:focus-visible,a:focus-visible{outline:2px solid #10B981;outline-offset:2px}
       @media(hover:hover) and (pointer:fine){button,[role=button]{transition:opacity 120ms cubic-bezier(.23,1,.32,1)}}
       @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
     </style>
   `;
+  html = html.replace(/<meta name="theme-color" content="[^"]*">/g, '<meta name="theme-color" content="#071A17">');
   if (!html.includes('rel="manifest"')) {
     html = html.replace('</head>', `${pwaMeta}</head>`);
-    html = html.replace(/name="viewport" content="[^"]*"/, 'name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"');
+    html = html.replace(
+      /name="viewport" content="[^"]*"/,
+      'name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"',
+    );
     fs.writeFileSync(indexPath, html, 'utf8');
   }
 }
