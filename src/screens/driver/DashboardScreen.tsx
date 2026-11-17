@@ -346,6 +346,9 @@ export default function DashboardScreen() {
             <View style={styles.capacitySection}>
               <Text style={styles.detailsLabel}>Passengers on board</Text>
               <Text style={styles.capacityStatusText}>{capacityStatus}</Text>
+              <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: Colors.sand, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: Colors.border }}>
+                <View style={{ width: `${Math.min(100, Math.round((passengerCount / maxCapacity) * 100))}%`, height: '100%', backgroundColor: passengerCount >= maxCapacity ? Colors.primaryRed : passengerCount >= Math.ceil(maxCapacity * 0.7) ? Colors.primaryYellow : Colors.success }} />
+              </View>
               <View style={styles.counterRow}>
                 <TouchableOpacity
                   style={styles.counterBtn}
@@ -368,13 +371,13 @@ export default function DashboardScreen() {
               </View>
               <View style={styles.presetRow}>
                 <TouchableOpacity style={[styles.presetChip, passengerCount < 15 && styles.presetChipActive]} onPress={() => updatePassengerCount(6)}>
-                  <Text style={styles.presetChipText}>Maluwag</Text>
+                  <Text style={[styles.presetChipText, passengerCount < 15 && { color: Colors.white }]}>Maluwag</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.presetChip, passengerCount >= 15 && passengerCount < maxCapacity && styles.presetChipActive]} onPress={() => updatePassengerCount(16)}>
-                  <Text style={styles.presetChipText}>Sakto</Text>
+                  <Text style={[styles.presetChipText, passengerCount >= 15 && passengerCount < maxCapacity && { color: Colors.white }]}>Sakto</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.presetChip, passengerCount >= maxCapacity && styles.presetChipActive]} onPress={() => updatePassengerCount(maxCapacity)}>
-                  <Text style={styles.presetChipText}>Puno</Text>
+                  <Text style={[styles.presetChipText, passengerCount >= maxCapacity && { color: Colors.white }]}>Puno</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -425,27 +428,27 @@ const styles = StyleSheet.create({
   fieldLabel: { color: Colors.ink, fontSize: 12, fontWeight: '700', marginBottom: 7, marginTop: 6 },
   selectButton: {
     flexDirection: 'row',
-    padding: 13,
+    padding: 14,
     backgroundColor: Colors.paper,
-    marginBottom: 12,
-    borderRadius: 8,
+    marginBottom: 14,
+    borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
   },
   placeholder: { fontSize: 14, color: Colors.subtleGray },
-  routeIcon: { width: 42, height: 42, borderRadius: 6, backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  routeIcon: { width: 42, height: 42, borderRadius: 10, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   routeName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: Colors.darkText,
   },
   routeHours: {
     fontSize: 12,
-    color: '#56696D',
+    color: Colors.subtleGray,
     marginTop: 4,
   },
-  optionList: { backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, marginTop: -6, marginBottom: 14, overflow: 'hidden' },
+  optionList: { backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, marginTop: -6, marginBottom: 14, overflow: 'hidden' },
   optionRow: { paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   optionTitle: { color: Colors.ink, fontSize: 14, fontWeight: '700' },
   optionMeta: { color: Colors.subtleGray, fontSize: 12, marginTop: 3 },
@@ -459,20 +462,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 4,
     paddingBottom: 18,
-    gap: 12,
+    gap: 14,
   },
-  liveMapCard: { width: '100%', backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, overflow: 'hidden' },
-  liveMapHeader: { padding: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  liveMapTitle: { color: Colors.ink, fontSize: 18, fontWeight: '600' },
+  liveMapCard: { width: '100%', backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 14, overflow: 'hidden' },
+  liveMapHeader: { padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  liveMapTitle: { color: Colors.ink, fontSize: 18, fontWeight: '700' },
   liveMapSub: { color: Colors.subtleGray, fontSize: 12, marginTop: 3 },
-  liveBadge: { backgroundColor: '#E5F3E8', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
-  liveBadgeText: { color: '#24643E', fontSize: 12, fontWeight: '700' },
+  liveBadge: { backgroundColor: Colors.successBg, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  liveBadgeText: { color: Colors.success, fontSize: 12, fontWeight: '700' },
   liveMap: { height: 340, width: '100%' },
-  liveMapFoot: { color: Colors.subtleGray, fontSize: 12, paddingHorizontal: 15, paddingVertical: 10, lineHeight: 16 },
+  liveMapFoot: { color: Colors.subtleGray, fontSize: 12, paddingHorizontal: 16, paddingVertical: 12, lineHeight: 17, backgroundColor: Colors.sand },
   glowCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 15,
-    padding: 24,
+    backgroundColor: Colors.paper,
+    borderRadius: 14,
+    padding: 22,
     width: '100%',
     maxWidth: 920,
     alignItems: 'stretch',
@@ -519,9 +522,9 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   vehicleBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.primaryRed,
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.subtleGray,
     marginTop: 4,
   },
   capacitySection: {
@@ -531,31 +534,32 @@ const styles = StyleSheet.create({
   capacityStatusText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.primaryRed,
+    color: Colors.ink,
     marginBottom: 10,
   },
   counterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
-    marginBottom: 12,
+    gap: 22,
+    marginBottom: 14,
   },
   counterBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.navy,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: Colors.ink,
     justifyContent: 'center',
     alignItems: 'center',
   },
   counterDisplay: {
     alignItems: 'center',
-    minWidth: 90,
+    minWidth: 96,
   },
   counterValue: {
-    fontSize: 34,
-    fontWeight: '600',
+    fontSize: 38,
+    fontWeight: '800',
     color: Colors.darkText,
+    fontVariant: ['tabular-nums'],
   },
   counterMax: {
     fontSize: 12,
@@ -566,16 +570,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   presetChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 16,
-    backgroundColor: Colors.mutedBackground,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: Colors.sand,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   presetChipActive: {
-    backgroundColor: '#F5DEC4',
-    borderColor: Colors.primaryYellow,
+    backgroundColor: Colors.ink,
+    borderColor: Colors.ink,
   },
   presetChipText: {
     fontSize: 12,
@@ -588,24 +592,19 @@ const styles = StyleSheet.create({
     maxWidth: 920,
     alignSelf: 'center',
   },
-  shiftError: { color: Colors.primaryRed, backgroundColor: '#FFF0EE', borderColor: '#E7BAB1', borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 10, fontSize: 12, lineHeight: 17 },
+  shiftError: { color: Colors.primaryRed, backgroundColor: Colors.dangerBg, borderColor: '#FECACA', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 10, fontSize: 13, lineHeight: 18 },
   toggleButton: {
     flexDirection: 'row',
     padding: 16,
-    borderRadius: 6,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 0,
   },
   buttonStart: {
     backgroundColor: Colors.ink,
   },
   buttonStop: {
-    backgroundColor: Colors.darkText,
+    backgroundColor: Colors.primaryRed,
   },
   buttonText: {
     color: Colors.white,

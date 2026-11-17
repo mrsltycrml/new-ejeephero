@@ -114,9 +114,19 @@ export default function WeatherScreen() {
 
   const weatherIcon = weather.weather[0].main.toLowerCase().includes('rain') ? 'rainy-outline' : weather.weather[0].main.toLowerCase().includes('cloud') ? 'cloudy-outline' : 'partly-sunny-outline';
   return <ScrollView style={styles.page} contentContainerStyle={styles.container}>
-    <View style={styles.header}><Text style={styles.title}>Weather in Makati</Text><Text style={styles.subtitle}>{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}</Text></View>
-    <View style={styles.mainCard}><View style={styles.weatherIcon}><Ionicons name={weatherIcon} size={48} color={Colors.ink} /></View><View><Text style={styles.temp}>{Math.round(weather.main.temp)}°C</Text><Text style={styles.condition}>{weather.weather[0].description}</Text></View></View>
-    {advisory && <View style={[styles.advisoryCard, { backgroundColor: ac.bg, borderColor: ac.border }]}><Ionicons name={advisory.severity === 'safe' ? 'checkmark-circle-outline' : 'alert-circle-outline'} size={20} color={ac.text} /><View style={{ flex: 1 }}><Text style={[styles.advisoryTitle, { color: ac.text }]}>{advisory.severity === 'danger' ? t('weather.travelAdvisory') : advisory.severity === 'caution' ? t('weather.caution') : t('weather.travelConditions')}</Text><Text style={[styles.advisoryText, { color: ac.text }]}>{advisory.message}</Text></View></View>}
+    <View style={styles.header}>
+      <Text style={styles.eyebrow}>Live Commuter Conditions</Text>
+      <Text style={styles.title}>Weather in Makati</Text>
+      <Text style={styles.subtitle}>{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}</Text>
+    </View>
+    <View style={styles.mainCard}>
+      <View style={styles.weatherIcon}><Ionicons name={weatherIcon} size={44} color={Colors.ink} /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.temp}>{Math.round(weather.main.temp)}°C</Text>
+        <Text style={styles.condition}>{weather.weather[0].description}</Text>
+      </View>
+    </View>
+    {advisory && <View style={[styles.advisoryCard, { backgroundColor: ac.bg, borderColor: ac.border }]}><Ionicons name={advisory.severity === 'safe' ? 'checkmark-circle-outline' : 'alert-circle-outline'} size={21} color={ac.text} /><View style={{ flex: 1 }}><Text style={[styles.advisoryTitle, { color: ac.text }]}>{advisory.severity === 'danger' ? t('weather.travelAdvisory') : advisory.severity === 'caution' ? t('weather.caution') : t('weather.travelConditions')}</Text><Text style={[styles.advisoryText, { color: ac.text }]}>{advisory.message}</Text></View></View>}
     <View style={styles.detailsGrid}>
       {[
         { icon: 'water-outline' as const, label: 'Humidity', value: reading(weather.main.humidity, '%') },
@@ -125,7 +135,7 @@ export default function WeatherScreen() {
         { icon: 'speedometer-outline' as const, label: 'Pressure', value: reading(weather.main.pressure, ' hPa') },
         { icon: 'sunny-outline' as const, label: 'Sunrise', value: sunLabel(weather.sys?.sunrise) },
         { icon: 'moon-outline' as const, label: 'Sunset', value: sunLabel(weather.sys?.sunset) },
-      ].map((item) => <View key={item.label} style={styles.detailBox}><Text style={styles.detailLabel}>{item.label}</Text><Text style={styles.detailValue}>{item.value}</Text></View>)}
+      ].map((item) => <View key={item.label} style={styles.detailCard}><View style={styles.detailIcon}><Ionicons name={item.icon} size={18} color={Colors.ink} /></View><Text style={styles.detailLabel}>{item.label}</Text><Text style={styles.detailValue}>{item.value}</Text></View>)}
     </View>
   </ScrollView>;
 }
@@ -133,19 +143,21 @@ export default function WeatherScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.canvas },
   page: { flex: 1, backgroundColor: Colors.canvas },
-  container: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 18, paddingBottom: 36, gap: 12 },
+  container: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 18, paddingBottom: 36, gap: 16 },
   header: { marginBottom: 2 },
-  title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.6, color: Colors.ink },
-  subtitle: { fontSize: 13, color: Colors.subtleGray, marginTop: 4 },
-  mainCard: { flexDirection: 'row', alignItems: 'center', gap: 20, backgroundColor: Colors.paper, borderRadius: 8, padding: 22, borderWidth: 1, borderColor: Colors.border },
-  weatherIcon: { width: 70, height: 70, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: Colors.paper },
-  temp: { fontSize: 40, fontWeight: '600', color: Colors.ink },
-  condition: { fontSize: 14, color: Colors.subtleGray, fontWeight: '600', marginTop: 2, textTransform: 'capitalize' },
-  advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, borderWidth: 1, borderRadius: 6, padding: 14 },
-  advisoryTitle: { fontSize: 13, fontWeight: '600' },
+  eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.9, textTransform: 'uppercase', color: Colors.subtleGray, marginBottom: 2 },
+  title: { fontSize: 30, fontWeight: '800', letterSpacing: -0.7, color: Colors.ink },
+  subtitle: { fontSize: 14, color: Colors.subtleGray, marginTop: 4 },
+  mainCard: { flexDirection: 'row', alignItems: 'center', gap: 18, backgroundColor: Colors.paper, borderRadius: 14, padding: 22, borderWidth: 1, borderColor: Colors.border },
+  weatherIcon: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border },
+  temp: { fontSize: 44, fontWeight: '800', color: Colors.ink, fontVariant: ['tabular-nums'] },
+  condition: { fontSize: 15, color: Colors.subtleGray, fontWeight: '600', marginTop: 2, textTransform: 'capitalize' },
+  advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderWidth: 1, borderRadius: 12, padding: 16 },
+  advisoryTitle: { fontSize: 14, fontWeight: '700' },
   advisoryText: { fontSize: 13, lineHeight: 19, marginTop: 3 },
-  detailsGrid: { backgroundColor: Colors.paper, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 16 },
-  detailBox: { minHeight: 46, flexDirection: 'row', gap: 12, justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: Colors.border },
-  detailLabel: { fontSize: 14, color: Colors.subtleGray },
-  detailValue: { fontSize: 14, fontWeight: '500', color: Colors.ink, fontVariant: ['tabular-nums'] },
+  detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  detailCard: { flexGrow: 1, flexBasis: 145, backgroundColor: Colors.paper, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 6 },
+  detailIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: Colors.sand, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  detailLabel: { fontSize: 12, color: Colors.subtleGray, fontWeight: '600' },
+  detailValue: { fontSize: 18, color: Colors.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });

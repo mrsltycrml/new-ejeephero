@@ -406,8 +406,9 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.paper,
     padding: 8,
+    gap: 6,
     borderBottomWidth: 1,
     borderColor: Colors.border,
   },
@@ -417,7 +418,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
+    borderRadius: 10,
     gap: 6,
   },
   tabButtonActive: {
@@ -425,7 +426,7 @@ const styles = StyleSheet.create({
   },
   tabButtonText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: Colors.darkText,
   },
   tabButtonTextActive: {
@@ -439,23 +440,24 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.7,
     color: Colors.ink,
     marginBottom: 4,
   },
   sectionDesc: {
-    fontSize: 13,
-    color: '#53666A',
-    lineHeight: 18,
+    fontSize: 14,
+    color: Colors.subtleGray,
+    lineHeight: 20,
     marginBottom: 20,
   },
 
   // ── Route Directory Styling ──
   routeCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: Colors.paper,
+    borderRadius: 14,
+    marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
@@ -465,7 +467,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
-  routeIcon: { width: 42, height: 42, borderRadius: 6, backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  routeIcon: { width: 44, height: 44, borderRadius: 10, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   routeInfo: {
     flex: 1,
   },

@@ -38,15 +38,15 @@ export default function FleetRosterRow(props: Props) {
 }
 function Pair({ label, value }: { label: string; value: string }) { return <View style={styles.pair}><Text style={styles.meta}>{label}</Text><Text style={styles.value}>{value}</Text></View>; }
 const styles=StyleSheet.create({
-  row: { backgroundColor: Colors.paper, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderColor: Colors.border },
+  row: { backgroundColor: Colors.paper, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.border },
   top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  identity: { flex: 1.4, minWidth: 0 }, name: { fontSize: 15, fontWeight: '600', color: Colors.ink },
-  assignment: { flex: 2, minWidth: 0 }, quantity: { alignItems: 'flex-end', minWidth: 58 }, count: { fontSize: 16, fontWeight: '500', color: Colors.ink, fontVariant: ['tabular-nums'] },
-  meta: { color: Colors.subtleGray, fontSize: 12, lineHeight: 18 }, value: { color: Colors.ink, fontSize: 14, lineHeight: 20 },
-  status: { color: Colors.subtleGray, fontSize: 12, maxWidth: 95 },
-  action: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }, actionText: { color: Colors.ink, fontSize: 13, fontWeight: '500' },
+  identity: { flex: 1.4, minWidth: 0 }, name: { fontSize: 15, fontWeight: '700', color: Colors.ink },
+  assignment: { flex: 2, minWidth: 0 }, quantity: { alignItems: 'flex-end', minWidth: 58 }, count: { fontSize: 16, fontWeight: '700', color: Colors.ink, fontVariant: ['tabular-nums'] },
+  meta: { color: Colors.subtleGray, fontSize: 12, lineHeight: 18 }, value: { color: Colors.ink, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  status: { color: Colors.ink, backgroundColor: Colors.sand, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden', fontSize: 11, fontWeight: '700', maxWidth: 110 },
+  action: { minHeight: 40, paddingHorizontal: 10, borderRadius: 8, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: 6 }, actionText: { color: Colors.ink, fontSize: 12, fontWeight: '700' },
   expand: { minWidth: 36, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  mobileSub: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 3 },
-  detail: { borderTopWidth: 1, borderColor: Colors.border, paddingTop: 16, marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  mobileSub: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
+  detail: { borderTopWidth: 1, borderColor: Colors.border, paddingTop: 14, marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
   pair: { flexGrow: 1, flexBasis: 180, minWidth: 0, gap: 3 }, delete: { minHeight: 44, flexDirection: 'row', gap: 7, alignItems: 'center' },
 });

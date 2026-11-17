@@ -323,7 +323,7 @@ export default function SupervisorDashboardScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activityTabs}>
-        {([{ key: 'live', label: 'Live speeds' }, { key: 'grades', label: 'Driver grades' }, { key: 'speed', label: 'Speeding' }, { key: 'cuts', label: 'Trip cuts' }] as const).map(item => <TouchableOpacity key={item.key} accessibilityRole="tab" accessibilityState={{ selected: activityView === item.key }} onPress={() => setActivityView(item.key)} style={[styles.activityTab, activityView === item.key && styles.activityTabActive]}><Text style={[styles.activityTabText, activityView === item.key && { color: Colors.ink }]}>{item.label}</Text></TouchableOpacity>)}
+        {([{ key: 'live', label: 'Live speeds' }, { key: 'grades', label: 'Driver grades' }, { key: 'speed', label: 'Speeding' }, { key: 'cuts', label: 'Trip cuts' }] as const).map(item => <TouchableOpacity key={item.key} accessibilityRole="tab" accessibilityState={{ selected: activityView === item.key }} onPress={() => setActivityView(item.key)} style={[styles.activityTab, activityView === item.key && styles.activityTabActive]}><Text style={[styles.activityTabText, activityView === item.key && { color: Colors.white }]}>{item.label}</Text></TouchableOpacity>)}
       </ScrollView>
       {activityView === 'live' && <View style={styles.card}>
         <Text style={styles.sectionTitle}>Live speed telemetry</Text>
@@ -440,28 +440,28 @@ function MapFilter({ label, selected, onPress }: { label: string; selected: bool
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.canvas },
   content: { width: '100%', maxWidth: 1180, alignSelf: 'center', padding: 20, paddingBottom: 32, gap: 20 },
-  routeDisclosure: { paddingHorizontal: 2, paddingVertical: 4 },
-  activityTabs: { gap: 24, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  activityTab: { minHeight: 44, justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', paddingHorizontal: 2 },
-  activityTabActive: { borderBottomColor: Colors.ink },
-  activityTabText: { fontSize: 14, color: Colors.subtleGray, fontWeight: '500' },
-  pageTitle: { color: Colors.ink, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
+  routeDisclosure: { backgroundColor: Colors.paper, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 18 },
+  activityTabs: { gap: 8, padding: 4, backgroundColor: Colors.paper, borderRadius: 12, borderWidth: 1, borderColor: Colors.border },
+  activityTab: { minHeight: 40, justifyContent: 'center', borderRadius: 8, paddingHorizontal: 14 },
+  activityTabActive: { backgroundColor: Colors.ink },
+  activityTabText: { fontSize: 13, color: Colors.subtleGray, fontWeight: '700' },
+  pageTitle: { color: Colors.ink, fontSize: 30, fontWeight: '800', letterSpacing: -0.7 },
   reportToolbar: { flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap', gap: 8, zIndex: 30 },
   reportPeriod: { flexGrow: 1, flexShrink: 1, flexBasis: 550, minWidth: 0, maxWidth: '100%', zIndex: 30 },
-  exportButton: { minHeight: 44, alignSelf: 'center', backgroundColor: Colors.ink, paddingHorizontal: 15, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  exportButtonCompact: { minHeight: 44 },
-  exportText: { color: Colors.white, fontWeight: '600', fontSize: 12 },
+  exportButton: { minHeight: 46, alignSelf: 'center', backgroundColor: Colors.ink, paddingHorizontal: 16, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  exportButtonCompact: { minHeight: 46 },
+  exportText: { color: Colors.white, fontWeight: '700', fontSize: 12 },
   pdfReady: { color: Colors.ink, fontSize: 12, marginTop: -8 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  metric: { flexGrow: 1, flexBasis: 125, minHeight: 65, paddingHorizontal: 4, paddingVertical: 8, justifyContent: 'space-between' },
-  metricCompact: { flexBasis: '45%', minHeight: 48, paddingVertical: 4 },
-  metricValue: { color: Colors.ink, fontWeight: '500', fontSize: 26, marginTop: 3, fontVariant: ['tabular-nums'] },
+  metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: 2 },
+  metric: { flexGrow: 1, flexBasis: 130, minHeight: 78, backgroundColor: Colors.paper, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'space-between' },
+  metricCompact: { flexBasis: '46%', minHeight: 68, paddingVertical: 10 },
+  metricValue: { color: Colors.ink, fontWeight: '800', fontSize: 28, marginTop: 4, fontVariant: ['tabular-nums'] },
   metricLabel: { color: Colors.subtleGray, fontSize: 12, fontWeight: '600' },
-  metricNote: { color: '#53656B', fontSize: 12, lineHeight: 16, marginTop: -7 },
-  dataWarning: { color: '#79431E', backgroundColor: '#FFF0DB', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 10, fontSize: 12, lineHeight: 16 },
-  card: { backgroundColor: Colors.paper, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, padding: 18 },
-  mapCard: { backgroundColor: Colors.paper, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, padding: 18 },
+  metricNote: { color: Colors.subtleGray, fontSize: 12, lineHeight: 16, marginTop: -7 },
+  dataWarning: { color: Colors.warning, backgroundColor: Colors.warningBg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 12, lineHeight: 16 },
+  card: { backgroundColor: Colors.paper, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 18 },
+  mapCard: { backgroundColor: Colors.paper, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 18 },
   collapsibleHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 24 },
   mapHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   mapFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 16 },

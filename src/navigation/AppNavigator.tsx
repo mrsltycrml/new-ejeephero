@@ -49,21 +49,22 @@ const Tab = createBottomTabNavigator();
 const commonScreenOptions = {
   headerTitleAlign: 'left' as const,
   tabBarActiveTintColor: Colors.ink,
-  tabBarInactiveTintColor: Colors.subtleGray,
+  tabBarInactiveTintColor: Colors.tabInactive,
   tabBarStyle: {
     backgroundColor: Colors.paper,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     paddingTop: 6,
-    paddingBottom: 5,
+    paddingBottom: 6,
     height: 62,
     elevation: 0,
   },
-  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' as const },
-  tabBarIconStyle: { marginTop: 0 },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' as const, letterSpacing: 0.1 },
+  tabBarIconStyle: { marginTop: 1 },
   headerStyle: {
     backgroundColor: Colors.paper,
   },
+  headerShadowVisible: false,
   headerTintColor: Colors.ink,
   headerTitleStyle: {
     fontWeight: '800' as const,
@@ -73,10 +74,10 @@ const commonScreenOptions = {
 
 function ServiceHeaderActions({ onAccount, onAlerts, onBot, alertsLabel = "Open driver alerts", open }: { onAccount: () => void; onAlerts?: () => void; onBot?: () => void; alertsLabel?: string; open: boolean }) {
   const { width } = useWindowDimensions();
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 10 }}>
-    {onBot && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open esakaybot" onPress={onBot} style={{ minWidth: 44, height: 44, paddingHorizontal: 10, justifyContent: 'center', flexDirection: "row", gap: 5, alignItems: "center", borderRadius: 10, backgroundColor: 'transparent' }}><Ionicons name="chatbubble-ellipses-outline" size={18} color={Colors.ink} />{width >= 380 && <Text style={{ color: Colors.ink, fontWeight: "700", fontSize: 12 }}>esakaybot</Text>}</TouchableOpacity>}
-    {onAlerts && <TouchableOpacity accessibilityRole="button" accessibilityLabel={alertsLabel} onPress={onAlerts} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}><Ionicons name="notifications-outline" size={19} color={Colors.ink} /></TouchableOpacity>}
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open account menu" accessibilityState={{ expanded: open }} onPress={onAccount} style={{ height: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, borderRadius: 10, backgroundColor: open ? Colors.sand : Colors.sand }}><Ionicons name="person-circle-outline" size={20} color={Colors.ink} />{width >= 520 && <Text style={{ color: Colors.ink, fontWeight: '800', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={13} color={Colors.ink} /></TouchableOpacity>
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
+    {onBot && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open esakaybot" onPress={onBot} style={{ minWidth: 42, height: 38, paddingHorizontal: 11, justifyContent: 'center', flexDirection: "row", gap: 6, alignItems: "center", borderRadius: 999, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border }}><Ionicons name="sparkles-outline" size={15} color={Colors.ink} />{width >= 360 && <Text style={{ color: Colors.ink, fontWeight: "700", fontSize: 12 }}>esakaybot</Text>}</TouchableOpacity>}
+    {onAlerts && <TouchableOpacity accessibilityRole="button" accessibilityLabel={alertsLabel} onPress={onAlerts} style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="notifications-outline" size={18} color={Colors.ink} /></TouchableOpacity>}
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open account menu" accessibilityState={{ expanded: open }} onPress={onAccount} style={{ height: 38, minWidth: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 999, backgroundColor: open ? Colors.ink : Colors.sand, borderWidth: 1, borderColor: open ? Colors.ink : Colors.border }}><Ionicons name="person-circle-outline" size={19} color={open ? Colors.white : Colors.ink} />{width >= 520 && <Text style={{ color: open ? Colors.white : Colors.ink, fontWeight: '700', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={12} color={open ? Colors.white : Colors.ink} /></TouchableOpacity>
   </View>;
 }
 
@@ -149,13 +150,13 @@ const DriverStack = () => <Stack.Navigator screenOptions={{ headerStyle: { backg
 function AdminHeaderActions({ onAlerts, onProfile, alertCount, activePanel }: { onAlerts: () => void; onProfile: () => void; alertCount: number; activePanel: AdminPanel }) {
   const { width } = useWindowDimensions();
   const compact = width < 520;
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 5 : 10, marginRight: 10 }}>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Violation alerts${alertCount ? `, ${alertCount} recent` : ''}`} accessibilityState={{ expanded: activePanel === 'alerts' }} onPress={onAlerts} style={{ minWidth: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: activePanel === 'alerts' ? Colors.sand : Colors.sand }}>
-      <Ionicons name="notifications-outline" size={19} color={Colors.ink} />
-      {alertCount > 0 && <View style={{ position: 'absolute', right: 0, top: 0, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 2, backgroundColor: Colors.primaryRed, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>{alertCount > 99 ? '99+' : alertCount}</Text></View>}
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 6 : 10, marginRight: 12 }}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Violation alerts${alertCount ? `, ${alertCount} recent` : ''}`} accessibilityState={{ expanded: activePanel === 'alerts' }} onPress={onAlerts} style={{ minWidth: 40, height: 38, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: activePanel === 'alerts' ? Colors.ink : Colors.sand, borderWidth: 1, borderColor: activePanel === 'alerts' ? Colors.ink : Colors.border }}>
+      <Ionicons name="notifications-outline" size={18} color={activePanel === 'alerts' ? Colors.white : Colors.ink} />
+      {alertCount > 0 && <View style={{ position: 'absolute', right: -2, top: -2, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 3, backgroundColor: Colors.primaryRed, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>{alertCount > 99 ? '99+' : alertCount}</Text></View>}
     </TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open admin profile" accessibilityState={{ expanded: activePanel === 'profile' }} onPress={onProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, minWidth: 44, height: 44, paddingHorizontal: compact ? 8 : 11, borderRadius: 10, backgroundColor: activePanel === 'profile' ? Colors.sand : Colors.sand }}>
-      <Ionicons name="person-circle-outline" size={20} color={Colors.navy} />{!compact && <Text style={{ color: Colors.navy, fontWeight: '800', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={13} color={Colors.navy} />
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open admin profile" accessibilityState={{ expanded: activePanel === 'profile' }} onPress={onProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 42, height: 38, paddingHorizontal: compact ? 10 : 12, borderRadius: 999, backgroundColor: activePanel === 'profile' ? Colors.ink : Colors.sand, borderWidth: 1, borderColor: activePanel === 'profile' ? Colors.ink : Colors.border }}>
+      <Ionicons name="person-circle-outline" size={19} color={activePanel === 'profile' ? Colors.white : Colors.ink} />{!compact && <Text style={{ color: activePanel === 'profile' ? Colors.white : Colors.ink, fontWeight: '700', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={12} color={activePanel === 'profile' ? Colors.white : Colors.ink} />
     </TouchableOpacity>
   </View>;
 }
