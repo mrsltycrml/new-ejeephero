@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,6 +12,7 @@ type Message = { role: 'user' | 'assistant'; content: string };
 export default function HeroBotScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const SUGGESTIONS = [
     t('herobot.suggestionMakatiLoop'),
     t('herobot.suggestionFareInfo'),
@@ -107,13 +109,13 @@ export default function HeroBotScreen() {
         </ScrollView>
       </View>
 
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputContainer, { paddingBottom: Math.max(12, insets.bottom + 8) }]}>
         <TextInput
           style={styles.input}
           value={input}
           onChangeText={setInput}
           placeholder={t('herobot.inputPlaceholder')}
-          placeholderTextColor="#888"
+          placeholderTextColor={Colors.subtleGray}
           onSubmitEditing={() => sendMessage()}
           returnKeyType="send"
           accessibilityLabel="Message esakaybot"
@@ -183,18 +185,19 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.white,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: Colors.paper,
     borderTopWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
   },
   input: {
     flex: 1,
-    backgroundColor: Colors.offWhite,
-    borderRadius: 24,
-    paddingHorizontal: 16,
+    minHeight: 46,
+    backgroundColor: Colors.canvas,
+    borderRadius: 8,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 10,
     fontSize: 15,
@@ -204,9 +207,9 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     backgroundColor: Colors.ink,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },

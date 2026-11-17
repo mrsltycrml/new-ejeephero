@@ -367,7 +367,7 @@ export default function LoginScreen({ navigation }: any) {
           <ESakayLogo width={220} />
         </View>
 
-        <Text accessibilityRole="header" style={{ fontSize: 24, fontWeight: '600', color: Colors.ink, marginBottom: 24 }}>Sign in</Text>
+        <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '700', letterSpacing: -0.6, color: Colors.ink, marginBottom: 24 }}>Sign in</Text>
         {isClerkConfigured ? (
           <ClerkSignInForm navigation={navigation} />
         ) : (
@@ -385,11 +385,11 @@ export default function LoginScreen({ navigation }: any) {
           style={styles.downloadBanner}
           activeOpacity={0.85}
         >
-          <Ionicons name="phone-portrait-outline" size={18} color={Colors.primaryRed} />
+          <Ionicons name="phone-portrait-outline" size={18} color={Colors.ink} />
           <Text style={styles.downloadBannerText}>
             Get the eSAKAY mobile app
           </Text>
-          <Ionicons name="chevron-forward" size={16} color={Colors.primaryRed} />
+          <Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} />
         </TouchableOpacity>
 
         <AppDownloadModal
@@ -445,8 +445,8 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: Colors.paper,
-    borderRadius: 16,
-    padding: 26,
+    borderRadius: 8,
+    padding: 24,
     marginBottom: 18,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primaryRed,
+    color: Colors.ink,
   },
   button: {
     backgroundColor: Colors.ink,
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
     borderWidth: 1,
-    borderColor: Colors.primaryRed,
+    borderColor: Colors.ink,
   },
   buttonText: {
     color: Colors.white,
@@ -543,8 +543,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   linkAction: {
-    color: Colors.primaryRed,
-    fontWeight: 'bold',
+    color: Colors.ink,
+    fontWeight: '700',
   },
   downloadBanner: {
     flexDirection: 'row',

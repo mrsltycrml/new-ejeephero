@@ -14,6 +14,7 @@ import { supabaseAuth } from '../../lib/supabase';
 import { isClerkConfigured } from '../../lib/clerk';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ESakayLogo from '../../components/ESakayLogo';
 import { FormScrollView } from '../../components/AppUI';
 
@@ -335,7 +336,7 @@ function ClerkRegisterForm() {
       </View>
 
       <View style={styles.noteContainer}>
-        <Ionicons name="information-circle" size={16} color="#FF9800" />
+        <Ionicons name="information-circle-outline" size={16} color={Colors.ink} />
         <Text style={styles.noteText}>{t('auth.approvalRequiredNote')}</Text>
       </View>
 
@@ -356,6 +357,7 @@ function ClerkRegisterForm() {
 
 export default function RegisterScreen({ navigation }: any) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -400,7 +402,7 @@ export default function RegisterScreen({ navigation }: any) {
       contentContainerStyle={styles.scrollContainer}
       showsVerticalScrollIndicator={false}
     >
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={[styles.backButton, { top: 12 + insets.top }]} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={Colors.ink} />
         </TouchableOpacity>
 
@@ -510,7 +512,7 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
 
             <View style={styles.noteContainer}>
-              <Ionicons name="information-circle" size={16} color="#FF9800" />
+              <Ionicons name="information-circle-outline" size={16} color={Colors.ink} />
               <Text style={styles.noteText}>{t('auth.approvalRequiredNote')}</Text>
             </View>
 
@@ -561,7 +563,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 30,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: -0.6,
     color: Colors.ink,
   },
   subtitle: {
@@ -573,7 +576,7 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: Colors.paper,
-    borderRadius: 16,
+    borderRadius: 8,
     padding: 24,
     marginBottom: 16,
     borderWidth: 1,
@@ -692,12 +695,12 @@ const styles = StyleSheet.create({
   roleActivePassenger: {
     backgroundColor: Colors.ink,
     borderWidth: 1,
-    borderColor: Colors.primaryRed,
+    borderColor: Colors.ink,
   },
   roleActiveDriver: {
     backgroundColor: Colors.ink,
     borderWidth: 1,
-    borderColor: Colors.primaryRed,
+    borderColor: Colors.ink,
   },
   roleText: {
     fontSize: 14,
@@ -712,17 +715,17 @@ const styles = StyleSheet.create({
   noteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF8E1',
+    backgroundColor: Colors.sand,
     padding: 11,
     borderRadius: 6,
     marginBottom: 14,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#FFE082',
+    borderColor: Colors.border,
   },
   noteText: {
     fontSize: 12,
-    color: '#795548',
+    color: Colors.subtleGray,
     flex: 1,
     lineHeight: 16,
   },
@@ -733,7 +736,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
     borderWidth: 1,
-    borderColor: Colors.primaryRed,
+    borderColor: Colors.ink,
   },
   buttonText: {
     color: Colors.white,
@@ -752,7 +755,7 @@ const styles = StyleSheet.create({
   secondaryLinkText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primaryRed,
+    color: Colors.ink,
   },
   linkButton: {
     padding: 10,
@@ -763,7 +766,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   linkAction: {
-    color: Colors.primaryRed,
-    fontWeight: 'bold',
+    color: Colors.ink,
+    fontWeight: '700',
   },
 });

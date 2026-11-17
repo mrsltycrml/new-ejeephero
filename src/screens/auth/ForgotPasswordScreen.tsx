@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSignIn } from '@clerk/clerk-expo';
 import { Colors } from '../../constants/theme';
 import { supabaseAuth } from '../../lib/supabase';
@@ -235,6 +236,7 @@ function SupabaseForgotPasswordContent() {
 }
 
 export default function ForgotPasswordScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   return (
     <FormScrollView
       containerStyle={styles.outer}
@@ -242,7 +244,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       contentContainerStyle={styles.scrollContainer}
       showsVerticalScrollIndicator={false}
     >
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={[styles.backButton, { top: 12 + insets.top }]} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={Colors.ink} />
         </TouchableOpacity>
 
@@ -288,17 +290,18 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   iconBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 8,
     backgroundColor: Colors.ink,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 14,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '600',
+    fontSize: 30,
+    fontWeight: '700',
+    letterSpacing: -0.6,
     color: Colors.ink,
   },
   subtitle: {
@@ -309,7 +312,7 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: Colors.paper,
-    borderRadius: 16,
+    borderRadius: 8,
     padding: 24,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -352,7 +355,7 @@ const styles = StyleSheet.create({
   },
   instructions: {
     fontSize: 13,
-    color: '#555',
+    color: Colors.subtleGray,
     lineHeight: 19,
     marginBottom: 16,
   },
@@ -383,7 +386,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryBtnText: {
-    color: Colors.primaryRed,
+    color: Colors.ink,
     fontSize: 13,
     fontWeight: '700',
   },

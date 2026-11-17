@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/theme';
+import { SkeletonBlock } from './AppUI';
 
 export type AdminPanel = 'alerts' | 'profile' | null;
 type AlertRow = { id: string; title: string; detail: string; time: string; kind: 'speed' | 'route' };
@@ -11,6 +13,7 @@ type AlertRow = { id: string; title: string; detail: string; time: string; kind:
 export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: { panel: AdminPanel; onClose: () => void; onManageProfile: () => void }) {
   const { user, fullName, status, signOut } = useAuth();
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,7 +67,7 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
 
   return <>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close menu" activeOpacity={1} onPress={onClose} style={styles.scrim} />
-    <View style={[styles.panel, { width: Math.min(width - 24, panel === 'alerts' ? 390 : 330), maxHeight: Math.max(220, height - 92) }]}>
+    <View style={[styles.panel, { top: 58 + insets.top, width: Math.min(width - 24, panel === 'alerts' ? 390 : 330), maxHeight: Math.max(220, height - 92 - insets.top) }]}>
       <View style={styles.panelHeader}>
         <Text style={styles.panelTitle}>{panel === 'alerts' ? 'Recent alerts' : 'Your account'}</Text>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close menu" onPress={onClose} style={styles.closeButton}><Ionicons name="close" size={19} color={Colors.ink} /></TouchableOpacity>
@@ -79,10 +82,10 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
         </View>
         <View style={styles.statusRow}><View style={styles.statusDot} /><Text style={styles.statusText}>{status === 'approved' ? 'Account active' : 'Account status unavailable'}</Text></View>
         <TouchableOpacity accessibilityRole="button" onPress={() => { onClose(); onManageProfile(); }} style={styles.menuItem}><Ionicons name="settings-outline" size={18} color={Colors.ink} /><Text style={styles.menuText}>Account settings</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>
-        {confirmLogout ? <View><Text style={styles.menuText}>Log out of your account?</Text><TouchableOpacity accessibilityRole="button" onPress={logout} style={styles.menuItem}><Text style={styles.menuText}>Confirm log out</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(false)} style={styles.menuItem}><Text style={styles.menuText}>Cancel</Text></TouchableOpacity></View> : <TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(true)} style={styles.menuItem}><Ionicons name="log-out-outline" size={18} color={Colors.ink} /><Text style={styles.menuText}>Log out</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>}
+        {confirmLogout ? <View style={styles.confirmBox}><Text style={styles.confirmTitle}>Log out of your account?</Text><View style={styles.confirmRow}><TouchableOpacity accessibilityRole="button" onPress={logout} style={styles.confirmDanger}><Text style={styles.confirmDangerText}>Confirm log out</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(false)} style={styles.confirmCancel}><Text style={styles.menuText}>Cancel</Text></TouchableOpacity></View></View> : <TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(true)} style={styles.menuItem}><Ionicons name="log-out-outline" size={18} color={Colors.ink} /><Text style={styles.menuText}>Log out</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>}
       </> : <>
         <Text style={styles.panelSub}>GPS speed and route records appear as they arrive.</Text>
-        {loading && alerts.length === 0 ? <Text style={styles.empty}>Loading alerts…</Text> : null}
+        {loading && alerts.length === 0 ? <View style={{ gap: 8, paddingVertical: 8 }}><SkeletonBlock height={48} /><SkeletonBlock height={48} /><SkeletonBlock height={48} /></View> : null}
         {!!error && <TouchableOpacity onPress={() => { void loadAlerts(); }}><Text accessibilityRole="alert" style={styles.error}>{error} Tap to retry.</Text></TouchableOpacity>}
         {!loading && !error && alerts.length === 0 ? <View style={styles.emptyBox}><Ionicons name="checkmark-circle-outline" size={27} color={Colors.subtleGray} /><Text style={styles.empty}>No recorded violations</Text></View> : null}
         {alerts.length > 0 && <ScrollView style={styles.alertList} nestedScrollEnabled>
@@ -101,10 +104,10 @@ const styles = StyleSheet.create({
   panel: { position: 'absolute', top: 66, right: 12, zIndex: 40, overflow: 'hidden', borderRadius: 8, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.paper, padding: 18, shadowColor: '#102027', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.16, shadowRadius: 26, elevation: 12 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
   panelTitle: { color: Colors.ink, fontSize: 18, fontWeight: '600', letterSpacing: -0.3 },
-  closeButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: Colors.offWhite },
+  closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: Colors.sand },
   panelSub: { color: Colors.subtleGray, fontSize: 12, lineHeight: 18, marginBottom: 12 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 14 },
-  avatar: { width: 42, height: 42, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paper },
+  avatar: { width: 42, height: 42, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.sand },
   avatarLetter: { color: Colors.ink, fontSize: 20, fontWeight: '600' },
   name: { color: Colors.ink, fontSize: 15, fontWeight: '600' },
   email: { color: Colors.subtleGray, fontSize: 12, lineHeight: 15, marginTop: 3 },
@@ -113,9 +116,15 @@ const styles = StyleSheet.create({
   statusText: { color: '#24643E', fontSize: 12, fontWeight: '700' },
   menuItem: { minHeight: 46, borderTopWidth: 1, borderTopColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: 11 },
   menuText: { flex: 1, color: Colors.ink, fontSize: 13, fontWeight: '700' },
+  confirmBox: { paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, gap: 8 },
+  confirmTitle: { color: Colors.ink, fontSize: 13, fontWeight: '600' },
+  confirmRow: { flexDirection: 'row', gap: 8 },
+  confirmDanger: { flex: 1, minHeight: 44, borderRadius: 6, backgroundColor: Colors.ember, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  confirmDangerText: { color: Colors.paper, fontSize: 13, fontWeight: '700' },
+  confirmCancel: { minHeight: 44, borderRadius: 6, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   alertList: { maxHeight: 320 },
   alertRow: { flexDirection: 'row', gap: 10, paddingVertical: 11, borderTopWidth: 1, borderTopColor: Colors.border },
-  alertIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center' },
+  alertIcon: { width: 32, height: 32, borderRadius: 6, backgroundColor: Colors.sand, alignItems: 'center', justifyContent: 'center' },
   alertName: { color: Colors.ink, fontSize: 12, fontWeight: '600' },
   alertDetail: { color: Colors.subtleGray, fontSize: 12, lineHeight: 16, marginTop: 2 },
   alertTime: { color: Colors.subtleGray, fontSize: 12, marginTop: 3 },

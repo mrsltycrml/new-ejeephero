@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper,
   },
   securityHeading: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  securityIcon: { width: 40, height: 40, borderRadius: 6, backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center' },
+  securityIcon: { width: 40, height: 40, borderRadius: 6, backgroundColor: Colors.sand, alignItems: 'center', justifyContent: 'center' },
   securitySub: { color: Colors.subtleGray, fontSize: 12, marginTop: 3 },
   sectionTitle: {
     fontSize: 17,
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: Colors.paper,
+    backgroundColor: Colors.sand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,

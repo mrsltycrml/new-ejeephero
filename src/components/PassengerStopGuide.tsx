@@ -32,14 +32,14 @@ export default function PassengerStopGuide({ boarding, zones, landmarks, onRefre
   </View>;
   return <View style={[s.section, prohibited && { borderColor: Colors.primaryRed }]}>
     <View style={[s.row, { flexWrap: 'nowrap', alignItems: 'flex-start' }]}>
-      <Ionicons name={prohibited ? 'warning-outline' : boarding.kind === 'allowed' ? 'checkmark-circle-outline' : 'location-outline'} size={23} color={Colors.primaryRed} />
+      <Ionicons name={prohibited ? 'warning-outline' : boarding.kind === 'allowed' ? 'checkmark-circle-outline' : 'location-outline'} size={23} color={prohibited ? Colors.primaryRed : boarding.kind === 'allowed' ? '#24613D' : Colors.ink} />
       <View style={{ flex: 1, gap: 4 }} accessibilityLiveRegion={prohibited ? 'assertive' : 'polite'} accessibilityRole={prohibited ? 'alert' : undefined}>
         <Text style={s.sectionTitle}>{boarding.title}</Text><Text style={s.body}>{boarding.detail}</Text>
       </View>
     </View>
     {prohibited && <Text style={s.body}>{BOARDING_EDUCATION}</Text>}
     <View style={s.row}>
-      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={[s.button, s.secondary]}><Ionicons name="bus-outline" size={18} color={Colors.primaryRed} /><Text style={s.label}>{open ? 'Close stop guide' : 'Where to board'}</Text><Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.ink} /></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={[s.button, s.secondary]}><Ionicons name="bus-outline" size={18} color={Colors.ink} /><Text style={s.label}>{open ? 'Close stop guide' : 'Where to board'}</Text><Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.ink} /></TouchableOpacity>
       <Text style={[s.muted, { flex: 1, minWidth: 140 }]}>{loading ? 'Checking stop information…' : loadError ? 'Could not refresh stops. Try again below.' : official.length ? `${official.length} verified loading bays` : 'Official boarding points awaiting confirmation'}</Text>
     </View>
     {open && <>

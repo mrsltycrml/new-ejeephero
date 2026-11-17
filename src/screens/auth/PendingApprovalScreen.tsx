@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -21,13 +21,13 @@ export default function PendingApprovalScreen() {
   const isBlocked = isRejected || isSuspended;
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       <View style={styles.card}>
         <View style={[styles.iconCircle, isBlocked && styles.iconCircleRejected]}>
           <Ionicons
-            name={isBlocked ? 'close-circle' : 'hourglass'}
-            size={56}
-            color={isBlocked ? '#F44336' : Colors.primaryYellow}
+            name={isBlocked ? 'close-circle-outline' : 'time-outline'}
+            size={36}
+            color={isBlocked ? Colors.primaryRed : Colors.ink}
           />
         </View>
 
@@ -49,7 +49,7 @@ export default function PendingApprovalScreen() {
               <ActivityIndicator color={Colors.white} size="small" />
             ) : (
               <>
-                <Ionicons name="refresh" size={20} color={Colors.white} style={{ marginRight: 8 }} />
+                <Ionicons name="refresh" size={18} color={Colors.white} style={{ marginRight: 8 }} />
                 <Text style={styles.refreshText}>{t('auth.checkStatus')}</Text>
               </>
             )}
@@ -57,101 +57,98 @@ export default function PendingApprovalScreen() {
         )}
 
         <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
-          <Ionicons name="log-out-outline" size={20} color={Colors.primaryRed} style={{ marginRight: 8 }} />
+          <Ionicons name="log-out-outline" size={18} color={Colors.ink} style={{ marginRight: 8 }} />
           <Text style={styles.logoutText}>{t('auth.logOut')}</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: Colors.offWhite,
+    backgroundColor: Colors.canvas,
+  },
+  container: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   card: {
-    backgroundColor: Colors.white,
-    borderRadius: 24,
-    padding: 36,
+    backgroundColor: Colors.paper,
+    borderRadius: 8,
+    padding: 28,
     width: '100%',
+    maxWidth: 480,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 5,
     borderWidth: 1,
-    borderColor: '#F0E6D8',
+    borderColor: Colors.border,
   },
   iconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#FFF8E1',
+    width: 68,
+    height: 68,
+    borderRadius: 8,
+    backgroundColor: Colors.sand,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 3,
-    borderColor: Colors.primaryYellow,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   iconCircleRejected: {
     backgroundColor: '#FFEBEE',
-    borderColor: '#F44336',
+    borderColor: Colors.primaryRed,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: Colors.darkText,
-    marginBottom: 12,
+    fontSize: 30,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    color: Colors.ink,
+    marginBottom: 10,
     textAlign: 'center',
   },
   description: {
-    fontSize: 15,
-    color: '#666',
+    fontSize: 14,
+    color: Colors.subtleGray,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 30,
+    lineHeight: 21,
+    marginBottom: 24,
   },
   refreshButton: {
     backgroundColor: Colors.ink,
     flexDirection: 'row',
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 8,
+    minHeight: 46,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    marginBottom: 12,
-    shadowColor: Colors.primaryRed,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 10,
   },
   refreshText: {
     color: Colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
   },
   logoutButton: {
     flexDirection: 'row',
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 8,
+    minHeight: 46,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    borderWidth: 2,
-    borderColor: Colors.primaryRed,
-    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.paper,
   },
   logoutText: {
-    color: Colors.primaryRed,
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: Colors.ink,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
