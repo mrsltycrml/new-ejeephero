@@ -1,68 +1,71 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateConfiguredFare, findWalkAndSaveSuggestion, routeDistanceKm } from '../src/services/fareCalculator.ts';
+import { quotePassengerFare, findVerifiedSavings, verifiedRideDistance, type FareMatrix } from '../src/services/passengerFare.ts';
 
-test('configured base fare covers the included distance', () => {
-  assert.equal(calculateConfiguredFare(3, { base_fare: 17, per_km_rate: 2.4, base_distance_km: 4 }, 'regular'), 17);
+const date = '2026-11-18';
+const evidence = { source_url: 'https://example.test/source', verified_at: '2026-11-01T00:00:00Z' };
+const matrix: FareMatrix = { ...evidence, route_id: 'r', currency: 'PHP', effective_from: '2026-11-01', effective_to: null, brackets: [{ up_to_km: 4, regular: 15, discounted: 11 }, { up_to_km: 8, regular: 20, discounted: 14 }] };
+const stops = ['a', 'b', 'c', 'branch'].map((id, i) => ({ id, name: id, route_id: 'r', latitude: 14.56, longitude: 121.03 + i * .001, sequence_order: i, location_source_url: evidence.source_url, location_verified_at: evidence.verified_at }));
+const segments = [{ ...evidence, route_id: 'r', from_stop_id: 'a', to_stop_id: 'b', distance_meters: 3000 }, { ...evidence, route_id: 'r', from_stop_id: 'b', to_stop_id: 'c', distance_meters: 4000 }];
+const walk = { ...evidence, from_stop_id: 'a', to_stop_id: 'b', distance_meters: 140, duration_seconds: 120, accessible: null, accessibility_source_url: null, accessibility_verified_at: null, coordinates: stops.slice(0, 2).map(({latitude, longitude}) => ({latitude, longitude})), steps: [{ instruction: 'Follow the marked path', distance_meters: 140, duration_seconds: 120, fromIndex: 0, toIndex: 1 }] };
+const input = { originId: 'a', destinationId: 'c', routeId: 'r', type: 'regular' as const, stops, segments, walks: [walk], matrix, date, maxWalkMeters: 500 };
+
+test('fare requires a current selected-route matrix; no formula or authority inference', () => {
+  for (const source of [null, { ...matrix, route_id: 'other' }, { ...matrix, effective_to: '2026-11-17' }, { ...matrix, effective_from: '2026-11-19' }]) assert.equal(quotePassengerFare(4, 'regular', { id: 'r' }, source, date), null);
+  const quote = quotePassengerFare(4, 'student', { id: 'r' }, matrix, date)!;
+  assert.deepEqual([quote.regular, quote.discount, quote.amount, quote.basis], [15, 4, 11, 'Sourced matrix']);
+  for (const category of ['senior', 'pwd'] as const) assert.equal(quotePassengerFare(7, category, { id: 'r' }, matrix, date)?.amount, 14);
 });
-
-test('fare adds the route rate only beyond the included distance', () => {
-  assert.equal(calculateConfiguredFare(6, { base_fare: 17, per_km_rate: 2.4, base_distance_km: 4 }, 'regular'), 21.75);
-});
-
-test('discounted passenger fares apply the discount to the base only', () => {
-  const route = { base_fare: 17, per_km_rate: 2.4, base_distance_km: 4 };
-  assert.equal(calculateConfiguredFare(6, route, 'student'), 18.5);
-  assert.equal(calculateConfiguredFare(6, route, 'senior'), 18.5);
-  assert.equal(calculateConfiguredFare(6, route, 'pwd'), 18.5);
-});
-
-test('operator-reported fare adds one peso per km for every passenger type', () => {
-  const route = { base_fare: 15, per_km_rate: 1, base_distance_km: 4 };
-  assert.equal(calculateConfiguredFare(6, route, 'regular'), 17);
-  assert.equal(calculateConfiguredFare(6, route, 'student'), 14);
-  assert.equal(calculateConfiguredFare(6, route, 'senior'), 14);
-  assert.equal(calculateConfiguredFare(6, route, 'pwd'), 14);
-});
-
-test('route distance sums consecutive stop segments', () => {
-  const distance = routeDistanceKm([
-    { id: 'a', name: 'A', latitude: 0, longitude: 0, sequence_order: 0 },
-    { id: 'b', name: 'B', latitude: 0, longitude: 0.01, sequence_order: 1 },
-    { id: 'c', name: 'C', latitude: 0, longitude: 0.02, sequence_order: 2 },
-  ]);
-  assert.ok(distance > 2.2 && distance < 2.24);
-});
-
-test('walk-and-save recommends a nearby later stop only when it lowers the estimate', () => {
-  const stops = [
-    { id: 'a', name: 'Origin Bay', latitude: 0, longitude: 0, sequence_order: 0 },
-    { id: 'b', name: 'Next Bay', latitude: 0, longitude: 0.001, sequence_order: 1 },
-    { id: 'c', name: 'Destination', latitude: 0, longitude: 0.01, sequence_order: 2 },
+test('whole fare table must be numeric, ordered, coherent and sourced', () => {
+  const bad = [
+    { brackets: [] }, { brackets: [matrix.brackets[1], matrix.brackets[0]] },
+    { brackets: [matrix.brackets[0], { up_to_km: 4, regular: 20, discounted: 14 }] },
+    { brackets: [matrix.brackets[0], { up_to_km: 8, regular: 10, discounted: 9 }] },
+    { brackets: [matrix.brackets[0], { up_to_km: 8, regular: Infinity, discounted: 14 }] },
+    { brackets: [{ up_to_km: 4, regular: 1e308, discounted: 0 }] },
+    { brackets: [{ up_to_km: '4', regular: 15, discounted: 11 }] },
+    { brackets: [{ up_to_km: 4, regular: 15, discounted: 16 }] },
+    { source_url: 'javascript:alert(1)' }, { verified_at: 'tomorrow' }, { verified_at: '2099-01-01T00:00:00Z' },
+    { currency: null }, { currency: 'USD' },
+    { effective_from: '2026-02-30' }, { effective_to: '2026-10-01' },
   ];
-  const suggestion = findWalkAndSaveSuggestion({
-    origin: { latitude: 0, longitude: 0 },
-    destination: stops[2],
-    stops,
-    route: { base_fare: 0, per_km_rate: 10, base_distance_km: 0 },
-    passengerType: 'regular',
-  });
-  assert.equal(suggestion?.stop.id, 'b');
-  assert.equal(suggestion?.walkingTimeMinutes, 2);
-  assert.ok((suggestion?.savings ?? 0) >= 1);
+  for (const patch of bad) assert.equal(quotePassengerFare(3, 'regular', { id: 'r' }, { ...matrix, ...patch } as any, date), null, JSON.stringify(patch));
+  for (const km of [NaN, Infinity, -1, 0, 201, 9]) assert.equal(quotePassengerFare(km, 'regular', { id: 'r' }, matrix, date), null);
+  assert.equal(quotePassengerFare(3, 'regular', { id: 'r' }, matrix, '2026-02-30'), null);
+});
+test('ride distances require sourced directed connections', () => {
+  assert.equal(verifiedRideDistance('a', 'c', 'r', segments), 7);
+  assert.equal(verifiedRideDistance('c', 'a', 'r', segments), null);
+  assert.equal(verifiedRideDistance('a', 'c', 'r', [{ ...segments[0], source_url: 'bad' }, segments[1]]), null);
+});
+test('savings compare the same category on a downstream baseline path', () => {
+  const result = findVerifiedSavings(input);
+  assert.equal(result.status, 'available');
+  assert.equal(result.suggestions[0].stop.id, 'b');
+  assert.deepEqual([result.suggestions[0].currentFare, result.suggestions[0].fare, result.suggestions[0].savings], [20, 15, 5]);
+  assert.equal(result.suggestions[0].walk.steps[0].instruction, 'Follow the marked path');
+  assert.equal(findVerifiedSavings({ ...input, type: 'student' }).suggestions[0].savings, 3);
+});
+test('missing or incomplete walking evidence is unavailable, not no-saving', () => {
+  for (const patch of [{ walks: [] }, { matrix: null }, { segments: [] }, { maxWalkMeters: 100 }, { stepFreeOnly: true }, { originId: 'c', destinationId: 'a' }, { walks: [{ ...walk, steps: [] }] }, { walks: [{ ...walk, coordinates: [] }] }]) assert.equal(findVerifiedSavings({ ...input, ...patch }).status, 'unavailable');
+  assert.equal(findVerifiedSavings({ ...input, stepFreeOnly: true, walks: [{ ...walk, accessible: true }] }).status, 'unavailable');
+  assert.equal(findVerifiedSavings({ ...input, stepFreeOnly: true, walks: [{ ...walk, accessible: true, accessibility_source_url: evidence.source_url, accessibility_verified_at: evidence.verified_at }] }).status, 'available');
+});
+test('equal sourced fares explicitly mean no saving among evaluated paths', () => {
+  const result = findVerifiedSavings({ ...input, matrix: { ...matrix, brackets: [{ up_to_km: 8, regular: 15, discounted: 11 }] } });
+  assert.equal(result.status, 'no-saving');
+  assert.equal(result.suggestions.length, 0);
+});
+test('a cheaper branch outside the baseline ride path is not a recommendation', () => {
+  const branch = { ...walk, to_stop_id: 'branch', coordinates: [walk.coordinates[0], stops[3]], distance_meters: 350, steps: [{ ...walk.steps[0], distance_meters: 350 }] };
+  const result = findVerifiedSavings({ ...input, walks: [branch], segments: [...segments, { ...segments[0], from_stop_id: 'branch', to_stop_id: 'c', distance_meters: 1000 }] });
+  assert.equal(result.status, 'unavailable');
 });
 
-test('walk-and-save stays silent when no cheaper stop is within walking range', () => {
-  const stops = [
-    { id: 'a', name: 'Origin Bay', latitude: 0, longitude: 0, sequence_order: 0 },
-    { id: 'b', name: 'Destination', latitude: 0, longitude: 0.01, sequence_order: 1 },
-  ];
-  const suggestion = findWalkAndSaveSuggestion({
-    origin: { latitude: 0, longitude: 0 },
-    destination: stops[1],
-    stops,
-    route: { base_fare: 17, per_km_rate: 2.4, base_distance_km: 4 },
-    passengerType: 'regular',
-  });
-  assert.equal(suggestion, null);
+test('ambiguous directed fare paths and missing downstream evidence do not claim no-saving', () => {
+  assert.equal(verifiedRideDistance('a', 'c', 'r', [...segments, { ...segments[0], to_stop_id: 'c', distance_meters: 5000 }]), null);
+  assert.equal(findVerifiedSavings({ ...input, stops: stops.map(s => s.id === 'b' ? { ...s, sequence_order: -1 } : s) }).status, 'unavailable');
+  const more = [...stops.slice(0, 3), { ...stops[3], id: 'd', sequence_order: 4 }];
+  const result = findVerifiedSavings({ ...input, destinationId: 'd', stops: more, segments: [...segments, { ...segments[0], from_stop_id: 'c', to_stop_id: 'd', distance_meters: 500 }], matrix: { ...matrix, brackets: [{ up_to_km: 10, regular: 15, discounted: 11 }] } });
+  assert.equal(result.status, 'unavailable');
 });

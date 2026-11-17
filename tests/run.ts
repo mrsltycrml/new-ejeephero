@@ -1,4 +1,8 @@
 import './fareCalculator.test.ts';
+import './walkingRoute.test.ts';
+import './walkingBackend.test.ts';
+import './herobotContext.test.ts';
+import './stopLandmarks.test.ts';
 import './reportingPeriod.test.ts';
 import './simplePdf.test.ts';
 import './passengerSafety.test.ts';
@@ -16,3 +20,5 @@ await import('./mapHtmlSerialization.test.ts');
 await import('./anomalyLocation.test.ts');
 await import('./driverShiftStart.test.ts');
 await import('./supervisorMapSelection.test.ts');
+await import('./passengerJourneyState.test.ts');
+await import('./passengerPlanningData.test.ts');

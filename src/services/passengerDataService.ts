@@ -1,18 +1,30 @@
 import { realRows } from '../utils/realData';
 import { supabase } from '../lib/supabase';
-import { offlineTransit } from './offlineTransitService';
+import { offlineTransit, type TransitResult } from './offlineTransitService';
 import type { LoadingZone } from './passengerSafety';
 import type { FareMatrix, RoadSegment, WalkLink } from './passengerFare';
 
-export async function loadPassengerPlanningData() {
+async function planningRows<T>(table: string): Promise<T[]> {
+  const rows: T[] = [];
+  for (let offset = 0; offset <= 5000; offset += 500) {
+    const result = await supabase.from(table).select('*').order('id').range(offset, offset + 499);
+    if (result.error || !Array.isArray(result.data)) throw new Error('Passenger planning data unavailable.');
+    rows.push(...realRows(result.data) as T[]);
+    if (rows.length > 5000) break;
+    if (result.data.length < 500) return rows;
+  }
+  // Refuse a partial catalog that could incorrectly claim no cheaper option.
+  throw new Error('Passenger planning data is too large to compare completely.');
+}
+
+export async function loadPassengerPlanningData(catalog?: TransitResult) {
   const [transit, segments, walks, matrices] = await Promise.all([
-    offlineTransit.getTransitData(),
-    supabase.from('passenger_route_segments').select('*'),
-    supabase.from('passenger_walk_links').select('*'),
-    supabase.from('passenger_fare_matrices').select('*').order('effective_from', { ascending: false }),
+    catalog ? Promise.resolve(catalog) : offlineTransit.getTransitData(),
+    planningRows<RoadSegment>('passenger_route_segments'),
+    planningRows<WalkLink>('passenger_walk_links'),
+    planningRows<FareMatrix>('passenger_fare_matrices'),
   ]);
-  if (segments.error || walks.error || matrices.error) throw new Error('Passenger planning data unavailable.');
-  return { ...transit, segments: realRows(segments.data || []) as RoadSegment[], walks: realRows(walks.data || []) as WalkLink[], matrices: realRows(matrices.data || []) as FareMatrix[] };
+  return { ...transit, segments, walks, matrices: matrices.sort((a, b) => String(b.effective_from).localeCompare(String(a.effective_from))) };
 }
 
 export async function loadLoadingZones(): Promise<LoadingZone[]> {

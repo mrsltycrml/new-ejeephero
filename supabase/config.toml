@@ -5,3 +5,7 @@ verify_jwt = false
 [functions.herobot-chat]
 # Identity is verified by the signed JWT + PostgREST/RLS inside this handler.
 verify_jwt = false
+
+[functions.walking-directions]
+# The handler verifies Supabase sessions or signed Clerk JWTs and approved profiles.
+verify_jwt = false
