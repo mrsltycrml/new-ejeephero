@@ -28,7 +28,7 @@ and driver profiles support testing; they must not be treated as actual live GPS
 
 Verified route geometry, loading-zone boundaries and waiting-area photographs
 remain incomplete. Do not invent them or label an unknown area illegal. SOS has
-a five-second cancellation timer and opens Messages; the passenger taps Send.
+a five-second cancellation timer, attempts server SMS when enabled, and offers a Messages fallback.
 
 ## Current UX request
 

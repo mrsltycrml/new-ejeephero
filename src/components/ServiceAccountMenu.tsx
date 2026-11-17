@@ -1,5 +1,5 @@
-import React from 'react';
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
@@ -7,16 +7,12 @@ import { Colors } from '../constants/theme';
 export default function ServiceAccountMenu({ open, onClose, onProfile, onAbout }: { open: boolean; onClose: () => void; onProfile: () => void; onAbout?: () => void }) {
   const { user, fullName, signOut } = useAuth();
   const { width } = useWindowDimensions();
+  const [confirmLogout, setConfirmLogout] = useState(false);
   if (!open) return null;
 
   const logOut = () => {
-    onClose();
-    const perform = () => { void signOut().catch(() => Alert.alert('Could not log out', 'Please try again.')); };
-    if (Platform.OS === 'web') {
-      if (window.confirm('Log out of eSAKAY?')) perform();
-    } else {
-      Alert.alert('Log out', 'Log out of eSAKAY?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Log out', style: 'destructive', onPress: perform }]);
-    }
+    setConfirmLogout(false);
+    void signOut().then(onClose).catch(() => Alert.alert('Could not log out', 'Please try again.'));
   };
 
   return <View style={styles.layer}>
@@ -25,7 +21,7 @@ export default function ServiceAccountMenu({ open, onClose, onProfile, onAbout }
       <View style={styles.identity}><View style={styles.avatar}><Ionicons name="person-outline" size={21} color={Colors.ink} /></View><View style={styles.identityText}><Text style={styles.name} numberOfLines={1}>{fullName || 'Your account'}</Text><Text style={styles.email} numberOfLines={2}>{user?.email || ''}</Text></View></View>
       <TouchableOpacity accessibilityRole="button" onPress={() => { onClose(); onProfile(); }} style={styles.action}><Ionicons name="person-circle-outline" size={20} color={Colors.ink} /><Text style={styles.actionText}>Account settings</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>
       {onAbout && <TouchableOpacity accessibilityRole="button" onPress={() => { onClose(); onAbout(); }} style={styles.action}><Ionicons name="information-circle-outline" size={20} color={Colors.ink} /><Text style={styles.actionText}>About eSAKAY</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>}
-      <TouchableOpacity accessibilityRole="button" onPress={logOut} style={styles.action}><Ionicons name="log-out-outline" size={20} color={Colors.ink} /><Text style={[styles.actionText, styles.logout]}>Log out</Text></TouchableOpacity>
+      {confirmLogout ? <View><Text style={styles.actionText}>Log out of eSAKAY?</Text><TouchableOpacity accessibilityRole="button" onPress={logOut} style={styles.action}><Text style={styles.actionText}>Confirm log out</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(false)} style={styles.action}><Text style={styles.actionText}>Cancel</Text></TouchableOpacity></View> : <TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(true)} style={styles.action}><Ionicons name="log-out-outline" size={20} color={Colors.ink} /><Text style={[styles.actionText, styles.logout]}>Log out</Text></TouchableOpacity>}
     </View>
   </View>;
 }

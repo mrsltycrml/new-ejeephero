@@ -46,17 +46,17 @@ async function readLocal<T>(kind: RegistryKind, adminId: string): Promise<T[]> {
   try { return JSON.parse(raw) as T[]; } catch { return []; }
 }
 
-export async function loadActiveFleetUnits(): Promise<Array<Pick<ManagedUnit, 'body_number' | 'plate_number'>>> {
+export async function loadActiveFleetUnits(): Promise<Array<Pick<ManagedUnit, 'body_number' | 'plate_number'> & { is_sample?: boolean }>> {
   const { data, error } = await supabase.rpc('get_available_fleet_units');
   if (!canUsePreview) return error ? [] : (data || []);
   const local = await readLocal<ManagedUnit>('units', 'shared');
-  const merged = new Map<string, Pick<ManagedUnit, 'body_number' | 'plate_number'>>();
+  const merged = new Map<string, Pick<ManagedUnit, 'body_number' | 'plate_number'> & { is_sample?: boolean }>();
   for (const unit of data || []) merged.set(unit.body_number.trim().toUpperCase(), unit);
   for (const unit of local.filter((entry) => !entry.deleted_at)) {
     if (!merged.has(unit.body_number.trim().toUpperCase())) merged.set(unit.body_number.trim().toUpperCase(), unit);
   }
   for (const unit of SAMPLE_UNITS) {
-    if (!merged.has(unit.name.toUpperCase())) merged.set(unit.name.toUpperCase(), { body_number: unit.name, plate_number: unit.plateNumber });
+    if (!merged.has(unit.name.toUpperCase())) merged.set(unit.name.toUpperCase(), { body_number: unit.name, plate_number: unit.plateNumber, is_sample: true });
   }
   return [...merged.values()];
 }

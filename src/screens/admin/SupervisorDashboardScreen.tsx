@@ -95,7 +95,7 @@ export default function SupervisorDashboardScreen() {
       supabase.from('vehicles').select('id,driver_id,route_id,body_number,plate_number,passenger_count,max_capacity,is_active').order('created_at', { ascending: false }).limit(1000),
       readPeriodRows<SpeedEvent>('speed_events', start, end),
       readPeriodRows<Violation>('trip_violations', start, end),
-      supabase.from('profiles').select('id,email,full_name,status').eq('role', 'driver'),
+      supabase.from('profiles').select('id,email,full_name,status').eq('role', 'driver').eq('supervisor_hidden', false),
       supabase.from('speed_events').select('vehicle_id').gte('created_at', new Date(Date.now() - 120_000).toISOString()).limit(100),
       supabase.from('vehicles').select('id', { count: 'exact', head: true }).gte('created_at', start).lt('created_at', end),
     ]);

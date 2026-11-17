@@ -36,7 +36,7 @@ async function readAll<T>(table: string, columns: string, orderColumn: string, r
   const rows: T[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     let query = supabase.from(table).select(columns).order(orderColumn, { ascending: orderColumn !== 'created_at' });
-    if (roleFilter) query = query.eq('role', 'driver');
+    if (roleFilter) query = query.eq('role', 'driver').eq('supervisor_hidden', false);
     const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
     if (error) throw new Error(`Could not load ${table}: ${error.message}`);
     const page = (data ?? []) as T[];

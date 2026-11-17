@@ -50,9 +50,9 @@ export default function SafetyScreen({ navigation }: any) {
   return <ScrollView style={s.screen} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     <View><Text style={s.title}>Safety</Text><Text style={s.subtitle}>Your emergency contacts, unit details, and local help.</Text></View>
     <View style={s.section}>
-      <Text style={s.sectionTitle}>Get help quickly</Text><Text style={s.body}>SOS gives you 5 seconds to cancel, then opens Messages with your saved contacts, current GPS location, and unit details.</Text>
+      <Text style={s.sectionTitle}>Get help quickly</Text><Text style={s.body}>SOS gives you 5 seconds to cancel, then attempts to send your location and unit details to your saved contacts.</Text>
       <SOSButton activeVehicleId={unit?.vehicle_id} activeVehicleBody={unit?.body_number} activeVehiclePlate={unit?.plate_number || undefined} activeVehicleIsSample={unit?.source === 'sample'} />
-      <Text style={s.muted}>Tap Send in Messages to share the alert. You can call a hotline at any time.</Text>
+      <Text style={s.muted}>If automatic messaging is unavailable, open Messages and tap Send. You can call a hotline at any time.</Text>
       <View style={s.divider} />
       <Text style={s.label}>{unit ? `${unit.source === 'sample' ? 'Sample ride' : 'Current ride'} · ${unit.body_number}` : 'Unit not detected yet'}</Text>
       <Text style={s.muted}>{unit ? `Plate ${unit.plate_number || 'unavailable'} · Added to SOS automatically.` : 'Choose your destination on the dashboard. The app checks your unit as you travel; no body or plate number to type.'}</Text>

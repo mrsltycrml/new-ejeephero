@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -14,6 +14,7 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);
@@ -56,18 +57,8 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
 
   if (!panel) return null;
   const logout = () => {
-    const perform = async () => {
-      try { onClose(); await signOut(); }
-      catch (cause) { Alert.alert('Could not log out', cause instanceof Error ? cause.message : 'Please try again.'); }
-    };
-    if (Platform.OS === 'web') {
-      if (window.confirm('Log out of your admin account?')) void perform();
-    } else {
-      Alert.alert('Log out?', 'You can sign in again at any time.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Log out', style: 'destructive', onPress: () => { void perform(); } },
-      ]);
-    }
+    setConfirmLogout(false);
+    void signOut().then(onClose).catch(cause => Alert.alert('Could not log out', cause instanceof Error ? cause.message : 'Please try again.'));
   };
 
   return <>
@@ -87,7 +78,7 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
         </View>
         <View style={styles.statusRow}><View style={styles.statusDot} /><Text style={styles.statusText}>{status === 'approved' ? 'Account active' : 'Account status unavailable'}</Text></View>
         <TouchableOpacity accessibilityRole="button" onPress={() => { onClose(); onManageProfile(); }} style={styles.menuItem}><Ionicons name="settings-outline" size={18} color={Colors.ink} /><Text style={styles.menuText}>Account settings</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" onPress={logout} style={styles.menuItem}><Ionicons name="log-out-outline" size={18} color={Colors.ink} /><Text style={styles.menuText}>Log out</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>
+        {confirmLogout ? <View><Text style={styles.menuText}>Log out of your account?</Text><TouchableOpacity accessibilityRole="button" onPress={logout} style={styles.menuItem}><Text style={styles.menuText}>Confirm log out</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(false)} style={styles.menuItem}><Text style={styles.menuText}>Cancel</Text></TouchableOpacity></View> : <TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(true)} style={styles.menuItem}><Ionicons name="log-out-outline" size={18} color={Colors.ink} /><Text style={styles.menuText}>Log out</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>}
       </> : <>
         <Text style={styles.panelSub}>GPS speed and route records appear as they arrive.</Text>
         {loading && alerts.length === 0 ? <Text style={styles.empty}>Loading alerts…</Text> : null}

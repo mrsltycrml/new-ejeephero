@@ -2,13 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Linking } from 'react-native';
 import * as Location from 'expo-location';
 import * as SMS from 'expo-sms';
+import * as Crypto from 'expo-crypto';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
 import { passengerStyles as s } from './PassengerUI';
 import EmergencyHotlines from './EmergencyHotlines';
 import { buildEmergencyMessage, type PassengerFix } from '../services/passengerSafety';
-import { loadEmergencyContacts, type EmergencyContact } from '../services/emergencyService';
+import { callEmergencyService, loadEmergencyContacts, type EmergencyContact } from '../services/emergencyService';
 
 type Props = { activeVehicleId?: string; activeVehiclePlate?: string; activeVehicleBody?: string; activeVehicleIsSample?: boolean };
 export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeVehicleBody, activeVehicleIsSample }: Props) {
@@ -64,7 +65,18 @@ export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeV
       const text = buildEmergencyMessage({ message: list[0]?.preset_message, fix: point, body: vehicle.body, plate: vehicle.plate, isSample: vehicle.sample });
       setMessage(text);
       if (!list.length) { setPhase('fallback'); setStatus('No emergency contacts are saved. Call a hotline below, or add a contact in Safety.'); return; }
-      await openMessages(list, text, current);
+      setStatus('Sending emergency alert…');
+      try {
+        const token = await getAccessToken();
+        if (run.current !== current) return;
+        const result = await callEmergencyService(token, { action: 'dispatch', requestId: Crypto.randomUUID(), fix: point, vehicleBody: vehicle.body, vehiclePlate: vehicle.plate, isSample: vehicle.sample });
+        if (run.current !== current) return;
+        if (result.accepted === list.length && result.total === list.length && !list.some(contact => contact.localOnly)) {
+          setPhase('ready'); setStatus('SMS provider accepted the alert for all saved contacts. Delivery is not confirmed. Call a hotline if you need immediate help.'); return;
+        }
+      } catch { /* The provider may have accepted a message even if the request timed out. */ }
+      if (run.current !== current) return;
+      setPhase('fallback'); setStatus('Automatic delivery could not be confirmed for every contact. Open Messages to send the alert; some contacts may receive duplicates.');
     };
     timer.current = setInterval(() => {
       if (run.current !== current) return;
@@ -96,7 +108,7 @@ export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeV
       <View style={{ flex: 1, padding: 16, backgroundColor: 'rgba(24,40,46,0.5)', alignItems: 'center', justifyContent: 'center' }}>
         <ScrollView style={{ maxHeight: '92%', width: '100%', maxWidth: 480, borderRadius: 12, backgroundColor: Colors.paper }} contentContainerStyle={{ padding: 22, gap: 16 }}>
           <Text accessibilityRole="header" style={s.title}>{phase === 'countdown' ? 'Preparing an SOS alert' : 'Emergency alert'}</Text>
-          {count !== null ? <><Text accessibilityLiveRegion="polite" style={{ fontSize: 44, fontWeight: '800', color: Colors.primaryRed, fontVariant: ['tabular-nums'] }}>{count} sec</Text><Text style={s.body}>When the timer ends, Messages will open with your saved contacts, current GPS location, body number, and plate number. Tap Send in Messages to share the alert.</Text><TouchableOpacity accessibilityRole="button" style={[s.button, { backgroundColor: Colors.ink }]} onPress={close}><Text style={s.buttonText}>Cancel alert</Text></TouchableOpacity></>
+          {count !== null ? <><Text accessibilityLiveRegion="polite" style={{ fontSize: 44, fontWeight: '800', color: Colors.primaryRed, fontVariant: ['tabular-nums'] }}>{count} sec</Text><Text style={s.body}>When the timer ends, the app will attempt to send an SMS with your location and unit details. If unavailable, open Messages and tap Send.</Text><TouchableOpacity accessibilityRole="button" style={[s.button, { backgroundColor: Colors.ink }]} onPress={close}><Text style={s.buttonText}>Cancel alert</Text></TouchableOpacity></>
             : <><Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.body}>{status}</Text>{(phase === 'locating' || phase === 'opening') && <ActivityIndicator color={Colors.primaryRed} />}{phase === 'locating' && <TouchableOpacity accessibilityRole="button" style={[s.button, s.secondary]} onPress={close}><Text style={s.label}>Cancel alert</Text></TouchableOpacity>}</>}
           <View style={{ gap: 4 }}><Text style={s.label}>Unit {activeVehicleBody || 'not selected'} · Plate {activeVehiclePlate || 'not selected'}</Text><Text style={s.muted}>{contactsLoaded ? `${contacts.length} saved contact${contacts.length === 1 ? '' : 's'}` : 'Checking saved contacts…'}</Text>{fix && <Text style={s.muted}>Location captured at {new Date(fix.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{fix.accuracy == null ? '' : ` · accuracy ±${Math.round(fix.accuracy)} m`}</Text>}</View>
           {(phase === 'ready' || phase === 'fallback') && message && contacts.length > 0 && <TouchableOpacity accessibilityRole="button" style={s.button} onPress={() => { void openMessages(); }}><Text style={s.buttonText}>Open Messages</Text></TouchableOpacity>}

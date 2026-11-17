@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
 import { loadActiveFleetUnits } from '../../services/fleetRegistryService';
 
-type ShiftUnit = { bodyNumber: string; plateNumber: string };
+type ShiftUnit = { bodyNumber: string; plateNumber: string; isSample?: boolean };
 
 export default function DashboardScreen() {
   const { t } = useTranslation();
@@ -103,7 +103,7 @@ export default function DashboardScreen() {
         for (const row of registeredUnits) {
           const body = String(row.body_number || '').trim();
           const plate = String(row.plate_number || '').trim();
-          if (body && plate) available.set(body.toUpperCase(), { bodyNumber: body, plateNumber: plate });
+          if (body && plate) available.set(body.toUpperCase(), { bodyNumber: body, plateNumber: plate, isSample: row.is_sample });
         }
         for (const row of historyResult.data || []) {
           const body = String(row.body_number || '').trim();
@@ -295,13 +295,13 @@ export default function DashboardScreen() {
             <Text style={styles.fieldLabel}>Assigned unit</Text>
             <TouchableOpacity style={styles.selectButton} onPress={() => { setUnitMenuOpen(!unitMenuOpen); setRouteMenuOpen(false); }} accessibilityRole="button" accessibilityLabel="Choose assigned unit" accessibilityState={{ expanded: unitMenuOpen }}>
               <View style={styles.routeIcon}><Ionicons name="car-outline" size={21} color={Colors.subtleGray} /></View>
-              <View style={{ flex: 1 }}><Text style={selectedUnit ? styles.routeName : styles.placeholder}>{selectedUnit ? selectedUnit.bodyNumber : 'Choose a unit'}</Text>
+              <View style={{ flex: 1 }}><Text style={selectedUnit ? styles.routeName : styles.placeholder}>{selectedUnit ? `${selectedUnit.bodyNumber}${selectedUnit.isSample ? ' · Sample' : ''}` : 'Choose a unit'}</Text>
                 {!!selectedUnit && <Text style={styles.routeHours}>Plate {selectedUnit.plateNumber}</Text>}</View>
               <Ionicons name={unitMenuOpen ? 'chevron-up' : 'chevron-down'} size={19} color={Colors.subtleGray} />
             </TouchableOpacity>
             {unitMenuOpen && <View style={styles.optionList}><ScrollView style={{ maxHeight: Math.max(96, Math.min(220, viewportHeight * 0.22)) }} nestedScrollEnabled>
               {units.length ? units.map((unit) => <TouchableOpacity key={`${unit.bodyNumber}-${unit.plateNumber}`} style={styles.optionRow} onPress={() => { setBodyNumber(unit.bodyNumber); setPlateNumber(unit.plateNumber); setUnitMenuOpen(false); setShiftError(''); }} accessibilityRole="button">
-                <View><Text style={styles.optionTitle}>{unit.bodyNumber}</Text><Text style={styles.optionMeta}>Plate {unit.plateNumber}</Text></View>
+                <View><Text style={styles.optionTitle}>{unit.bodyNumber}{unit.isSample ? ' · Sample' : ''}</Text><Text style={styles.optionMeta}>Plate {unit.plateNumber}</Text></View>
                 {selectedUnit?.bodyNumber === unit.bodyNumber && <Ionicons name="checkmark" size={18} color={Colors.ink} />}
               </TouchableOpacity>) : <Text style={styles.emptyOptions}>{unitLoading ? 'Loading units…' : 'No units are available. Ask an admin to add your unit.'}</Text>}
             </ScrollView></View>}

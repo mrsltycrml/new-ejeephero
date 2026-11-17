@@ -144,7 +144,7 @@ Shared controls use tight corners (6 px), and coherent panels use modest corners
 - **Filters:** ordinary roster filters use a white surface and dark border to show selection. Sample status stays explicit and never contributes to real monitoring totals.
 - **Reporting period:** the current Philippine period stays visible. Day/week/month/year choices and calendar details appear on demand, keeping the resting control compact.
 - **Navigation:** the supplied official logo anchors the white header; the white bottom bar uses charcoal for the active destination and muted text for inactive destinations. Account and alert details open over the current screen.
-- **SOS:** the red action opens a five-second cancellation window, then prepares the saved contacts, current GPS, and available unit details in Messages. The passenger taps Send; unavailable location or messaging states remain visible.
+- **SOS:** the red action opens a five-second cancellation window, then attempts automatic SMS with current GPS and available unit details. Messages is available as a fallback; unavailable location or messaging states remain visible.
 
 The sidecar's browser snippets translate these native components for preview. Their hover and keyboard-focus styling makes the preview usable; it is not evidence that every application control has an identical custom web focus treatment.
 
@@ -157,6 +157,6 @@ The sidecar's browser snippets translate these native components for preview. Th
 - Do keep empty, unavailable, estimated, and unverified states explicit.
 - Don't present sample positions as live GPS or unverified map geometry as authoritative.
 - Don't present operator fare estimates as a verified LTFRB matrix.
-- Don't imply that SOS sends automatically; Messages opens and the passenger taps Send.
+- Don't describe provider acceptance as confirmed SMS delivery.
 - Don't repeat decorative tinted panels or oversized metrics for ordinary information.
 - Don't replace an anchored header menu with a full-screen destination.
