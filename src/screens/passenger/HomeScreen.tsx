@@ -191,7 +191,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     <TouchableOpacity accessibilityRole="button" onPress={() => void enableLocation()} style={s.input}><Text>Enable location</Text></TouchableOpacity>
     {locationFresh && fix && <TouchableOpacity accessibilityRole="button" onPress={() => map.current?.centerOn(fix.latitude, fix.longitude)} style={s.input}><Text>Center on my location</Text></TouchableOpacity>}
   </View>;
-  const journeyMapProps = { routes, terminals: routeStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes, selectedTerminal: activeStop, onSelectTerminal: chooseDestination };
+  const journeyMapProps = { routes, terminals: routeStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes, selectedTerminal: activeStop, onSelectTerminal: chooseDestination, vehicleSelectionKey: selected?.id ?? null };
 
   // 1) DESTINATION SEARCH VIEW (Board 01 right)
   if (searchOpen) {

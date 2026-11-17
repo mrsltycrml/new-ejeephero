@@ -29,6 +29,7 @@ export interface LeafletMapProps {
   alightingStop?: TerminalData | null;
   walkingRoutes?: WalkingRouteGeometry[];
   selectedVehicle?: VehicleData | null;
+  vehicleSelectionKey?: string | null;
   vehicleFocusRequestId?: string | number;
   fleetMode?: boolean;
   isOffline?: boolean;
@@ -50,6 +51,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   alightingStop,
   walkingRoutes,
   selectedVehicle,
+  vehicleSelectionKey,
   vehicleFocusRequestId,
   fleetMode = false,
   isOffline = false,
@@ -132,6 +134,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     cameraKey: journeyMap.cameraKey,
     selectedRouteId,
     selectedVehicleId: selectedVehicle?.id || null,
+    vehicleSelectionKey,
     vehicleFocusRequestId,
     hideOccupancy,
     isOffline: Boolean(isOffline),
@@ -145,6 +148,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     geofenceResult,
     selectedTerminal,
     selectedVehicle,
+    vehicleSelectionKey,
     vehicleFocusRequestId,
     isOffline,
     journeyMap, selectedRouteId, boardingStop, alightingStop, now,
@@ -515,7 +519,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         window.journeyCameraKey = data.cameraKey;
       }
       // Selection/request identity moves the camera once; telemetry never changes this key.
-      var vehicleFocusKey = data.selectedVehicleId ? JSON.stringify([data.selectedVehicleId, data.vehicleFocusRequestId == null ? null : data.vehicleFocusRequestId]) : null;
+      var vehicleSelectionKey = data.vehicleSelectionKey === undefined ? data.selectedVehicleId : data.vehicleSelectionKey;
+      var vehicleFocusKey = vehicleSelectionKey ? JSON.stringify([vehicleSelectionKey, data.vehicleFocusRequestId == null ? null : data.vehicleFocusRequestId]) : null;
       if (window.vehicleFocusKey !== vehicleFocusKey) {
         window.vehicleFocusKey = vehicleFocusKey;
         window.pendingVehicleFocus = vehicleFocusKey !== null;

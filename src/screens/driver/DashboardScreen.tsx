@@ -544,6 +544,7 @@ export default function DashboardScreen() {
               terminals={mapTerminals}
               vehicles={liveVehicle ? [liveVehicle] : []}
               selectedVehicle={liveVehicle}
+              vehicleSelectionKey={vehicleId}
               selectedRouteId={selectedRoute}
               fleetMode
             />

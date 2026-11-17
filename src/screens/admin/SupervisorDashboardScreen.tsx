@@ -606,6 +606,7 @@ export default function SupervisorDashboardScreen() {
                 terminals={mapTerminals}
                 vehicles={mapVehicles}
                 selectedVehicle={selectedMapVehicle}
+                vehicleSelectionKey={mapUnitFilter === 'all' ? null : mapUnitFilter}
                 vehicleFocusRequestId={vehicleFocusRequestId}
                 selectedRouteId={mapRouteFilter === 'all' ? null : mapRouteFilter}
                 fleetMode

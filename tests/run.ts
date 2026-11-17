@@ -15,3 +15,4 @@ import './routeMap.test.ts';
 await import('./mapHtmlSerialization.test.ts');
 await import('./anomalyLocation.test.ts');
 await import('./driverShiftStart.test.ts');
+await import('./supervisorMapSelection.test.ts');
