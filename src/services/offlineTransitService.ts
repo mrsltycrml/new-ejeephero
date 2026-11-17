@@ -86,6 +86,7 @@ export type TransitResult = {
   syncedAt: string | null;
   error: string | null;
 };
+type TransitSnapshot = Pick<TransitResult, 'routes' | 'terminals'> & { syncedAt: string };
 
 // One new envelope prevents old seeded caches and partial writes from returning.
 const CACHE_KEY = '@ejeephero_real_transit_v1';
@@ -114,6 +115,10 @@ async function readAll<T>(table: string): Promise<T[]> {
 export class OfflineTransitService {
   private static instance: OfflineTransitService;
   private lastLatencyMs = 0;
+  private snapshot: TransitSnapshot | null = null;
+  private requestSequence = 0;
+  private successfulRequest = 0;
+  private cacheWrite: Promise<void> = Promise.resolve();
   private constructor() {}
   public static getInstance(): OfflineTransitService {
     return OfflineTransitService.instance ??= new OfflineTransitService();
@@ -128,25 +133,39 @@ export class OfflineTransitService {
     } catch (cause) {
       const error = cause instanceof Error ? cause.message : 'Transit data unavailable.';
       result = { routes: [], terminals: [], syncedAt: null, isFromCache: false, status: 'unavailable', error };
+      let cached = this.snapshot;
       try {
-        const raw = await AsyncStorage.getItem(CACHE_KEY);
-        const cached = raw ? JSON.parse(raw) : null;
-        if (cached && Array.isArray(cached.routes) && Array.isArray(cached.terminals) && Number.isFinite(Date.parse(cached.syncedAt)) && Date.parse(cached.syncedAt) <= Date.now()) {
-          result = { ...normalizeTransit(cached.routes, cached.terminals), syncedAt: cached.syncedAt, isFromCache: true, status: 'cached', error };
+        if (!cached) {
+          const raw = await AsyncStorage.getItem(CACHE_KEY);
+          const stored = raw ? JSON.parse(raw) : null;
+          if (stored && Array.isArray(stored.routes) && Array.isArray(stored.terminals) && Number.isFinite(Date.parse(stored.syncedAt)) && Date.parse(stored.syncedAt) <= Date.now()) cached = stored;
         }
       } catch { /* A corrupt cache must never become a successful empty read. */ }
+      // A successful source read can supersede disk while getItem is pending.
+      cached = this.snapshot ?? cached;
+      if (cached) result = { ...normalizeTransit(cached.routes, cached.terminals), syncedAt: cached.syncedAt, isFromCache: true, status: 'cached', error };
     }
     this.lastLatencyMs = Math.round(performance.now() - start);
     return { ...result, latencyMs: this.lastLatencyMs };
   }
 
-  public async syncWithRemote() {
+  public async syncWithRemote(): Promise<TransitSnapshot> {
+    const request = ++this.requestSequence;
     const [routes, terminals] = await Promise.all([readAll<RouteData>('routes'), readAll<TerminalData>('terminals')]);
     const current = { ...normalizeTransit(routes, terminals), syncedAt: new Date().toISOString() };
-    try {
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(current));
-    } catch { /* Cache persistence must not override a successful source read. */ }
-    return current;
+    if (request > this.successfulRequest) {
+      this.successfulRequest = request;
+      this.snapshot = current;
+      // Serialize writes; a queued snapshot may already have been superseded.
+      this.cacheWrite = this.cacheWrite.then(async () => {
+        if (this.snapshot !== current) return;
+        try {
+          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(current));
+        } catch { /* Keep the successful in-memory snapshot even when disk fails. */ }
+      });
+    }
+    await this.cacheWrite;
+    return this.snapshot!;
   }
 
   /** Publishes measured evidence; never substitutes server time or unknown values. */

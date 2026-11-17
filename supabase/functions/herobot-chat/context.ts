@@ -7,7 +7,8 @@ const sourcedStop = (row: ReferenceRow) => active(row)
   && typeof row.latitude === 'number' && Number.isFinite(row.latitude) && Math.abs(row.latitude) <= 90
   && typeof row.longitude === 'number' && Number.isFinite(row.longitude) && Math.abs(row.longitude) <= 180
   && /^https?:\/\/\S+$/.test(String(row.location_source_url || ''))
-  && Number.isFinite(Date.parse(String(row.location_verified_at || '')));
+  && Number.isFinite(Date.parse(String(row.location_verified_at || '')))
+  && Date.parse(String(row.location_verified_at || '')) <= Date.now();
 
 export function buildTransitChatContext(routes: ReferenceRow[] | null, stops: ReferenceRow[] | null) {
   const rules = `You are the eSAKAY commuter assistant. Answer transit and app-use questions concisely in English or Taglish.

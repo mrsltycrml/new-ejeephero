@@ -51,6 +51,7 @@ export default function DashboardScreen() {
   const [currentPosition, setCurrentPosition] = useState<MeasuredFix | null>(null);
   const [publishedAt, setPublishedAt] = useState<number | null>(null);
   const [passengerCount, setPassengerCount] = useState<number | null>(null);
+  const [savingPassengerCount, setSavingPassengerCount] = useState(false);
   const [maxCapacity, setMaxCapacity] = useState<number | null>(null);
   const [shiftStartedAt, setShiftStartedAt] = useState<string>('Unavailable');
   const [locationGranted, setLocationGranted] = useState<boolean>(false);
@@ -58,6 +59,7 @@ export default function DashboardScreen() {
   const [endShiftSheetOpen, setEndShiftSheetOpen] = useState(false);
   const publishing = useRef(false);
   const activeVehicle = useRef<string | null>(null);
+  const passengerCountPending = useRef(false);
 
   const checkLocationPerm = useCallback(async () => {
     try {
@@ -221,17 +223,27 @@ export default function DashboardScreen() {
   }, [user?.id, startGpsTracking]);
 
   const updatePassengerCount = async (nextCount: number) => {
+    if (!isActive || !vehicleId || activeVehicle.current !== vehicleId || starting || passengerCountPending.current) return;
     if (maxCapacity == null) { setShiftError('Vehicle capacity unavailable.'); return; }
     const clamped = Math.max(0, Math.min(maxCapacity, nextCount));
     triggerHaptic('light');
-    if (!vehicleId) return;
-    const { error } = await supabase.from('vehicles').update({ passenger_count: clamped }).eq('id', vehicleId);
-    if (error) { setShiftError('Passenger count could not be saved.'); return; }
-    setPassengerCount(clamped);
+    passengerCountPending.current = true;
+    setSavingPassengerCount(true);
+    setShiftError('');
+    try {
+      const { error } = await supabase.from('vehicles').update({ passenger_count: clamped }).eq('id', vehicleId);
+      if (error) throw error;
+      if (activeVehicle.current === vehicleId) setPassengerCount(clamped);
+    } catch {
+      if (activeVehicle.current === vehicleId) setShiftError('Passenger count could not be saved.');
+    } finally {
+      passengerCountPending.current = false;
+      setSavingPassengerCount(false);
+    }
   };
 
   const toggleShift = async () => {
-    if (starting) return;
+    if (starting || passengerCountPending.current) return;
     setShiftError('');
     setStarting(true);
     let insertedId: string | null = null;
@@ -659,6 +671,8 @@ export default function DashboardScreen() {
         <View style={styles.stepperBox}>
           <TouchableOpacity
             style={styles.stepperBtn}
+            disabled={savingPassengerCount || starting || !isActive || maxCapacity == null}
+            accessibilityState={{ disabled: savingPassengerCount || starting || !isActive || maxCapacity == null }}
             onPress={() => updatePassengerCount((passengerCount ?? 0) - 1)}
             accessibilityLabel="Decrease passenger count"
           >
@@ -667,6 +681,8 @@ export default function DashboardScreen() {
           <Text style={styles.stepperValue}>{passengerCount ?? 'Unavailable'}</Text>
           <TouchableOpacity
             style={styles.stepperBtn}
+            disabled={savingPassengerCount || starting || !isActive || maxCapacity == null}
+            accessibilityState={{ disabled: savingPassengerCount || starting || !isActive || maxCapacity == null }}
             onPress={() => updatePassengerCount((passengerCount ?? 0) + 1)}
             accessibilityLabel="Increase passenger count"
           >
@@ -674,7 +690,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.fieldHelper}>Enter the observed passenger count. Changes are saved to this shift.</Text>
+        <Text style={styles.fieldHelper}>{savingPassengerCount ? 'Saving passenger count…' : 'Enter the observed passenger count. Changes are saved to this shift.'}</Text>
 
         <TouchableOpacity
           accessibilityRole="button"
@@ -740,7 +756,7 @@ export default function DashboardScreen() {
 
         <TouchableOpacity
           accessibilityRole="button"
-          disabled={starting}
+          disabled={starting || savingPassengerCount}
           onPress={toggleShift}
           style={styles.confirmEndBtn}
         >

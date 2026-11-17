@@ -52,6 +52,11 @@ hooks.deregister();
 const render = () => { index = 0; effects = []; return SupervisorDashboardScreen(); };
 const find = (node: any, type: string): any => node?.type === type ? node : (node?.props?.children || []).flat(Infinity).map((child: any) => find(child, type)).find(Boolean);
 const identity = (props: any) => props.vehicleSelectionKey === undefined ? props.selectedVehicle?.id ?? null : props.vehicleSelectionKey;
+const textOf = (node: any): string => typeof node === 'string' || typeof node === 'number' ? String(node) : (node?.props?.children || []).flat(Infinity).map(textOf).join('');
+const liveKpi = (node: any): any => {
+  const children = node?.props?.children || [];
+  return textOf(children[0]) === 'Live units' ? children[1].props.children[0] : children.flat(Infinity).map(liveKpi).find(value => value !== undefined);
+};
 
 test('supervisor retains explicit unit identity through source telemetry dropout and recovery', async () => {
   render(); const cleanup = effects.map(effect => effect());
@@ -77,4 +82,40 @@ test('supervisor retains explicit unit identity through source telemetry dropout
     assert.equal(identity(recovered), identity(initial));
     assert.equal(recovered.vehicleFocusRequestId, initial.vehicleFocusRequestId);
   } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); }
+});
+
+test('actual supervisor Live units KPI excludes weak and unknown accuracy', async () => {
+  states.length = 0;
+  positions = [{ ...measured, timestamp: new Date().toISOString(), captured_at: new Date().toISOString(), accuracy: null }];
+  render(); const cleanup = effects.map(effect => effect());
+  try {
+    await setImmediate();
+    let tree = render();
+    assert.equal(find(tree, 'Map').props.vehicles.length, 1, 'weak evidence may still have a map marker');
+    assert.equal(liveKpi(tree), 0);
+    positions[0].accuracy = 60;
+    await find(tree, 'Scroll').props.refreshControl.props.onRefresh();
+    assert.equal(liveKpi(render()), 0);
+    positions[0].accuracy = 5;
+    await find(render(), 'Scroll').props.refreshControl.props.onRefresh();
+    assert.equal(liveKpi(render()), 1);
+  } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); }
+});
+
+test('actual supervisor Live units KPI expires by wall clock without a completed refresh', async (t) => {
+  const now = Date.now();
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now });
+  states.length = 0;
+  positions = [{ ...measured, timestamp: new Date(now).toISOString(), captured_at: new Date(now).toISOString() }];
+  render(); const cleanup = effects.map(effect => effect());
+  try {
+    await setImmediate();
+    assert.equal(liveKpi(render()), 1);
+    // Interval refresh promises cannot finish until this synchronous clock assertion yields.
+    t.mock.timers.tick(31000);
+    const tree = render();
+    assert.equal(find(tree, 'Map').props.vehicles.length, 1);
+    assert.equal(liveKpi(tree), 0);
+    await setImmediate();
+  } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); t.mock.timers.reset(); }
 });

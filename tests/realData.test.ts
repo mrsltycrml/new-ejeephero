@@ -1,15 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
+import { setImmediate } from 'node:timers/promises';
 
 // Replace only storage/network boundaries; exercise the production services.
 const cache = new Map<string, string>();
 let tables: Record<string, any[]> = {};
 let failed = false;
 let cacheWriteFailed = false;
+let cacheReadFailed = false;
+let readOverride: ((table: string) => Promise<any>) | null = null;
+let writeOverride: (() => Promise<void>) | null = null;
 let fleet: any[] = [];
 const published: any[] = [];
-const storage = { getItem: async (key: string) => cache.get(key) ?? null, setItem: async (key: string, value: string) => {
+const storage = { getItem: async (key: string) => {
+  if (cacheReadFailed) throw new Error('Storage unreadable');
+  return cache.get(key) ?? null;
+}, setItem: async (key: string, value: string) => {
+  if (writeOverride) await writeOverride();
   if (cacheWriteFailed) throw new Error('Storage full');
   cache.set(key, value);
 } };
@@ -21,7 +29,7 @@ const database = {
       select: () => query, eq: () => query, in: () => query, gte: () => query, order: () => query, limit: () => query,
       insert: async (row: any) => { if (!failed) published.push(row); return { error: failed ? { message: 'offline' } : null }; },
       range: (a: number, b: number) => { start = a; end = b; return query; },
-      then: (resolve: any, reject: any) => Promise.resolve({ data: failed ? null : (tables[table] ?? []).slice(start, end + 1), error: failed ? { message: 'offline' } : null }).then(resolve, reject),
+      then: (resolve: any, reject: any) => (readOverride ? readOverride(table) : Promise.resolve({ data: failed ? null : (tables[table] ?? []).slice(start, end + 1), error: failed ? { message: 'offline' } : null })).then(resolve, reject),
     };
     return query;
   },
@@ -35,7 +43,8 @@ const hooks = registerHooks({
     return next(specifier, context);
   },
 });
-const { offlineTransit } = await import('../src/services/offlineTransitService.ts');
+const { OfflineTransitService } = await import('../src/services/offlineTransitService.ts');
+let offlineTransit: typeof import('../src/services/offlineTransitService.ts').offlineTransit;
 const { loadActiveFleetUnits, loadRegistry } = await import('../src/services/fleetRegistryService.ts');
 const { loadAdminOperations } = await import('../src/services/adminOperationsService.ts');
 const { evaluateGeofence } = await import('../src/services/geofencingService.ts');
@@ -43,7 +52,12 @@ hooks.deregister();
 
 const route = { id: 'real-route-99', name: 'Verified service', is_active: true, coordinates: [], base_fare: 0, per_km_rate: 0 };
 const stop = { id: 'real-stop', route_id: route.id, name: 'Verified stop', latitude: 14.6, longitude: 121.1, sequence_order: 0, location_verified_at: '2026-11-01T00:00:00Z', location_source_url: 'https://example.test/survey' };
-test.beforeEach(() => { failed = false; cacheWriteFailed = false; });
+test.beforeEach(() => {
+  // Isolate the service's memory without exposing a production reset API.
+  offlineTransit = Reflect.construct(OfflineTransitService, []);
+  cache.clear(); tables = {}; failed = false; cacheWriteFailed = false; cacheReadFailed = false;
+  readOverride = null; writeOverride = null;
+});
 
 test('empty fleet stays empty even in development; sample fleet rows are excluded', async () => {
   fleet = [];
@@ -107,6 +121,17 @@ test('successful empty source reads stay empty when the cache cannot be written'
   assert.equal(result.error, null);
   assert.deepEqual(result.routes, []);
   assert.deepEqual(result.terminals, []);
+  failed = true;
+  for (const storageUnavailable of [false, true]) {
+    cacheReadFailed = storageUnavailable;
+    const offline = await offlineTransit.getTransitData();
+    assert.equal(offline.status, 'cached');
+    assert.equal(offline.isFromCache, true);
+    assert.equal(offline.syncedAt, result.syncedAt);
+    assert.match(offline.error ?? '', /offline/);
+    assert.deepEqual(offline.routes, []);
+    assert.deepEqual(offline.terminals, []);
+  }
 });
 
 test('successful source changes survive cache write failures', async () => {
@@ -119,6 +144,62 @@ test('successful source changes survive cache write failures', async () => {
   assert.equal(result.status, 'ready');
   assert.equal(result.isFromCache, false);
   assert.deepEqual(result.routes.map(row => row.id), ['new-route']);
+});
+
+test('an older overlapping source read cannot replace a newer successful empty snapshot', async () => {
+  const pending: Record<string, (value: any) => void> = {};
+  readOverride = table => new Promise(resolve => { pending[table] = resolve; });
+  const older = offlineTransit.getTransitData();
+  await setImmediate();
+  readOverride = null;
+  const newer = await offlineTransit.getTransitData();
+  pending.routes({ data: [route], error: null });
+  pending.terminals({ data: [stop], error: null });
+  await older;
+  failed = true;
+  const offline = await offlineTransit.getTransitData();
+  assert.deepEqual(offline.routes, []);
+  assert.deepEqual(offline.terminals, []);
+  assert.equal(offline.syncedAt, newer.syncedAt);
+  assert.equal(offline.status, 'cached');
+  assert.match(offline.error ?? '', /offline/);
+  const stored = JSON.parse(cache.get('@ejeephero_real_transit_v1')!);
+  assert.deepEqual(stored.routes, []);
+});
+
+test('overlapping cache persistence is serialized and the final disk snapshot is the newest success', async () => {
+  const releases: Array<() => void> = [];
+  let writes = 0;
+  writeOverride = () => { writes++; return new Promise(resolve => releases.push(resolve)); };
+  tables = { routes: [route], terminals: [stop] };
+  const first = offlineTransit.getTransitData();
+  await setImmediate();
+  tables = {};
+  const second = offlineTransit.getTransitData();
+  await setImmediate();
+  try {
+    assert.equal(writes, 1, 'new persistence must wait for the in-flight write');
+    failed = true;
+    const offlineDuringWrite = await offlineTransit.getTransitData();
+    assert.deepEqual(offlineDuringWrite.routes, [], 'newest success is available before disk finishes');
+    assert.equal(offlineDuringWrite.status, 'cached');
+    releases.shift()!();
+    await setImmediate();
+    assert.equal(writes, 2);
+    releases.shift()!();
+    const [, newest] = await Promise.all([first, second]);
+    const stored = JSON.parse(cache.get('@ejeephero_real_transit_v1')!);
+    assert.deepEqual(stored.routes, []);
+    assert.deepEqual(stored.terminals, []);
+    assert.equal(stored.syncedAt, newest.syncedAt);
+    // A new service has to read the final disk envelope, not this instance's memory.
+    const restarted = Reflect.construct(OfflineTransitService, []);
+    assert.deepEqual((await restarted.getTransitData()).routes, []);
+  } finally {
+    writeOverride = null;
+    releases.splice(0).forEach(release => release());
+    await Promise.all([first, second]);
+  }
 });
 
 test('live fleet excludes sample database vehicles and preserves missing telemetry as unknown', async () => {

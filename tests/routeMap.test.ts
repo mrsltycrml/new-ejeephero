@@ -73,3 +73,17 @@ test('an archived route cannot retain selected stops or map geometry even if oth
   const map = buildJourneyMap({ ...selection, routes: [archived], terminals: [origin, end] });
   assert.deepEqual(map.routes, []); assert.deepEqual(map.terminals, []); assert.deepEqual(map.rideCoordinates, []);
 });
+
+test('future verification cannot supply route geometry, map stops or selectable stops', () => {
+  for (const future of ['2099-01-01', new Date(Date.now() + 60000).toISOString()]) {
+    const futureRoute = { ...route, geometry_verified_at: future };
+    const futureStop = { ...end, location_verified_at: future };
+    const selection = { selectedRouteId: route.id, boardingStop: origin, alightingStop: null };
+    assert.deepEqual(buildJourneyMap({ routes: [futureRoute], terminals: [] }).routes, []);
+    assert.deepEqual(buildJourneyMap({ routes: [route], terminals: [futureStop] }).terminals, []);
+    assert.deepEqual(rideLeg(futureRoute, origin, end), []);
+    assert.deepEqual(rideLeg(route, origin, futureStop), []);
+    assert.deepEqual(selectJourneyStop(selection, futureStop, 'alighting', [route], [origin, futureStop]), selection);
+    assert.equal(reconcileJourneySelection({ ...selection, alightingStop: futureStop }, [route], [origin, futureStop]).alightingStop, null);
+  }
+});

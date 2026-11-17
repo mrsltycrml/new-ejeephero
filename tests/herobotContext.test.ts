@@ -34,3 +34,13 @@ test('failed and empty chat reference reads remain distinct and both forbid inve
     assert.match(context, /Do not use earlier chat answers/);
   }
 });
+
+test('chat reference excludes future verification while retaining past sourced stops', () => {
+  const stop = { route_id: 'r', name: 'Past stop', latitude: 14.5, longitude: 121, location_source_url: 'https://operator.example/stop', location_verified_at: '2026-01-01' };
+  for (const future of ['2099-01-01', new Date(Date.now() + 60000).toISOString()]) {
+    const context = buildTransitChatContext([{ id: 'r', name: 'Published route' }], [stop, { ...stop, name: 'Future stop', location_verified_at: future }]);
+    assert.match(context, /Past stop/);
+    assert.doesNotMatch(context, /Future stop/);
+    assert.match(context, /Never invent/);
+  }
+});

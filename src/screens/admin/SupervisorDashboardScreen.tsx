@@ -531,7 +531,7 @@ export default function SupervisorDashboardScreen() {
               <Text style={styles.kpiLabel}>Live units</Text>
               <Ionicons name="bus-outline" size={17} color={Colors.brandGreen} />
             </View>
-            <Text style={styles.kpiNumber}>{vehicles.length}</Text>
+            <Text style={styles.kpiNumber}>{liveUnits.filter(unit => locationQuality(unit.fix, telemetryNow) === 'live').length}</Text>
           </View>
 
           <View style={styles.kpiTile}>
