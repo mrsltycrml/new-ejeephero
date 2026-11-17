@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { ESAKAY_OPERATIONS } from '../constants/esakayOperations';
+import { FRESH_TELEMETRY_WINDOW_MS, pickLatestFreshPositions } from '../utils/operationsSummary';
 
 export interface RouteData {
   id: string;
@@ -380,21 +381,21 @@ export class OfflineTransitService {
       }
 
       const vehicleIds = activeVehicles.map((vehicle) => vehicle.id);
+      const since = new Date(Date.now() - FRESH_TELEMETRY_WINDOW_MS).toISOString();
       const { data: positions, error: positionsError } = await supabase
         .from('vehicle_positions')
         .select('vehicle_id,latitude,longitude,speed,heading,timestamp')
         .in('vehicle_id', vehicleIds)
-        .order('timestamp', { ascending: false });
+        .gte('timestamp', since)
+        .order('timestamp', { ascending: false })
+        .limit(300);
       if (positionsError) throw positionsError;
 
-      const latestPosition = new Map<string, (typeof positions)[number]>();
-      for (const position of positions ?? []) {
-        if (!latestPosition.has(position.vehicle_id)) latestPosition.set(position.vehicle_id, position);
-      }
+      const latestPosition = pickLatestFreshPositions(positions ?? []);
 
       const currentVehicles = activeVehicles.flatMap((vehicle) => {
         const position = latestPosition.get(vehicle.id);
-        if (!position || Date.now() - Date.parse(position.timestamp) > 120_000) return [];
+        if (!position) return [];
         return [{
           id: vehicle.id,
           vehicle_id: vehicle.id,

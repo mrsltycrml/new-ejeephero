@@ -5,7 +5,8 @@ const require = createRequire(import.meta.url);
 process.env.CI = '1';
 process.env.EXPO_NO_TELEMETRY = '1';
 try {
-  const { expoExport } = require('../node_modules/@expo/cli/build/src/export/index.js');
+  const fromExpo = createRequire(require.resolve('expo/package.json'));
+  const { expoExport } = fromExpo('@expo/cli/build/src/export/index.js');
   await expoExport(['--platform', 'web', '--max-workers', '2']);
   process.exit(0);
 } catch (error) {

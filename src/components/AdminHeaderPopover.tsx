@@ -45,6 +45,7 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
   }, []);
 
   useEffect(() => {
+    setConfirmLogout(false);
     if (panel !== 'alerts') return;
     void loadAlerts();
     const timer = setInterval(() => { void loadAlerts(); }, 15000);

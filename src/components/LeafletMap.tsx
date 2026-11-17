@@ -3,7 +3,6 @@ import { StyleSheet, View, Platform } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { scriptJson } from '../utils/scriptJson';
 import { RouteData, TerminalData, VehicleData } from '../services/offlineTransitService';
-import { StopSafetyProfile, LateNightSafeRoutingResult } from '../services/densityRoutingService';
 import { GeofenceEvaluationResult, DEFAULT_CONFIGURED_BAY_RADIUS_METERS } from '../services/geofencingService';
 import {
   MAKATI_BOUNDS,
@@ -31,8 +30,6 @@ interface LeafletMapProps {
   destinationPlace?: { name: string; latitude: number; longitude: number } | null;
   hideOccupancy?: boolean;
   geofenceResult?: GeofenceEvaluationResult | null;
-  densityProfiles?: Map<string, StopSafetyProfile>;
-  safeRoutingResult?: LateNightSafeRoutingResult | null;
   selectedTerminal?: TerminalData | null;
   selectedVehicle?: VehicleData | null;
   fleetMode?: boolean;
@@ -49,8 +46,6 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   destinationPlace,
   hideOccupancy = false,
   geofenceResult,
-  densityProfiles,
-  safeRoutingResult,
   selectedTerminal,
   selectedVehicle,
   fleetMode = false,
@@ -89,57 +84,43 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   }));
 
   // Serializable payload for the webview
-  const mapData = useMemo(() => {
-    const serializedProfiles: Record<string, { crowdCount: number; densityLevel: string }> = {};
-    if (densityProfiles) {
-      densityProfiles.forEach((v, k) => {
-        serializedProfiles[k] = {
-          crowdCount: v.crowdCount,
-          densityLevel: v.densityLevel,
-        };
-      });
-    }
-
-    return {
-      routes: routes.filter(r => Boolean(r.geometry_verified_at && r.geometry_source_url) && r.coordinates?.length > 1).map(r => ({
-        id: r.id,
-        name: r.name,
-        color_code: r.color_code,
-        coordinates: r.coordinates,
-      })),
-      terminals: terminals.filter(t => Boolean(t.location_verified_at && t.location_source_url)).map(t => ({
-        id: t.id,
-        name: t.name,
-        latitude: t.latitude,
-        longitude: t.longitude,
-        geofenceRadiusMeters: t.geofence_radius_meters,
-        is_esakay_hub: t.is_esakay_hub,
-        isInside: geofenceResult?.currentZone?.id === t.id,
-        isRecommended: safeRoutingResult?.recommendedSafeStop?.id === t.id,
-        isSelected: selectedTerminal?.id === t.id,
-        profile: serializedProfiles[t.id] || { crowdCount: 0, densityLevel: 'Normal' },
-      })),
-      vehicles: vehicles.map(v => ({
-        id: v.id,
-        body_number: v.body_number,
-        plate_number: v.plate_number,
-        latitude: v.latitude,
-        longitude: v.longitude,
-        status: v.status,
-        passenger_count: v.passenger_count,
-        max_capacity: v.max_capacity,
-        speed: v.speed,
-        isSpeeding: Boolean(v.isSpeeding),
-        isSample: Boolean(v.is_sample),
-        isSelected: selectedVehicle?.id === v.id,
-      })),
-      userLocation: userLocation || null,
-      destinationPlace: destinationPlace || null,
-      hideOccupancy,
-      bayRadius: DEFAULT_CONFIGURED_BAY_RADIUS_METERS,
-      isOffline: Boolean(isOffline),
-    };
-  }, [
+  const mapData = useMemo(() => ({
+    routes: routes.filter(r => Boolean(r.geometry_verified_at && r.geometry_source_url) && r.coordinates?.length > 1).map(r => ({
+      id: r.id,
+      name: r.name,
+      color_code: r.color_code,
+      coordinates: r.coordinates,
+    })),
+    terminals: terminals.filter(t => Boolean(t.location_verified_at && t.location_source_url)).map(t => ({
+      id: t.id,
+      name: t.name,
+      latitude: t.latitude,
+      longitude: t.longitude,
+      geofenceRadiusMeters: t.geofence_radius_meters,
+      is_esakay_hub: t.is_esakay_hub,
+      isInside: geofenceResult?.currentZone?.id === t.id,
+      isSelected: selectedTerminal?.id === t.id,
+    })),
+    vehicles: vehicles.map(v => ({
+      id: v.id,
+      body_number: v.body_number,
+      plate_number: v.plate_number,
+      latitude: v.latitude,
+      longitude: v.longitude,
+      status: v.status,
+      passenger_count: v.passenger_count,
+      max_capacity: v.max_capacity,
+      speed: v.speed,
+      isSpeeding: Boolean(v.isSpeeding),
+      isSample: Boolean(v.is_sample),
+      isSelected: selectedVehicle?.id === v.id,
+    })),
+    userLocation: userLocation || null,
+    destinationPlace: destinationPlace || null,
+    hideOccupancy,
+    bayRadius: DEFAULT_CONFIGURED_BAY_RADIUS_METERS,
+    isOffline: Boolean(isOffline),
+  }), [
     routes,
     terminals,
     vehicles,
@@ -147,8 +128,6 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     destinationPlace,
     hideOccupancy,
     geofenceResult,
-    densityProfiles,
-    safeRoutingResult,
     selectedTerminal,
     selectedVehicle,
     isOffline,
@@ -548,13 +527,11 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           }).addTo(geofencesLayer);
 
           // Marker
-          var badgeColor = term.profile.densityLevel.indexOf('High') !== -1 ? '#4CAF50' : (term.profile.densityLevel.indexOf('Moderate') !== -1 ? '#FF9800' : '#757575');
           var iconSymbol = term.is_esakay_hub ? 'H' : 'S';
-          var pinClasses = 'terminal-pin' + (term.isSelected ? ' selected' : '') + (term.isRecommended ? ' safe-recommended' : '');
+          var pinClasses = 'terminal-pin' + (term.isSelected ? ' selected' : '');
           
           var html = '<div class="terminal-marker">' +
             '<div class="' + pinClasses + '">' + iconSymbol + '</div>' +
-            '<div class="terminal-badge" style="background-color:' + badgeColor + '">' + Number(term.profile.crowdCount || 0) + '</div>' +
             '</div>';
 
           var markerIcon = L.divIcon({

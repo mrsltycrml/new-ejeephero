@@ -71,10 +71,6 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
         return;
       }
 
-      // If Clerk requests new-device Device Trust verification, check if this is a verified legacy Supabase account first
-      const legacyOk = await tryLegacySupabaseSignIn(normalizedEmail, password);
-      if (legacyOk) return;
-
       if (attempt.status === 'needs_second_factor') {
         await signIn.prepareSecondFactor({ strategy: 'email_code' } as any);
         setPendingFactor('second');

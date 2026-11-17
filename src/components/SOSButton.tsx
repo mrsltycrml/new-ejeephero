@@ -65,6 +65,10 @@ export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeV
       const text = buildEmergencyMessage({ message: list[0]?.preset_message, fix: point, body: vehicle.body, plate: vehicle.plate, isSample: vehicle.sample });
       setMessage(text);
       if (!list.length) { setPhase('fallback'); setStatus('No emergency contacts are saved. Call a hotline below, or add a contact in Safety.'); return; }
+      if (list.every(contact => contact.localOnly)) {
+        await openMessages(list, text, current);
+        return;
+      }
       setStatus('Sending emergency alert…');
       try {
         const token = await getAccessToken();
@@ -74,7 +78,14 @@ export default function SOSButton({ activeVehicleId, activeVehiclePlate, activeV
         if (result.accepted === list.length && result.total === list.length && !list.some(contact => contact.localOnly)) {
           setPhase('ready'); setStatus('SMS provider accepted the alert for all saved contacts. Delivery is not confirmed. Call a hotline if you need immediate help.'); return;
         }
-      } catch { /* The provider may have accepted a message even if the request timed out. */ }
+      } catch (err: any) {
+        if (run.current !== current) return;
+        // 503 means automatic dispatch is disabled on server; zero SMS queued, open Messages directly.
+        if (err?.status === 503) {
+          await openMessages(list, text, current);
+          return;
+        }
+      }
       if (run.current !== current) return;
       setPhase('fallback'); setStatus('Automatic delivery could not be confirmed for every contact. Open Messages to send the alert; some contacts may receive duplicates.');
     };

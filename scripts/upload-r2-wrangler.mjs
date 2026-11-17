@@ -35,4 +35,11 @@ for (const file of files) {
   wrangler('r2','object','put',objectKey,'--file',localPath,'--content-type','application/json','--remote');
 }
 
+const releaseApk = path.join(rootDir, '.release', 'ejeephero.apk');
+if (fs.existsSync(releaseApk)) {
+  const apkKey = `${bucketName}/releases/ejeephero-latest.apk`;
+  console.log(`[upload:r2] Uploading .release/ejeephero.apk -> r2://${apkKey}`);
+  wrangler('r2','object','put',apkKey,'--file',releaseApk,'--content-type','application/vnd.android.package-archive','--remote');
+}
+
 console.log('[upload:r2] Versioned assets uploaded. Existing objects were preserved; files are served by the eSAKAY Worker.');

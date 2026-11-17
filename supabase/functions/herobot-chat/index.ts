@@ -16,8 +16,15 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     if (Number(req.headers.get('Content-Length') || 0) > 16000) return new Response('Request too large', { status: 413, headers: corsHeaders });
-    const { message } = await req.json();
+    const { message, history } = await req.json();
     const trimmedMessage = String(message ?? "").trim();
+    const recentHistory = Array.isArray(history)
+      ? history
+          .slice(-6)
+          .filter((item: any) => item && (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string')
+          .map((item: any) => ({ role: item.role as 'user' | 'assistant', content: item.content.trim().slice(0, 600) }))
+          .filter((item) => item.content.length > 0)
+      : [];
     if (!trimmedMessage || trimmedMessage.length > 2000) {
       return new Response(JSON.stringify({ error: "Message is required" }), {
         status: 400,
@@ -42,10 +49,10 @@ Deno.serve(async (req) => {
     const budget = await supabase.rpc('claim_chat_request', { p_user_id: resolvedUserId });
     if (budget.error || budget.data !== true) return new Response(JSON.stringify({ error: 'Please wait a minute before sending another message.' }), { status: 429, headers: corsHeaders });
 
-    // Fetch real-time routes and terminals from Supabase for context injection
+    // Fetch real-time routes, terminals, and live unit count from Supabase for context injection
     let contextText = "";
     try {
-      const [{ data: routesData }, { data: terminalsData }] = await Promise.all([
+      const [{ data: routesData }, { data: terminalsData }, { count: activeUnitCount }] = await Promise.all([
         supabase
           .from("routes")
           .select("id,name,description,operating_hours,base_fare,per_km_rate,base_distance_km,fare_effective_date,is_coming_soon")
@@ -55,6 +62,10 @@ Deno.serve(async (req) => {
           .from("terminals")
           .select("name,route_id,sequence_order,is_esakay_hub,is_well_lit,cctv_monitored")
           .order("sequence_order"),
+        supabase
+          .from("vehicles")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true),
       ]);
 
       if (routesData && terminalsData) {
@@ -80,7 +91,7 @@ Deno.serve(async (req) => {
           contextText += `\n* Route: "${route.name}"${statusTag}\n  - Description: ${route.description}\n  - Operating Hours: ${route.operating_hours}\n  - Operator-reported estimate: Regular base fare ₱${baseFare} (Student/Senior/PWD base ₱${discountBase}) for first ${baseKm} km, plus ₱${perKm}/km for every category thereafter. This is not a verified LTFRB fare table.\n  - Route landmarks (official boarding points require posted confirmation): ${stops || "Coming Soon"}\n`;
         });
         contextText +=
-          "\nUse the above data to answer the user's transit question accurately. You are ONLY allowed to answer questions related to Makati e-Jeepneys, routes, terminals, fares, discounts (Student/Senior/PWD), safe night stops, operating hours, SOS/safety features, and transit services. If the user asks an unrelated question, politely decline and explain that your purpose is to help passengers with the Makati e-Jeepney Transit Tracker system. Keep responses concise, well-structured, and helpful in Taglish/English. Use bullet points (-) for lists with a blank line between each item for mobile readability. Do not use markdown bolding or asterisks; return plain text only.";
+          `\nLive active units broadcasting GPS right now: ${activeUnitCount ?? 0}.\nUse the above data to answer the user's transit question accurately. You are ONLY allowed to answer questions related to Makati e-Jeepneys, routes, terminals, fares, discounts (Student/Senior/PWD), safe night stops, operating hours, SOS/safety features, and transit services. If the user asks an unrelated question, politely decline and explain that your purpose is to help passengers with the Makati e-Jeepney Transit Tracker system. Keep responses concise, well-structured, and helpful in Taglish/English. Use bullet points (-) for lists with a blank line between each item for mobile readability. Do not use markdown bolding or asterisks; return plain text only.`;
       }
     } catch (dbErr: any) {
       console.error("Failed to load transit context from database:", dbErr?.message ?? dbErr);
@@ -211,6 +222,7 @@ Deno.serve(async (req) => {
           temperature: 0.2,
           messages: [
             { role: "system", content: contextText || "You are esakaybot, a Makati e-Jeepney transit assistant." },
+            ...recentHistory,
             { role: "user", content: trimmedMessage },
           ],
         }),

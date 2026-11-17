@@ -27,7 +27,11 @@ export default {
     headers.set('X-Content-Type-Options','nosniff');
     headers.set('Referrer-Policy','strict-origin-when-cross-origin');
     headers.set('Permissions-Policy','geolocation=(self), camera=(), microphone=()');
-    if(headers.get('Content-Type')?.includes('text/html') || url.pathname==='/manifest.json') headers.set('Cache-Control','no-cache');
+    if(headers.get('Content-Type')?.includes('text/html') || url.pathname==='/manifest.json') {
+      headers.set('Cache-Control','no-cache');
+    } else if (url.pathname.startsWith('/_expo/static/')) {
+      headers.set('Cache-Control','public, max-age=31536000, immutable');
+    }
     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   },
 };

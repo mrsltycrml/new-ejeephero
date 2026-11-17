@@ -9,17 +9,12 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { NetworkProvider } from './src/contexts/NetworkContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
-import { initDB } from './src/lib/database';
 import { initializeLanguage } from './src/locales/i18n';
 import { clerkPublishableKey, clerkTokenCache, isClerkConfigured } from './src/lib/clerk';
 
 export default function App() {
   useEffect(() => {
-    const init = async () => {
-      await initDB();
-      await initializeLanguage();
-    };
-    init().catch(console.error);
+    initializeLanguage().catch(console.error);
   }, []);
 
   const appTree = (

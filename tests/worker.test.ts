@@ -14,4 +14,7 @@ test('asset gateway returns R2 JSON and genuine missing-file errors, never the a
   const page=await worker.fetch(new Request('https://app.example/'),env);
   assert.equal(page.headers.get('cache-control'),'no-cache');
   assert.equal(page.headers.get('x-content-type-options'),'nosniff');
+  const assetEnv={EJEEPHERO_STATIC:env.EJEEPHERO_STATIC,ASSETS:{fetch:async()=>new Response('console.log(1)',{headers:{'Content-Type':'application/javascript'}})}};
+  const jsAsset=await worker.fetch(new Request('https://app.example/_expo/static/js/web/entry-abc123.js'),assetEnv);
+  assert.equal(jsAsset.headers.get('cache-control'),'public, max-age=31536000, immutable');
 });

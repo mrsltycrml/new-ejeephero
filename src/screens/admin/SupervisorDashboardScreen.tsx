@@ -14,6 +14,7 @@ import { SAMPLE_ROUTE_CUTS, SAMPLE_SPEED_OFFENSES, SAMPLE_TELEMETRY } from '../.
 import ReportingPeriodPicker from '../../components/ReportingPeriodPicker';
 import { currentReportingPeriod, formatReportingPeriod, periodContains, periodRangeUtc } from '../../utils/reportingPeriod';
 import { downloadAdminPeriodReport, openAdminPeriodReport, type PreparedAdminReport } from '../../services/adminReportService';
+import { calculateSafetyScore, FRESH_TELEMETRY_WINDOW_MS, pickLatestFreshPositions } from '../../utils/operationsSummary';
 import { useAuth } from '../../contexts/AuthContext';
 
 type Violation = {
@@ -119,16 +120,16 @@ export default function SupervisorDashboardScreen() {
     setUnitChoices([...choices.values()].sort((a, b) => a.label.localeCompare(b.label)));
     const details = new Map<string, string>(allUnits.map((vehicle: any) => [vehicle.id, `${vehicle.body_number || 'No body number'} · ${vehicle.plate_number || 'No plate number'}`]));
     setUnitDetails(details);
+    const sincePositions = new Date(Date.now() - FRESH_TELEMETRY_WINDOW_MS).toISOString();
     const positionsResult = active.length
       ? await supabase.from('vehicle_positions')
           .select('vehicle_id,latitude,longitude,speed,heading,timestamp')
           .in('vehicle_id', active.map((vehicle) => vehicle.id))
+          .gte('timestamp', sincePositions)
           .order('timestamp', { ascending: false })
+          .limit(300)
       : { data: [], error: null };
-    const latestPosition = new Map<string, any>();
-    for (const position of positionsResult.data ?? []) {
-      if (!latestPosition.has(position.vehicle_id) && Date.now() - Date.parse(position.timestamp) <= 120_000) latestPosition.set(position.vehicle_id, position);
-    }
+    const latestPosition = pickLatestFreshPositions(positionsResult.data ?? []);
     const recentEvents = recentSpeedResult.data ?? [];
     const speedingIds = new Set(recentEvents.map((event: any) => event.vehicle_id));
     const mappedVehicles = active.flatMap((vehicle: any) => {
@@ -175,7 +176,7 @@ export default function SupervisorDashboardScreen() {
         driverId,
         name: profileNames.get(driverId) ?? 'Driver',
         status: profile.status,
-        score: Math.max(0, Math.round(100 - deductions - confirmedTrips * 10)),
+        score: calculateSafetyScore(deductions, confirmedTrips),
         speedEvents: driverEvents.length,
         confirmedTrips,
       };
@@ -188,8 +189,8 @@ export default function SupervisorDashboardScreen() {
   useEffect(() => {
     loadDashboard();
     const refreshTimer = setInterval(() => { void loadDashboard(); }, 15_000);
+    // Avoid subscribing to 3-second vehicle_positions inserts (would trigger 40+ queries/s per tab under fleet load).
     const channel = supabase.channel(`supervisor-live-monitor-${++monitorChannelSequence}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_positions' }, () => loadDashboard())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'speed_events' }, () => loadDashboard())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_violations' }, () => loadDashboard())
       .subscribe();

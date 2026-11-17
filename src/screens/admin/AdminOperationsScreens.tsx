@@ -12,7 +12,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { loadRegistry, saveRegistryRecord, setRegistryDeleted, type ManagedUnit, type ManagedDriver, type RegistryMode } from '../../services/fleetRegistryService';
 import { currentReportingPeriod, periodContains } from '../../utils/reportingPeriod';
 import {
+  forceEndShift,
   loadAdminOperations,
+  setDriverHidden,
   summarizeDrivers,
   summarizeUnits,
   type DriverSummary,
@@ -45,7 +47,7 @@ function useOperationsData() {
     void load();
     const timer = setInterval(() => { void load(); }, 30_000);
     const channel = supabase.channel(`admin-operations-live-${++operationsChannelSequence}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, () => { void load(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicles' }, () => { void load(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'speed_events' }, () => { void load(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_violations' }, () => { void load(); })
       .subscribe();
@@ -127,9 +129,9 @@ function LoadingView() {
   return <View style={styles.center}><ActivityIndicator size="large" color={Colors.primaryRed} /><Text style={styles.loadingText}>Loading operations…</Text></View>;
 }
 
-function UnitCard({ item, driverName, routeName, onTrack, onDelete }: { item: UnitSummary; driverName: string; routeName: string; onTrack: () => void; onDelete: () => void }) {
+function UnitCard({ item, driverName, routeName, onTrack, onDelete, onEndShift }: { item: UnitSummary; driverName: string; routeName: string; onTrack: () => void; onDelete: () => void; onEndShift?: () => void }) {
   const shift = item.activeShift || item.latestShift;
-  return <FleetRosterRow body={item.bodyNumber || item.plateNumber || 'Unit'} plate={item.plateNumber || ''} driver={driverName} route={routeName} trips={item.tripsToday} total={item.totalTrips} started={formatDateTime(shift.created_at)} ended={item.activeShift ? 'In progress' : formatDateTime(shift.ended_at)} status={item.state === 'on_trip' ? 'On trip' : item.state === 'traveled_today' ? 'Traveled today' : 'No trip today'} onTrack={onTrack} onDelete={onDelete} />;
+  return <FleetRosterRow body={item.bodyNumber || item.plateNumber || 'Unit'} plate={item.plateNumber || ''} driver={driverName} route={routeName} trips={item.tripsToday} total={item.totalTrips} started={formatDateTime(shift.created_at)} ended={item.activeShift ? 'In progress' : formatDateTime(shift.ended_at)} status={item.state === 'on_trip' ? 'On trip' : item.state === 'traveled_today' ? 'Traveled today' : 'No trip today'} onTrack={onTrack} onDelete={onDelete} onEndShift={onEndShift} />;
 }
 function SampleUnitCard({ item, onTrack }: { item: SampleUnit; onTrack: () => void }) {
   return <FleetRosterRow body={item.name} plate={item.plateNumber} driver={item.driverName} route={item.routeName} trips={item.tripsToday} total={item.totalTrips} started={item.lastTripStarted} ended={item.shiftEnded} status="Sample" onTrack={onTrack} />;
@@ -195,7 +197,20 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
     else Alert.alert('Delete unit?', `${name} can be restored from Recently deleted. Trip history will remain.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => { void action(); } }]);
   };
 
-  if (loading) return <LoadingView />;
+    const endActiveUnitShift = (record: UnitSummary) => {
+      if (!record.activeShift) return;
+      const name = record.bodyNumber || record.plateNumber || 'this unit';
+      const action = async () => {
+        try {
+          await forceEndShift(record.activeShift!.id);
+          refresh();
+        } catch (cause) { Alert.alert('Could not end shift', cause instanceof Error ? cause.message : 'Try again.'); }
+      };
+      if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(`Force end active shift for ${name}?`)) void action(); }
+      else Alert.alert('Force end shift?', `Close active shift for ${name}?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'End shift', style: 'destructive', onPress: () => { void action(); } }]);
+    };
+
+    if (loading) return <LoadingView />;
   return <FlatList
     style={styles.page}
     data={shown}
@@ -224,14 +239,14 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
     renderItem={({ item }) => {
       if (item.kind === 'sample') return <SampleUnitCard item={item.unit} onTrack={() => trackUnit(item.unit.key, item.unit.name)} />;
       const shift = item.unit.activeShift || item.unit.latestShift;
-      return <UnitCard item={item.unit} driverName={drivers.get(shift.driver_id) || 'Unknown driver'} routeName={routes.get(shift.route_id) || 'Unknown route'} onTrack={() => trackUnit(item.unit.key, item.unit.bodyNumber || item.unit.plateNumber || 'Unit')} onDelete={() => deleteRecordedUnit(item.unit)} />;
+      return <UnitCard item={item.unit} driverName={drivers.get(shift.driver_id) || 'Unknown driver'} routeName={routes.get(shift.route_id) || 'Unknown route'} onTrack={() => trackUnit(item.unit.key, item.unit.bodyNumber || item.unit.plateNumber || 'Unit')} onDelete={() => deleteRecordedUnit(item.unit)} onEndShift={item.unit.activeShift ? () => endActiveUnitShift(item.unit) : undefined} />;
     }}
     ItemSeparatorComponent={() => <View style={styles.itemGap} />}
     ListEmptyComponent={<View style={styles.empty}><Ionicons name="bus-outline" size={36} color={Colors.tabInactive} /><Text style={styles.emptyTitle}>No matching units</Text><Text style={styles.emptyBody}>Try another search or filter.</Text></View>}
   />;
 }
 
-function DriverCard({ item, routeName, speedCount, routeCutCount, periodTrips }: { item: DriverSummary; routeName: string; speedCount: number | null; routeCutCount: number | null; periodTrips: number }) {
+function DriverCard({ item, routeName, speedCount, routeCutCount, periodTrips, onHide }: { item: DriverSummary; routeName: string; speedCount: number | null; routeCutCount: number | null; periodTrips: number; onHide: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const shift = item.activeShift || item.latestShift;
   const accountBlocked = Boolean(item.profile.status && item.profile.status !== 'approved');
@@ -259,6 +274,10 @@ function DriverCard({ item, routeName, speedCount, routeCutCount, periodTrips }:
       <Detail label="Route" value={shift ? routeName : 'No trip yet'} />
       <Detail label={item.activeShift ? 'Shift started' : 'Last trip'} value={shift ? formatDateTime(shift.created_at) : 'No trip yet'} />
       <Detail label="Selected period / total trips" value={`${periodTrips} / ${item.totalTrips}`} />
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Hide ${item.profile.full_name || 'driver'}`} onPress={onHide} style={styles.deleteButton}>
+        <Ionicons name="eye-off-outline" size={15} color={Colors.ember} />
+        <Text style={styles.deleteButtonText}>Hide from active drivers</Text>
+      </TouchableOpacity>
     </View>}
   </View>;
 }
@@ -314,7 +333,17 @@ export function AdminDriversScreen() {
     : [];
   const shown = [...recordedRows, ...sampleRows];
 
-  if (loading) return <LoadingView />;
+    const hideDriverProfile = (driver: DriverSummary) => {
+      const name = driver.profile.full_name || driver.profile.email || 'this driver';
+      const action = async () => {
+        try { await setDriverHidden(driver.profile.id, true); refresh(); }
+        catch (cause) { Alert.alert('Could not hide driver', cause instanceof Error ? cause.message : 'Try again.'); }
+      };
+      if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(`Hide ${name} from active drivers? Their trip history stays intact.`)) void action(); }
+      else Alert.alert('Hide driver?', `Hide ${name} from active driver lists? Their history remains in reports.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Hide', style: 'destructive', onPress: () => { void action(); } }]);
+    };
+
+    if (loading) return <LoadingView />;
   return <FlatList
     style={styles.page}
     data={shown}
@@ -342,7 +371,7 @@ export function AdminDriversScreen() {
     </>}
     renderItem={({ item }) => item.kind === 'sample'
       ? <SampleDriverCard item={item.driver} />
-      : <DriverCard item={item.driver} routeName={routes.get((item.driver.activeShift || item.driver.latestShift)?.route_id || '') || 'Unknown route'} speedCount={data.speedEvents === null ? null : speedCounts.get(item.driver.profile.id) ?? 0} routeCutCount={data.tripViolations === null ? null : routeCutCounts.get(item.driver.profile.id) ?? 0} periodTrips={tripsInPeriod.get(item.driver.profile.id) ?? 0} />}
+      : <DriverCard item={item.driver} routeName={routes.get((item.driver.activeShift || item.driver.latestShift)?.route_id || '') || 'Unknown route'} speedCount={data.speedEvents === null ? null : speedCounts.get(item.driver.profile.id) ?? 0} routeCutCount={data.tripViolations === null ? null : routeCutCounts.get(item.driver.profile.id) ?? 0} periodTrips={tripsInPeriod.get(item.driver.profile.id) ?? 0} onHide={() => hideDriverProfile(item.driver)} />}
     ItemSeparatorComponent={() => <View style={styles.itemGap} />}
     ListEmptyComponent={<View style={styles.empty}><Ionicons name="people-outline" size={36} color={Colors.tabInactive} /><Text style={styles.emptyTitle}>No matching drivers</Text><Text style={styles.emptyBody}>Try another search or filter.</Text></View>}
   />;

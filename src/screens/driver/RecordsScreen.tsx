@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
 import ReportingPeriodPicker from '../../components/ReportingPeriodPicker';
 import { currentReportingPeriod, periodContains, periodRangeUtc, type ReportingPeriod } from '../../utils/reportingPeriod';
+import { calculateSafetyScore } from '../../utils/operationsSummary';
 
 type SpeedRecord = { id: string; created_at: string; speed_kph: number; limit_kph: number; score_deduction: number | null };
 type RouteRecord = { id: string; created_at: string; status: string; reason: string | null };
@@ -91,7 +92,7 @@ export default function RecordsScreen() {
   useEffect(() => { void load(); }, [load]);
   const confirmed = routes.filter((item) => item.status === 'confirmed');
   const speedDeduction = speeds.reduce((sum, item) => sum + Number(item.score_deduction || 0), 0);
-  const score = Math.max(0, Math.round(100 - speedDeduction - confirmed.length * 10));
+  const score = calculateSafetyScore(speedDeduction, confirmed.length);
   const records: DriverRecord[] = [
     ...speeds.map((item) => ({ id: item.id, kind: 'speed' as const, title: 'Speeding offense', detail: `${Math.round(item.speed_kph)} km/h recorded · ${Math.round(item.limit_kph)} km/h limit`, date: item.created_at })),
     ...routes.map((item) => ({ id: item.id, kind: 'route' as const, title: item.status === 'confirmed' ? 'Confirmed route cut' : 'Route review', detail: item.reason || 'Route compliance record', date: item.created_at })),

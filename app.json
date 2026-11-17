@@ -50,14 +50,7 @@
           "defaultChannel": "general"
         }
       ],
-      [
-        "expo-contacts",
-        {
-          "contactsPermission": "Allow eSAKAY to access your contacts to set emergency speed dials."
-        }
-      ],
       "expo-sensors",
-      "expo-sqlite",
       "expo-font",
       "expo-status-bar",
       "expo-secure-store",

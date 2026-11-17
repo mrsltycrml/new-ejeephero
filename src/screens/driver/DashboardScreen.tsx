@@ -39,11 +39,17 @@ export default function DashboardScreen() {
   const locationSub = useRef<Location.LocationSubscription | null>(null);
 
   const publishPosition = useCallback(async (activeVehicleId: string, coords: Location.LocationObjectCoords) => {
+    const rawKph = Math.max(0, (coords.speed || 0) * 3.6);
+    // shortcut: ignore >130 km/h GPS multipath spikes before RLS (0..130) rejects the row.
+    if (rawKph > 130) {
+      setTelemetryError('');
+      return;
+    }
     const { error } = await supabase.from('vehicle_positions').insert({
       vehicle_id: activeVehicleId,
       latitude: coords.latitude,
       longitude: coords.longitude,
-      speed: Math.max(0, (coords.speed || 0) * 3.6),
+      speed: rawKph,
       heading: coords.heading || 0,
     });
     if (error) throw new Error(error.message);
@@ -91,6 +97,7 @@ export default function DashboardScreen() {
   }, []);
 
   useEffect(() => {
+    if (isActive) return;
     let cancelled = false;
     const loadUnits = async () => {
       try {
@@ -122,7 +129,7 @@ export default function DashboardScreen() {
     void loadUnits();
     const timer = setInterval(() => { void loadUnits(); }, 15_000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [user?.id]);
+  }, [user?.id, isActive]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -171,8 +178,9 @@ export default function DashboardScreen() {
     try {
       if (isActive) {
         if (!vehicleId) throw new Error('The active unit could not be found. Refresh and try again.');
+        // Omit ended_at so the Postgres trigger records server now() instead of skewed device time.
         const { error } = await supabase.from('vehicles')
-          .update({ is_active: false, passenger_count: 0, ended_at: new Date().toISOString() })
+          .update({ is_active: false, passenger_count: 0 })
           .eq('id', vehicleId);
         if (error) throw new Error(error.message);
         locationSub.current?.remove();

@@ -7,10 +7,14 @@ const key = (userId: string) => `esakay:emergency-contacts:${userId}`;
 export async function callEmergencyService(token: string | null, body: Record<string, unknown>) {
   if (!token) throw new Error('Sign in again to use automatic emergency messages.');
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), body.action === 'dispatch' ? 20000 : 8000);
+  const timeout = setTimeout(() => controller.abort(), body.action === 'dispatch' ? 6000 : 8000);
   try {
     const { data, error } = await supabase.functions.invoke('emergency-dispatch', { headers: { Authorization: `Bearer ${token}` }, body, signal: controller.signal });
-    if (error || data?.error) throw new Error(data?.error || 'Automatic messaging is unavailable.');
+    if (error || data?.error) {
+      const err = new Error(data?.error || 'Automatic messaging is unavailable.') as Error & { status?: number };
+      err.status = (error as any)?.context?.status;
+      throw err;
+    }
     return data;
   } finally { clearTimeout(timeout); }
 }

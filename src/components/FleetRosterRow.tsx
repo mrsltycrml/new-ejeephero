@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'r
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/theme';
 
-type Props = { body: string; plate: string; driver: string; route: string; trips: number; total: number; started: string; ended: string; status: string; onTrack: () => void; onDelete?: () => void };
+type Props = { body: string; plate: string; driver: string; route: string; trips: number; total: number; started: string; ended: string; status: string; onTrack: () => void; onDelete?: () => void; onEndShift?: () => void };
 export default function FleetRosterRow(props: Props) {
   const [open, setOpen] = useState(false);
   const wide = useWindowDimensions().width >= 760;
@@ -19,6 +19,7 @@ export default function FleetRosterRow(props: Props) {
     {!wide && <View style={styles.mobileSub}><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.meta}>{props.driver}</Text><Text style={styles.meta}>{props.trips} trips today</Text></View><TouchableOpacity accessibilityRole="button" accessibilityLabel={`Track ${props.body}`} onPress={props.onTrack} style={styles.action}><Ionicons name="navigate-outline" size={16} color={Colors.ink}/><Text style={styles.actionText}>Track unit</Text></TouchableOpacity></View>}
     {open && <View style={styles.detail}>
       <Pair label="Route" value={props.route}/><Pair label="Last trip" value={props.started}/><Pair label="Shift ended" value={props.ended}/><Pair label="Total trips" value={String(props.total)}/>
+      {props.onEndShift && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`End shift for ${props.body}`} onPress={props.onEndShift} style={styles.delete}><Ionicons name="stop-circle-outline" size={16} color={Colors.primaryRed}/><Text style={{ color: Colors.primaryRed, fontSize: 13 }}>Force end shift</Text></TouchableOpacity>}
       {props.onDelete && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete unit ${props.body}`} onPress={props.onDelete} style={styles.delete}><Ionicons name="trash-outline" size={16} color={Colors.primaryRed}/><Text style={{ color: Colors.primaryRed, fontSize: 13 }}>Delete unit</Text></TouchableOpacity>}
     </View>}
   </View>;

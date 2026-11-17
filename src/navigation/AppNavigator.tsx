@@ -39,7 +39,6 @@ import { AdminDriversScreen, AdminUnitsScreen } from '../screens/admin/AdminOper
 
 // Shared
 import WeatherScreen from '../screens/shared/WeatherScreen';
-import ContactsScreen from '../screens/shared/ContactsScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 
 const Stack = createNativeStackNavigator();

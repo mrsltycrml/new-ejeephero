@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { Asset } from 'expo-asset';
 import { supabase } from '../lib/supabase';
 import { formatReportingPeriod, periodRangeUtc, type ReportingPeriod } from '../utils/reportingPeriod';
+import { calculateSafetyScore } from '../utils/operationsSummary';
 import { SimplePdf } from '../utils/simplePdf';
 import { loadRegistry } from './fleetRegistryService';
 import { ESAKAY_OPERATIONS, ROUTE_WAYPOINT_REVIEW } from '../constants/esakayOperations';
@@ -103,7 +104,7 @@ export async function openAdminPeriodReport(period: ReportingPeriod, liveUnits: 
   const scoreRows = profiles.map((profile) => {
     const events = speeds.filter((event) => event.driver_id === profile.id);
     const confirmed = cuts.filter((cut) => cut.driver_id === profile.id && cut.status === 'confirmed');
-    const score = Math.max(0, Math.round(100 - events.reduce((sum, event) => sum + Number(event.score_deduction || 0), 0) - confirmed.length * 10));
+    const score = calculateSafetyScore(events.reduce((sum, event) => sum + Number(event.score_deduction || 0), 0), confirmed.length);
     return [profile.full_name || profile.email || 'Unknown', profile.status || 'Unknown', shifts.filter((shift) => shift.driver_id === profile.id).length, events.length, confirmed.length, score];
   }).sort((a, b) => Number(a[5]) - Number(b[5]));
   report.table(['Driver', 'Account', 'Shifts', 'Speed', 'Route cuts', 'Score'], [150, 95, 55, 55, 80, 55], scoreRows);
