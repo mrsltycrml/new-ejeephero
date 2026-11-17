@@ -26,6 +26,9 @@ test('stationary proximity, duplicate fixes and multiple nearby vehicles never e
   assert.equal(detectRide(first.evidence, fix(1), [vehicle(1), vehicle(1, { id: 'v2', vehicle_id: 'v2' })], start + 10000).evidence, null);
 });
 test('sample, stale, inaccurate and missing telemetry cannot auto-assign an SOS unit', () => {
+  assert.deepEqual(nearbyRideUnits({ ...fix(0), timestamp: NaN }, [vehicle(0)], start), []);
+  assert.deepEqual(nearbyRideUnits(fix(0), [vehicle(0, { accuracy: null })], start), []);
+  assert.deepEqual(nearbyRideUnits(fix(0), [vehicle(0, { accuracy: 100 })], start), []);
   assert.deepEqual(nearbyRideUnits(fix(0), [vehicle(0, { is_sample: true })], start), []);
   assert.deepEqual(nearbyRideUnits(fix(0), [vehicle(0, { recorded_at: undefined })], start), []);
   assert.deepEqual(nearbyRideUnits(fix(3), [vehicle(0)], start + 30000), []);

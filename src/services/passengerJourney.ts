@@ -1,5 +1,6 @@
 import type { VehicleData } from './offlineTransitService';
 import type { PassengerFix } from './passengerSafety';
+import { locationQuality } from './locationQuality.ts';
 
 export type RideEvidence = { id: string; first: PassengerFix; last: PassengerFix; vehicleTime: number; count: number };
 export function meters(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
@@ -7,10 +8,9 @@ export function meters(a: { latitude: number; longitude: number }, b: { latitude
   const h = Math.sin((b.latitude - a.latitude) * rad / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin((b.longitude - a.longitude) * rad / 2) ** 2;
   return 6371000 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
-const validPoint = (p: { latitude: number; longitude: number }) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180;
 export function nearbyRideUnits(fix: PassengerFix | null, vehicles: VehicleData[], now: number) {
-  if (!fix || !validPoint(fix) || fix.accuracy == null || !Number.isFinite(fix.accuracy) || fix.accuracy < 0 || fix.accuracy > 20 || now - fix.timestamp > 15_000 || fix.timestamp > now + 3000) return [];
-  return vehicles.filter(v => !v.is_sample && validPoint(v) && v.body_number && v.plate_number && Number.isFinite(Date.parse(v.recorded_at || '')) && now - Date.parse(v.recorded_at!) <= 20_000 && Date.parse(v.recorded_at!) <= now + 3000)
+  if (!fix || locationQuality(fix, now) !== 'live' || fix.accuracy! > 20 || now - fix.timestamp > 15_000 || fix.timestamp > now + 3000) return [];
+  return vehicles.filter(v => !v.is_sample && locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now) === 'live' && v.body_number && v.plate_number && now - Date.parse(v.recorded_at!) <= 20_000 && Date.parse(v.recorded_at!) <= now + 3000)
     .map(vehicle => ({ vehicle, distance: meters(fix, vehicle) })).filter(v => v.distance <= 60).sort((a, b) => a.distance - b.distance);
 }
 

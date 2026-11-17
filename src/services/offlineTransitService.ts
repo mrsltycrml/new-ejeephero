@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { FRESH_TELEMETRY_WINDOW_MS, pickLatestFreshPositions } from '../utils/operationsSummary';
 import { realRows } from '../utils/realData';
+import { telemetryFix, positionPayload, validPoint, type MeasuredFix } from './locationQuality';
+import { activeRoute, verifiedRoute, verifiedStop } from './routeMap';
 
 export interface RouteData {
   id: string;
@@ -63,6 +65,7 @@ export interface VehicleData {
   status: 'Maluwag' | 'Sakto' | 'Puno' | null;
   isSpeeding?: boolean;
   recorded_at?: string;
+  accuracy?: number | null;
   is_sample?: boolean;
 }
 
@@ -81,17 +84,13 @@ export type TransitResult = {
 const CACHE_KEY = '@ejeephero_real_transit_v1';
 
 function normalizeTransit(rawRoutes: RouteData[], rawTerminals: TerminalData[]) {
-  const routes = realRows(rawRoutes).filter(route => route.is_active !== false && route.is_published !== false && !route.deleted_at && !route.is_coming_soon && (!route.status || ['active', 'published'].includes(route.status))).map(route => ({
+  const routes = realRows(rawRoutes).filter(activeRoute).map(route => ({
     ...route,
-    coordinates: route.geometry_verified_at && route.geometry_source_url && Array.isArray(route.coordinates) && route.coordinates.length > 1 && route.coordinates.every(validPoint) ? route.coordinates : [],
+    coordinates: verifiedRoute(route) ? route.coordinates : [],
   }));
   const routeIds = new Set(routes.map(route => route.id));
-  const terminals = realRows(rawTerminals).filter(stop => routeIds.has(stop.route_id) && stop.is_active !== false && !stop.deleted_at && stop.location_verified_at && stop.location_source_url && validPoint(stop));
+  const terminals = realRows(rawTerminals).filter(stop => routeIds.has(stop.route_id) && verifiedStop(stop));
   return { routes, terminals };
-}
-
-function validPoint(point: { latitude: number; longitude: number }): boolean {
-  return Number.isFinite(point.latitude) && Math.abs(point.latitude) <= 90 && Number.isFinite(point.longitude) && Math.abs(point.longitude) <= 180;
 }
 
 async function readAll<T>(table: string): Promise<T[]> {
@@ -143,6 +142,12 @@ export class OfflineTransitService {
     return current;
   }
 
+  /** Publishes measured evidence; never substitutes server time or unknown values. */
+  public async publishPosition(vehicleId: string, fix: MeasuredFix): Promise<void> {
+    const { error } = await supabase.from('vehicle_positions').insert(positionPayload(vehicleId, fix));
+    if (error) throw new Error(error.message);
+  }
+
   /** A failed fleet request rejects; an empty successful feed returns []. */
   public async getVehicles(): Promise<VehicleData[]> {
     const { data, error } = await supabase.from('vehicles').select('*').eq('is_active', true);
@@ -158,6 +163,7 @@ export class OfflineTransitService {
     return activeVehicles.flatMap(vehicle => {
       const position = latest.get(vehicle.id);
       if (!position || !validPoint(position)) return [];
+      const fix = telemetryFix(position);
       const count = Number.isFinite(vehicle.passenger_count) ? vehicle.passenger_count : null;
       const capacity = Number.isFinite(vehicle.max_capacity) && vehicle.max_capacity > 0 ? vehicle.max_capacity : null;
       const full = count != null && capacity != null ? count >= capacity : null;
@@ -165,7 +171,7 @@ export class OfflineTransitService {
         id: vehicle.id, vehicle_id: vehicle.id, route_id: vehicle.route_id,
         plate_number: vehicle.plate_number ?? '', body_number: vehicle.body_number ?? '',
         latitude: position.latitude, longitude: position.longitude,
-        speed: position.speed ?? null, heading: position.heading ?? null, recorded_at: position.timestamp,
+        speed: fix.speed, heading: fix.heading, accuracy: fix.accuracy, recorded_at: position.captured_at!,
         passenger_count: count, max_capacity: capacity, is_full: full,
         status: full == null ? null : full ? 'Puno' as const : count >= capacity * 0.7 ? 'Sakto' as const : 'Maluwag' as const,
       }];

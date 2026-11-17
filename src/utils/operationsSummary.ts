@@ -1,3 +1,5 @@
+import { LIVE_FIX_MS, locationQuality, telemetryFix } from '../services/locationQuality.ts';
+
 export type FleetShift = {
   id: string;
   driver_id: string;
@@ -38,7 +40,7 @@ export type DriverSummary = {
   totalTrips: number;
 };
 
-export const FRESH_TELEMETRY_WINDOW_MS = 120_000;
+export const FRESH_TELEMETRY_WINDOW_MS = LIVE_FIX_MS;
 
 /** Computes driver safety score from speed deductions and confirmed route cuts. */
 export function calculateSafetyScore(speedDeductions: number, confirmedRouteCuts: number): number {
@@ -110,16 +112,19 @@ export type TelemetryRow = {
   speed: number | null;
   heading: number | null;
   timestamp: string;
+  captured_at?: string | null;
+  accuracy?: number | null;
 };
 
 /** Picks the newest position per vehicle only if recorded within the fresh telemetry window. */
 export function pickLatestFreshPositions<T extends TelemetryRow>(positions: T[], nowMs = Date.now()): Map<string, T> {
   const latest = new Map<string, T>();
   for (const position of positions) {
-    const recordedMs = Date.parse(position.timestamp);
-    if (!Number.isFinite(recordedMs) || nowMs - recordedMs > FRESH_TELEMETRY_WINDOW_MS) continue;
+    const fix = telemetryFix(position);
+    const recordedMs = fix.timestamp;
+    if (!['live', 'weak'].includes(locationQuality(fix, nowMs))) continue;
     const prev = latest.get(position.vehicle_id);
-    if (!prev || recordedMs > Date.parse(prev.timestamp)) {
+    if (!prev || recordedMs > Date.parse(prev.captured_at || '')) {
       latest.set(position.vehicle_id, position);
     }
   }

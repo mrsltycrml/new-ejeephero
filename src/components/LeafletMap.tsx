@@ -1,18 +1,11 @@
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useMemo } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef, useMemo, useState } from 'react';
 import { StyleSheet, View, Platform } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { scriptJson } from '../utils/scriptJson';
 import { RouteData, TerminalData, VehicleData } from '../services/offlineTransitService';
-import { GeofenceEvaluationResult, DEFAULT_CONFIGURED_BAY_RADIUS_METERS } from '../services/geofencingService';
-import {
-  MAKATI_BOUNDS,
-  MAKATI_CENTER,
-  MAKATI_MIN_ZOOM,
-  MAKATI_MAX_ZOOM,
-  MAKATI_DEFAULT_ZOOM,
-  WORLD_MASK_OUTER_RING,
-  MAKATI_BOUNDARY_COORDINATES,
-} from '../constants/makatiBoundary';
+import { GeofenceEvaluationResult } from '../services/geofencingService';
+import { buildJourneyMap, type WalkingRouteGeometry } from '../services/routeMap';
+import { locationQuality, validPoint } from '../services/locationQuality';
 
 export interface LeafletMapRef {
   centerOn: (latitude: number, longitude: number, zoom?: number) => void;
@@ -22,7 +15,7 @@ export interface LeafletMapRef {
   ) => void;
 }
 
-interface LeafletMapProps {
+export interface LeafletMapProps {
   routes: RouteData[];
   terminals: TerminalData[];
   vehicles: VehicleData[];
@@ -31,6 +24,10 @@ interface LeafletMapProps {
   hideOccupancy?: boolean;
   geofenceResult?: GeofenceEvaluationResult | null;
   selectedTerminal?: TerminalData | null;
+  selectedRouteId?: string | null;
+  boardingStop?: TerminalData | null;
+  alightingStop?: TerminalData | null;
+  walkingRoutes?: WalkingRouteGeometry[];
   selectedVehicle?: VehicleData | null;
   fleetMode?: boolean;
   isOffline?: boolean;
@@ -47,6 +44,10 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   hideOccupancy = false,
   geofenceResult,
   selectedTerminal,
+  selectedRouteId,
+  boardingStop,
+  alightingStop,
+  walkingRoutes,
   selectedVehicle,
   fleetMode = false,
   isOffline = false,
@@ -57,12 +58,14 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   const NativeWebView = WebView as React.ComponentType<any>;
   const isWeb = Platform.OS === 'web';
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
 
   // Expose imperative methods to parent (like recenter)
   useImperativeHandle(ref, () => ({
     centerOn: (latitude: number, longitude: number, zoom = 16) => {
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(zoom)) return;
-      const clampedZoom = Math.min(Math.max(zoom, MAKATI_MIN_ZOOM), MAKATI_MAX_ZOOM);
+      if (!validPoint({ latitude, longitude }) || !Number.isFinite(zoom)) return;
+      const clampedZoom = Math.min(Math.max(zoom, 3), 19);
       const js = `if (window.leafletMap) { window.leafletMap.flyTo([${latitude}, ${longitude}], ${clampedZoom}, { duration: 0.8 }); }`;
       if (isWeb && iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({ type: 'CENTER', latitude, longitude, zoom: clampedZoom }, '*');
@@ -71,9 +74,9 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       }
     },
     animateToRegion: (region) => {
-      if (!Number.isFinite(region.latitude) || !Number.isFinite(region.longitude)) return;
+      if (!validPoint(region)) return;
       const rawZoom = region.latitudeDelta && region.latitudeDelta < 0.01 ? 17 : 16;
-      const clampedZoom = Math.min(Math.max(rawZoom, MAKATI_MIN_ZOOM), MAKATI_MAX_ZOOM);
+      const clampedZoom = Math.min(Math.max(rawZoom, 3), 19);
       const js = `if (window.leafletMap) { window.leafletMap.flyTo([${region.latitude}, ${region.longitude}], ${clampedZoom}, { duration: 0.8 }); }`;
       if (isWeb && iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({ type: 'CENTER', latitude: region.latitude, longitude: region.longitude, zoom: clampedZoom }, '*');
@@ -84,24 +87,26 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   }));
 
   // Serializable payload for the webview
+  const journeyMap = useMemo(() => buildJourneyMap({ routes, terminals, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes }), [routes, terminals, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes]);
   const mapData = useMemo(() => ({
-    routes: routes.filter(r => Boolean(r.geometry_verified_at && r.geometry_source_url) && r.coordinates?.length > 1).map(r => ({
+    routes: journeyMap.routes.map(r => ({
       id: r.id,
       name: r.name,
       color_code: r.color_code,
       coordinates: r.coordinates,
+      isSelected: r.id === selectedRouteId,
     })),
-    terminals: terminals.filter(t => Boolean(t.location_verified_at && t.location_source_url)).map(t => ({
+    terminals: journeyMap.terminals.map(t => ({
       id: t.id,
       name: t.name,
       latitude: t.latitude,
       longitude: t.longitude,
-      geofenceRadiusMeters: t.geofence_radius_meters,
       is_esakay_hub: t.is_esakay_hub,
       isInside: geofenceResult?.currentZone?.id === t.id,
       isSelected: selectedTerminal?.id === t.id,
+      role: t.id === boardingStop?.id ? 'Board' : t.id === alightingStop?.id ? 'Alight' : 'Stop',
     })),
-    vehicles: vehicles.filter(v => !v.is_sample).map(v => ({
+    vehicles: vehicles.filter(v => !v.is_sample && ['live', 'weak'].includes(locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now))).map(v => ({
       id: v.id,
       body_number: v.body_number,
       plate_number: v.plate_number,
@@ -111,13 +116,20 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       passenger_count: v.passenger_count,
       max_capacity: v.max_capacity,
       speed: v.speed,
-      isSpeeding: Boolean(v.isSpeeding),
+      quality: locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now),
+      measuredAt: v.recorded_at,
+      accuracy: v.accuracy ?? null,
+      isSpeeding: Boolean(v.isSpeeding) && locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now) === 'live',
       isSelected: selectedVehicle?.id === v.id,
     })),
-    userLocation: userLocation || null,
-    destinationPlace: destinationPlace || null,
+    userLocation: userLocation && validPoint(userLocation) ? userLocation : null,
+    destinationPlace: journeyMap.destinationPlace,
+    rideCoordinates: journeyMap.rideCoordinates,
+    walkingRoutes: journeyMap.walkingRoutes,
+    fitPoints: journeyMap.fitPoints,
+    cameraKey: journeyMap.cameraKey,
+    selectedRouteId,
     hideOccupancy,
-    bayRadius: DEFAULT_CONFIGURED_BAY_RADIUS_METERS,
     isOffline: Boolean(isOffline),
   }), [
     routes,
@@ -130,6 +142,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     selectedTerminal,
     selectedVehicle,
     isOffline,
+    journeyMap, selectedRouteId, boardingStop, alightingStop, now,
   ]);
 
   const initialDataRef = useRef(mapData);
@@ -321,7 +334,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
 <body>
   <div id="map"></div>
   <div id="offline-badge" class="offline-badge" style="display: none;">
-    <span class="offline-dot"></span> Offline Makati Map Active
+    <span class="offline-dot"></span> Offline — map tiles may be unavailable
   </div>
   <script>
     function escapedMapText(value) { return String(value).replace(/[&<>"']/g, function(c) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
@@ -336,23 +349,19 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
             escapedMapText(t.name) + ' <span style="color:#778493;font-weight:400;">(' + Number(t.latitude).toFixed(4) + ', ' + Number(t.longitude).toFixed(4) + ')</span></div>';
         }).join('');
         mapEl.innerHTML = '<div style="padding:16px;padding-top:48px;height:100%;overflow-y:auto;background:#f4f1ea;">' +
-          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">Offline Makati Transit Schematic</div>' +
+          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">Map unavailable — verified stop list</div>' +
           listHtml + '</div>';
       };
       window.renderMapData(${scriptJson(initialDataRef.current)});
     } else {
-    // The fleet view covers the full Makati–Mandaluyong corridor.
-    // Passenger maps retain the existing Makati-focused bounds.
-    var MAKATI_BOUNDS = ${JSON.stringify(MAKATI_BOUNDS)};
+    // Regional overview only; this center is never a user or vehicle fix.
     var map = L.map('map', {
       zoomControl: false,
       attributionControl: true,
-      minZoom: ${fleetMode ? 11 : MAKATI_MIN_ZOOM},
-      maxZoom: ${MAKATI_MAX_ZOOM},
-      maxBounds: ${fleetMode ? 'undefined' : 'MAKATI_BOUNDS'},
-      maxBoundsViscosity: ${fleetMode ? 0 : 1},
+      minZoom: 3,
+      maxZoom: 19,
       bounceAtZoomLimits: true
-    }).setView([${fleetMode ? 14.567 : MAKATI_CENTER.latitude}, ${fleetMode ? 121.033 : MAKATI_CENTER.longitude}], ${fleetMode ? 14 : MAKATI_DEFAULT_ZOOM});
+    }).setView([14.567, 121.033], 13);
     window.leafletMap = map;
 
     // 2. IDEA 3: OFFLINE TILE CACHING & FALLBACK
@@ -429,34 +438,12 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     // for offline use. The route and live markers remain available separately.
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      minZoom: ${fleetMode ? 11 : MAKATI_MIN_ZOOM},
-      maxZoom: ${MAKATI_MAX_ZOOM}
+      minZoom: 3,
+      maxZoom: 19
     }).addTo(map);
-
-    // Keep the city mask in the passenger view; it would obscure Mandaluyong units.
-    if (!${fleetMode}) {
-    var worldRing = ${JSON.stringify(WORLD_MASK_OUTER_RING)};
-    var makatiCoords = ${JSON.stringify(MAKATI_BOUNDARY_COORDINATES)};
-    L.polygon([worldRing, makatiCoords], {
-      fillColor: '#0f172a',
-      fillOpacity: 0.38,
-      stroke: false,
-      interactive: false
-    }).addTo(map);
-
-    // High-contrast accent border along official Makati City boundary
-    L.polyline(makatiCoords, {
-      color: '#C41E3A',
-      weight: 2.5,
-      opacity: 0.85,
-      dashArray: '5, 5',
-      interactive: false
-    }).addTo(map);
-    }
 
     // Layer Groups
     var routesLayer = L.layerGroup().addTo(map);
-    var geofencesLayer = L.layerGroup().addTo(map);
     var terminalsLayer = L.layerGroup().addTo(map);
     var vehiclesLayer = L.layerGroup().addTo(map);
     var userLayer = L.layerGroup().addTo(map);
@@ -494,37 +481,39 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
             var latlngs = route.coordinates.map(function(c) { return [c.latitude, c.longitude]; });
             var p = L.polyline(latlngs, {
               color: route.color_code || '#C41E3A',
-              weight: 5,
-              opacity: 0.85
+              weight: route.isSelected ? 7 : 3,
+              opacity: route.isSelected ? 0.95 : (data.selectedRouteId ? 0.25 : 0.65)
             }).addTo(routesLayer);
+            var routeLabel = document.createElement('span');
+            routeLabel.textContent = route.name;
+            p.bindTooltip(routeLabel);
             polylines.push(p);
           }
         });
       }
-      if (!window.hasAutoFitted && polylines.length > 0 && !data.userLocation) {
-        try {
-          var group = L.featureGroup(polylines);
-          map.fitBounds(group.getBounds().pad(0.08));
-          window.hasAutoFitted = true;
-        } catch(err) {}
+      if (data.rideCoordinates && data.rideCoordinates.length > 1) {
+        L.polyline(data.rideCoordinates.map(function(p) { return [p.latitude, p.longitude]; }), {color:'#12734A',weight:10,opacity:1}).addTo(routesLayer);
+      }
+      (data.walkingRoutes || []).forEach(function(walk) {
+        var line = L.polyline(walk.coordinates.map(function(p) { return [p.latitude,p.longitude]; }), {color:'#203B53',weight:4,dashArray:'7 7'}).addTo(routesLayer);
+        var label = document.createElement('span'); label.textContent = 'Walk · ' + walk.source; line.bindTooltip(label);
+      });
+      var selectedRoute = data.routes.find(function(r) { return r.isSelected; });
+      var directed = data.rideCoordinates.length > 1 ? data.rideCoordinates : (selectedRoute ? selectedRoute.coordinates : []);
+      for (var i = 1; i < directed.length; i += Math.max(1, Math.ceil(directed.length / 12))) {
+        var a = directed[i-1], b = directed[i];
+        var angle = Math.atan2((b.longitude-a.longitude)*Math.cos(a.latitude*Math.PI/180), b.latitude-a.latitude)*180/Math.PI;
+        L.marker([(a.latitude+b.latitude)/2,(a.longitude+b.longitude)/2], {interactive:false, icon:L.divIcon({className:'route-direction',html:'<span style="display:block;color:#12734A;font-size:24px;text-shadow:0 0 3px white;transform:rotate('+angle+'deg)">↑</span>',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(routesLayer);
+      }
+      if (window.journeyCameraKey !== data.cameraKey) {
+        if (data.fitPoints.length) map.fitBounds(data.fitPoints.map(function(p) { return [p.latitude,p.longitude]; }), {padding:[30,30],maxZoom:16});
+        window.journeyCameraKey = data.cameraKey;
       }
 
       // 2. Draw Terminals & Geofence Circles
-      geofencesLayer.clearLayers();
       terminalsLayer.clearLayers();
       if (data.terminals) {
         data.terminals.forEach(function(term) {
-          // Geofence Circle
-          var circleColor = term.isInside ? '#4CAF50' : '#C41E3A';
-          var fillColor = term.isInside ? 'rgba(76, 175, 80, 0.25)' : 'rgba(196, 30, 58, 0.12)';
-          L.circle([term.latitude, term.longitude], {
-            radius: term.geofenceRadiusMeters || data.bayRadius || 45,
-            color: circleColor,
-            fillColor: fillColor,
-            fillOpacity: 0.25,
-            weight: 1.5
-          }).addTo(geofencesLayer);
-
           // Marker
           var iconSymbol = term.is_esakay_hub ? 'H' : 'S';
           var pinClasses = 'terminal-pin' + (term.isSelected ? ' selected' : '');
@@ -541,6 +530,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           });
 
           var marker = L.marker([term.latitude, term.longitude], { icon: markerIcon }).addTo(terminalsLayer);
+          var stopLabel = document.createElement('span'); stopLabel.textContent = term.role + ': ' + term.name; marker.bindTooltip(stopLabel);
           marker.on('click', function() {
             sendEvent('SELECT_TERMINAL', { id: term.id });
           });
@@ -554,7 +544,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           var isPuno = veh.status === 'Puno';
           var isSakto = veh.status === 'Sakto';
           var statusColor = veh.isSpeeding ? '#D32F2F' : (isPuno ? '#F44336' : (isSakto ? '#FF9800' : '#4CAF50'));
-          var vehicleStatusText = data.hideOccupancy ? 'GPS position' : (veh.isSpeeding ? 'SPEEDING' : (veh.status || 'Occupancy unavailable'));
+          var vehicleStatusText = veh.quality === 'weak' ? 'Weak GPS · accuracy unknown or poor' : (data.hideOccupancy ? 'GPS position' : (veh.isSpeeding ? 'SPEEDING' : (veh.status || 'Occupancy unavailable')));
           if (data.hideOccupancy) statusColor = '#B63D32';
 
           var vHtml = '<div class="vehicle-marker-wrapper">' +
@@ -575,20 +565,11 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           });
 
           var vMarker = L.marker([veh.latitude, veh.longitude], { icon: vIcon }).addTo(vehiclesLayer);
+          var gpsLabel = document.createElement('span'); gpsLabel.textContent = 'Measured ' + veh.measuredAt + ' · ' + (veh.accuracy == null ? 'accuracy unknown' : '±' + veh.accuracy + ' m'); vMarker.bindTooltip(gpsLabel);
           vMarker.on('click', function() {
             sendEvent('SELECT_VEHICLE', { id: veh.id });
           });
         });
-        var tracked = data.vehicles.find(function(veh) { return veh.isSelected; });
-        if (tracked) {
-          var trackKey = tracked.id + ':' + Number(tracked.latitude).toFixed(5) + ':' + Number(tracked.longitude).toFixed(5);
-          if (window.lastTrackedVehicle !== trackKey) {
-            map.flyTo([tracked.latitude, tracked.longitude], Math.max(map.getZoom(), 16), { duration: 0.6 });
-            window.lastTrackedVehicle = trackKey;
-          }
-        } else {
-          window.lastTrackedVehicle = null;
-        }
       }
 
       // 4. Draw User Location
@@ -639,7 +620,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         if (!data || typeof data !== 'object') return;
         const payload = data as { type?: string; id?: string };
         if (payload.type === 'SELECT_TERMINAL' && onSelectTerminal) {
-          const found = terminals.find((t) => t.id === payload.id);
+          const found = journeyMap.terminals.find((t) => t.id === payload.id);
           if (found) onSelectTerminal(found);
         } else if (payload.type === 'SELECT_VEHICLE' && onSelectVehicle) {
           const found = vehicles.find((v) => v.id === payload.id);
@@ -649,7 +630,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         // ignore non-map messages
       }
     },
-    [onSelectTerminal, onSelectVehicle, terminals, vehicles]
+    [onSelectTerminal, onSelectVehicle, journeyMap.terminals, vehicles]
   );
 
   useEffect(() => {

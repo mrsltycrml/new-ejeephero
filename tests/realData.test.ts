@@ -8,6 +8,7 @@ let tables: Record<string, any[]> = {};
 let failed = false;
 let cacheWriteFailed = false;
 let fleet: any[] = [];
+const published: any[] = [];
 const storage = { getItem: async (key: string) => cache.get(key) ?? null, setItem: async (key: string, value: string) => {
   if (cacheWriteFailed) throw new Error('Storage full');
   cache.set(key, value);
@@ -18,6 +19,7 @@ const database = {
     let start = 0, end = Infinity;
     const query: any = {
       select: () => query, eq: () => query, in: () => query, gte: () => query, order: () => query, limit: () => query,
+      insert: async (row: any) => { if (!failed) published.push(row); return { error: failed ? { message: 'offline' } : null }; },
       range: (a: number, b: number) => { start = a; end = b; return query; },
       then: (resolve: any, reject: any) => Promise.resolve({ data: failed ? null : (tables[table] ?? []).slice(start, end + 1), error: failed ? { message: 'offline' } : null }).then(resolve, reject),
     };
@@ -120,12 +122,41 @@ test('successful source changes survive cache write failures', async () => {
 });
 
 test('live fleet excludes sample database vehicles and preserves missing telemetry as unknown', async () => {
-  tables = { vehicles: [{ id: 'real', is_active: true, body_number: 'REAL', plate_number: 'TEST-1' }, { id: 'sample', is_sample: true, is_active: true }], vehicle_positions: ['real', 'sample'].map(vehicle_id => ({ vehicle_id, latitude: 14.6, longitude: 121.1, speed: null, heading: null, timestamp: new Date().toISOString() })) };
+  tables = { vehicles: [{ id: 'real', is_active: true, body_number: 'REAL', plate_number: 'TEST-1' }, { id: 'sample', is_sample: true, is_active: true }], vehicle_positions: ['real', 'sample'].map(vehicle_id => ({ vehicle_id, latitude: 14.6, longitude: 121.1, speed: null, heading: null, timestamp: new Date().toISOString(), captured_at: new Date().toISOString() })) };
   const result = await offlineTransit.getVehicles();
   assert.deepEqual(result.map(row => row.vehicle_id), ['real']);
   assert.equal(result[0].speed, null);
   assert.equal(result[0].passenger_count, null);
   assert.equal(result[0].status, null);
+  assert.equal(result[0].accuracy, null);
+  assert.equal(result[0].recorded_at, tables.vehicle_positions[0].captured_at);
+});
+
+test('vehicle loader retains capture accuracy and km/h but drops stale and legacy positions', async () => {
+  const captured_at = new Date(Date.now() - 5000).toISOString();
+  tables = { vehicles: [{ id: 'v', is_active: true }], vehicle_positions: [{ vehicle_id: 'v', latitude: 14.6, longitude: 121, speed: 18, heading: 90, accuracy: 7, timestamp: new Date().toISOString(), captured_at }] };
+  const [vehicle] = await offlineTransit.getVehicles();
+  assert.equal(vehicle.speed, 18);
+  assert.equal(vehicle.accuracy, 7);
+  assert.equal(vehicle.recorded_at, captured_at);
+  tables.vehicle_positions[0].captured_at = new Date(Date.now() - 60000).toISOString();
+  assert.deepEqual(await offlineTransit.getVehicles(), []);
+  delete tables.vehicle_positions[0].captured_at;
+  assert.deepEqual(await offlineTransit.getVehicles(), []);
+});
+
+test('publication rejects unusable fixes, preserves measured evidence and reports database failure', async () => {
+  const fix = { latitude: 14.6, longitude: 121, timestamp: Date.now(), speed: null, heading: null, accuracy: 6 };
+  published.length = 0;
+  await assert.rejects(offlineTransit.publishPosition('v', { ...fix, accuracy: null }), /weak/);
+  assert.equal(published.length, 0);
+  await offlineTransit.publishPosition('v', fix);
+  assert.equal(published[0].captured_at, new Date(fix.timestamp).toISOString());
+  assert.equal(published[0].accuracy, 6);
+  assert.equal(published[0].speed, null);
+  failed = true;
+  await assert.rejects(offlineTransit.publishPosition('v', fix), /offline/);
+  assert.equal(published.length, 1);
 });
 
 test('sample operations and registry rows are excluded before counts and summaries', async () => {

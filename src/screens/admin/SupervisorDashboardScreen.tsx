@@ -20,6 +20,7 @@ import { useRoute } from '@react-navigation/native';
 import { ESAKAY_OPERATIONS } from '../../constants/esakayOperations';
 import DirectoryScreen from '../passenger/DirectoryScreen';
 import { realRows } from '../../utils/realData';
+import { locationQuality, telemetryFix, type MeasuredFix } from '../../services/locationQuality';
 import {
   currentReportingPeriod,
   formatReportingPeriod,
@@ -71,6 +72,7 @@ type LiveUnit = {
   lastSeen: string;
   isSpeeding: boolean;
   stale?: boolean;
+  fix: MeasuredFix | null;
 };
 
 type Scorecard = {
@@ -129,6 +131,8 @@ export default function SupervisorDashboardScreen() {
   const [scorecards, setScorecards] = useState<Scorecard[]>([]);
   const [speedEvents, setSpeedEvents] = useState<SpeedEvent[]>([]);
   const [liveUnits, setLiveUnits] = useState<LiveUnit[]>([]);
+  const [telemetryNow, setTelemetryNow] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setTelemetryNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const [unitChoices, setUnitChoices] = useState<UnitChoice[]>([]);
   const [mapRouteFilter, setMapRouteFilter] = useState('all');
   const [mapUnitFilter, setMapUnitFilter] = useState('all');
@@ -221,6 +225,7 @@ export default function SupervisorDashboardScreen() {
     const mappedVehicles = active.flatMap((vehicle: any) => {
       const position = latestPosition.get(vehicle.id);
       if (!position) return [];
+      const fix = telemetryFix(position);
       const count = vehicle.passenger_count ?? null;
       const capacity = vehicle.max_capacity ?? null;
       return [
@@ -232,9 +237,10 @@ export default function SupervisorDashboardScreen() {
           route_id: vehicle.route_id,
           latitude: position.latitude,
           longitude: position.longitude,
-          speed: position.speed ?? null,
-          recorded_at: position.timestamp,
-          heading: position.heading ?? null,
+          speed: fix.speed,
+          recorded_at: position.captured_at || undefined,
+          accuracy: fix.accuracy,
+          heading: fix.heading,
           passenger_count: count,
           max_capacity: capacity,
           is_full: count == null || capacity == null ? null : count >= capacity,
@@ -258,9 +264,10 @@ export default function SupervisorDashboardScreen() {
         body: vehicle.body_number || 'Unit unavailable',
         plate: vehicle.plate_number || 'Plate unavailable',
         speed: position?.speed ?? null,
-        lastSeen: position?.timestamp ?? '',
+        lastSeen: position?.captured_at ?? '',
         isSpeeding: speedingIds.has(vehicle.id),
         stale: !position,
+        fix: position ? telemetryFix(position) : null,
       };
     });
 
@@ -383,6 +390,10 @@ export default function SupervisorDashboardScreen() {
 
   const selectedMapVehicle =
     mapUnitFilter === 'all' ? null : mapVehicles.find((vehicle) => unitKey(vehicle) === mapUnitFilter) || null;
+  const currentLiveUnits = liveUnits.map(unit => {
+    const quality = locationQuality(unit.fix, telemetryNow);
+    return { ...unit, quality, stale: quality !== 'live', speed: quality === 'live' ? unit.fix?.speed ?? null : null };
+  });
 
   if (loading) return <ScreenSkeleton preset="dashboard" />;
   if (dataError) return <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}><Text accessibilityRole="alert">{dataError}</Text></ScrollView>;
@@ -593,13 +604,14 @@ export default function SupervisorDashboardScreen() {
                 terminals={mapTerminals}
                 vehicles={mapVehicles}
                 selectedVehicle={selectedMapVehicle}
+                selectedRouteId={mapRouteFilter === 'all' ? null : mapRouteFilter}
                 fleetMode
               />
             </View>
 
             <View style={styles.staleBanner}>
               <Ionicons name="warning-outline" size={18} color={Colors.warning} />
-              <Text style={styles.staleBannerText}>{liveUnits.filter(unit => unit.stale).length} active shifts have unavailable GPS</Text>
+              <Text style={styles.staleBannerText}>{currentLiveUnits.filter(unit => unit.stale).length} active shifts have stale, weak or unavailable GPS</Text>
             </View>
 
             <View style={styles.dividerList}>
@@ -650,7 +662,7 @@ export default function SupervisorDashboardScreen() {
               </Text>
             </View>
             <View style={styles.dividerList}>
-              {liveUnits.map((unit) => (
+              {currentLiveUnits.map((unit) => (
                 <View key={unit.id} style={styles.listRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>{unit.body}</Text>
@@ -671,7 +683,7 @@ export default function SupervisorDashboardScreen() {
                         ]}
                       >
                         {unit.stale
-                          ? 'GPS unavailable'
+                          ? `GPS ${unit.quality}${unit.quality === 'weak' ? ' — accuracy unknown or poor' : ''}`
                           : `GPS measured ${new Date(unit.lastSeen).toLocaleTimeString()}`}
                       </Text>
                     </View>

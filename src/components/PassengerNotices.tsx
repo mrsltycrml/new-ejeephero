@@ -9,7 +9,7 @@ import { passengerStyles as s } from './PassengerUI';
 import { Colors } from '../constants/theme';
 
 export default function PassengerNotices({ open, onClose, onGuide }: { open: boolean; onClose: () => void; onGuide: () => void }) {
-  const { width } = useWindowDimensions(); const { location } = useLocation();
+  const { width } = useWindowDimensions(); const { location, foreground, errorMsg } = useLocation();
   const insets = useSafeAreaInsets();
   const [zones, setZones] = useState<LoadingZone[]>([]); const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -20,7 +20,7 @@ export default function PassengerNotices({ open, onClose, onGuide }: { open: boo
     return () => { active = false; clearInterval(timer); };
   }, [open]);
   if (!open) return null;
-  const status = evaluateBoardingLocation(location ? { ...location.coords, timestamp: location.timestamp } : null, zones, now);
+  const status = evaluateBoardingLocation(location && foreground && !errorMsg ? { ...location.coords, timestamp: location.timestamp } : null, zones, now);
   return <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 40 }}>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close boarding notices" onPress={onClose} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />
     <View style={[s.section, { position: 'absolute', top: 58 + insets.top, right: 12, width: Math.min(360, width - 24), gap: 12, shadowColor: Colors.ink, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.16, shadowRadius: 22, elevation: 9 }]}>

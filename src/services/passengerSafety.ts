@@ -24,7 +24,7 @@ export function distanceMeters(a: { latitude: number; longitude: number }, b: { 
 }
 
 export function evaluateBoardingLocation(fix: PassengerFix | null, zones: LoadingZone[], now = Date.now()): BoardingStatus {
-  if (!fix || now - fix.timestamp > 60_000 || fix.timestamp > now + 5000) return { kind: 'unavailable', title: 'Location needed', detail: 'Allow location access to check your waiting area.' };
+  if (!fix || !Number.isFinite(fix.timestamp) || now - fix.timestamp > 30_000 || fix.timestamp > now + 5000) return { kind: 'unavailable', title: 'Fresh location needed', detail: 'Enable location and wait for a fresh fix to check your waiting area.' };
   if (!Number.isFinite(fix.latitude) || !Number.isFinite(fix.longitude) || Math.abs(fix.latitude) > 90 || Math.abs(fix.longitude) > 180 || fix.accuracy == null || !Number.isFinite(fix.accuracy) || fix.accuracy < 0 || fix.accuracy > 30) {
     return { kind: 'uncertain', title: 'Checking your location', detail: 'The GPS signal is not precise enough yet. Follow the signs at your stop.' };
   }

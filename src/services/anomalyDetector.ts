@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { Accelerometer } from 'expo-sensors';
 import { supabase } from '../lib/supabase';
+import { locationQuality, telemetryFix } from './locationQuality';
 
 // Conditionally import notifications - skip on web and Expo Go (SDK 53+)
 let Notifications: any = null;
@@ -49,17 +50,18 @@ export const stopAnomalyDetection = () => {
 const triggerAnomaly = async (vehicleId: string, type: string, gForce: number) => {
   const { data: pos } = await supabase
     .from('vehicle_positions')
-    .select('latitude, longitude')
+    .select('*')
     .eq('vehicle_id', vehicleId)
     .order('timestamp', { ascending: false })
     .limit(1)
     .maybeSingle();
 
+  const usable = pos && !pos.is_sample && locationQuality(telemetryFix(pos)) === 'live';
   await supabase.from('anomalies').insert({
     vehicle_id: vehicleId,
     type: `${type} (G-Force: ${gForce.toFixed(2)})`,
-    latitude: pos?.latitude ?? null,
-    longitude: pos?.longitude ?? null,
+    latitude: usable ? pos.latitude : null,
+    longitude: usable ? pos.longitude : null,
   });
 
   if (Notifications) {

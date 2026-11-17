@@ -8,21 +8,25 @@ import { FormScrollView, triggerHaptic } from '../../components/AppUI';
 import { useLocation } from '../../contexts/LocationContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
-import { offlineTransit, type RouteData, type TerminalData, type VehicleData } from '../../services/offlineTransitService';
+import { type TerminalData, type VehicleData } from '../../services/offlineTransitService';
 import { loadLoadingZones } from '../../services/passengerDataService';
 import { evaluateBoardingLocation, type LoadingZone } from '../../services/passengerSafety';
 import { searchPassengerPlaces } from '../../services/placeSearchService';
-import { nearestRouteStop, type PassengerPlace } from '../../services/passengerPlaces';
+import { type PassengerPlace } from '../../services/passengerPlaces';
+import { locationDescription, locationQuality } from '../../services/locationQuality';
+import { rideLeg, selectJourneyStop } from '../../services/routeMap';
 import { Colors } from '../../constants/theme';
 
 export default function PassengerHomeScreen({ route, navigation }: any) {
-  const { location } = useLocation();
+  const { fix, quality, errorMsg, foreground, enableLocation } = useLocation();
   const { isConnected } = useNetwork();
-  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, endRide } = usePassengerJourney();
+  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, endRide, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, walkingRoutes, transit } = usePassengerJourney();
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const map = useRef<LeafletMapRef>(null);
 
-  const [stops, setStops] = useState<TerminalData[]>([]);
+  const stops = transit.terminals;
+  const routes = transit.routes;
+  const [inspectedStop, setInspectedStop] = useState<TerminalData | null>(null);
   const [query, setQuery] = useState(place?.name || destination?.name || '');
   const [searchOpen, setSearchOpen] = useState(false);
   const [boardingOpen, setBoardingOpen] = useState(false);
@@ -31,8 +35,6 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const [searchError, setSearchError] = useState('');
   const [searched, setSearched] = useState(false);
   const searchVersion = useRef(0);
-  const [routes, setRoutes] = useState<RouteData[]>([]);
-  const [transitNotice, setTransitNotice] = useState('Loading routes…');
   const [selected, setSelected] = useState<VehicleData | null>(null);
   const [zones, setZones] = useState<LoadingZone[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -61,16 +63,6 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const lastWarning = useRef<string | null>(null);
   useEffect(() => {
     let active = true;
-    offlineTransit
-      .getTransitData()
-      .then((data) => {
-        if (active) {
-          setStops(data.terminals);
-          setRoutes(data.routes);
-          setTransitNotice(data.status === 'ready' ? (data.routes.length ? '' : 'No published active routes.') : data.syncedAt ? `Routes cached at ${new Date(data.syncedAt).toLocaleString()}; refresh unavailable.` : 'Route data unavailable.');
-        }
-      })
-      .catch(() => {});
     setZonesLoading(true);
     loadLoadingZones()
       .then((data) => {
@@ -92,8 +84,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     };
   }, [isConnected]);
 
-  const fix = location ? { ...location.coords, timestamp: location.timestamp } : null;
-  const boarding = evaluateBoardingLocation(fix, zones, now);
+  const boarding = evaluateBoardingLocation(foreground && !errorMsg ? fix : null, zonesError ? [] : zones, now);
   const warningKey = boarding.kind === 'prohibited' ? boarding.zone!.id : null;
   useEffect(() => {
     if (warningKey && lastWarning.current !== warningKey) {
@@ -102,29 +93,26 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     lastWarning.current = warningKey;
   }, [warningKey]);
 
-  const activeStop = destination ? stops.find(stop => stop.id === destination.id) ?? null : null;
-  const stopIndex = Math.max(0, stops.findIndex((st) => st.id === activeStop?.id));
-  const stopBadgeCode = activeStop ? `STOP ${String(stopIndex + 1).padStart(2, '0')}` : 'UNAVAILABLE';
+  const activeStop = inspectedStop ? stops.find(stop => stop.id === inspectedStop.id && (!selectedRouteId || stop.route_id === selectedRouteId)) ?? null : null;
+  const stopBadgeCode = activeStop ? 'VERIFIED STOP' : 'NO STOP SELECTED';
   const routeName = (id?: string) => routes.find(item => item.id === id)?.name || 'Route unavailable';
 
-  const results = stops.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
-  const allModeVehicles = isConnected ? vehicles.filter(vehicle => !vehicle.is_sample && now - Date.parse(vehicle.recorded_at || '') <= 20_000) : [];
-  const displayed = activeStop
-    ? allModeVehicles.filter((v) => v.route_id === activeStop.route_id)
+  const routeStops = stops.filter(t => !selectedRouteId || t.route_id === selectedRouteId).sort((a, b) => a.sequence_order - b.sequence_order);
+  const results = routeStops.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
+  const allModeVehicles = isConnected ? vehicles.filter(vehicle => !vehicle.is_sample && ['live', 'weak'].includes(locationQuality({ ...vehicle, timestamp: Date.parse(vehicle.recorded_at || '') }, now))) : [];
+  const displayed = selectedRouteId
+    ? allModeVehicles.filter((v) => v.route_id === selectedRouteId)
     : allModeVehicles;
   const currentSelected = selected
     ? displayed.find((v) => v.vehicle_id === selected.vehicle_id) || null
     : null;
-  const locationFresh = location && now - location.timestamp < 60_000;
+  const locationFresh = foreground && !errorMsg && quality === 'live';
 
   const chooseDestination = (stop: TerminalData) => {
     triggerHaptic('light');
-    setPlace(null);
-    setDestination(stop);
-    setQuery(stop.name);
+    setInspectedStop(stop);
     setSearchOpen(false);
     setSelected(null);
-    map.current?.centerOn(stop.latitude, stop.longitude, 15);
   };
 
   const searchPlaces = async () => {
@@ -147,13 +135,11 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
 
   const choosePlace = (value: PassengerPlace) => {
     triggerHaptic('light');
-    const nearest = nearestRouteStop(value, stops);
     setPlace(value);
-    setDestination(nearest?.stop || null);
+    setDestination(null);
     setQuery(value.name);
     setSearchOpen(false);
     setSelected(null);
-    map.current?.centerOn(value.latitude, value.longitude, 15);
   };
 
   const selectVehicle = (vehicle: VehicleData) => {
@@ -172,6 +158,40 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     });
     setBoardingOpen(false);
   };
+
+  const selectedRoute = routes.find(r => r.id === selectedRouteId);
+  const selection = { selectedRouteId, boardingStop, alightingStop };
+  const canChooseStop = (role: 'boarding' | 'alighting') => activeStop && selectJourneyStop(selection, activeStop, role, routes, stops) !== selection;
+  const transitNotice = transit.status === 'ready'
+    ? (routes.length ? `Routes read ${transit.syncedAt ? new Date(transit.syncedAt).toLocaleString() : 'at an unknown time'}.` : 'No published active routes.')
+    : transit.syncedAt ? `Cached routes from ${new Date(transit.syncedAt).toLocaleString()}; refresh unavailable.` : transit.error || 'Route data unavailable.';
+  const journeyControls = <View style={{ padding: 16, gap: 10 }}>
+    <Text style={s.muted}>{transitNotice}</Text>
+    <ScrollView horizontal contentContainerStyle={{ gap: 8 }}>
+      <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: !selectedRouteId }} onPress={() => { setSelectedRouteId(null); setInspectedStop(null); }} style={s.input}><Text>All routes</Text></TouchableOpacity>
+      {routes.map(r => <TouchableOpacity key={r.id} accessibilityRole="button" accessibilityState={{ selected: r.id === selectedRouteId }} onPress={() => { setSelectedRouteId(r.id); setInspectedStop(null); setSelected(null); }} style={[s.input, r.id === selectedRouteId && { backgroundColor: Colors.paleGreen }]}><Text>{r.name}</Text></TouchableOpacity>)}
+    </ScrollView>
+    {!(selectedRoute ? selectedRoute.coordinates.length > 1 : routes.some(r => r.coordinates.length > 1)) && <Text style={s.muted}>Verified route geometry unavailable. No route line can be shown.</Text>}
+    {!routeStops.length && <Text style={s.muted}>Verified stop locations unavailable for this selection.</Text>}
+    <Text style={s.muted}>Boarding: {boardingStop?.name || 'Not selected'} · Alighting: {alightingStop?.name || 'Not selected'}</Text>
+    <Text style={s.muted}>Destination place: {place?.name || 'Not selected'}</Text>
+    {boardingStop && alightingStop && !rideLeg(selectedRoute, boardingStop, alightingStop).length && <Text style={s.muted}>Ride leg unavailable: verified geometry must connect these stops in route order.</Text>}
+    {!!selectedRoute?.coordinates.length && <Text style={s.muted}>Arrows follow published geometry order. Green highlights the selected ride leg.</Text>}
+    {!!activeStop && <View style={{ gap: 8 }}>
+      <Text style={s.label}>{activeStop.name} · {routeName(activeStop.route_id)}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <TouchableOpacity accessibilityRole="button" disabled={!canChooseStop('boarding')} accessibilityState={{ disabled: !canChooseStop('boarding') }} onPress={() => setBoardingStop(activeStop)} style={[s.input, !canChooseStop('boarding') && { opacity: 0.5 }]}><Text>Board here</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" disabled={!canChooseStop('alighting')} accessibilityState={{ disabled: !canChooseStop('alighting') }} onPress={() => setDestination(activeStop)} style={[s.input, !canChooseStop('alighting') && { opacity: 0.5 }]}><Text>Alight here</Text></TouchableOpacity>
+      </View>
+      <Text style={s.muted}>Choose stops on the same route, with boarding before alighting. A stop marker does not verify a loading boundary.</Text>
+    </View>}
+    {(boardingStop || alightingStop) && <TouchableOpacity accessibilityRole="button" onPress={() => { setBoardingStop(null); setDestination(null); }}><Text style={s.muted}>Clear boarding and alighting stops</Text></TouchableOpacity>}
+    <Text style={s.muted}>{errorMsg || locationDescription(fix, now)}</Text>
+    <Text style={s.muted}>Foreground GPS only. The regional map center is not your location.</Text>
+    <TouchableOpacity accessibilityRole="button" onPress={() => void enableLocation()} style={s.input}><Text>Enable location</Text></TouchableOpacity>
+    {locationFresh && fix && <TouchableOpacity accessibilityRole="button" onPress={() => map.current?.centerOn(fix.latitude, fix.longitude)} style={s.input}><Text>Center on my location</Text></TouchableOpacity>}
+  </View>;
+  const journeyMapProps = { routes, terminals: routeStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes, selectedTerminal: activeStop, onSelectTerminal: chooseDestination };
 
   // 1) DESTINATION SEARCH VIEW (Board 01 right)
   if (searchOpen) {
@@ -284,9 +304,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
         {/* Route stops section */}
         <View style={styles.listGroup}>
           <Text style={styles.groupHeading}>Route stops</Text>
-          {(results.length ? results : stops).map((stop) => {
-            const idx = stops.findIndex((st) => st.id === stop.id);
-            const num = String((idx >= 0 ? idx : 0) + 1).padStart(2, '0');
+          {!routeStops.length && <Text style={s.muted}>No verified stop locations for this selection.</Text>}
+          {(query ? results : routeStops).map((stop) => {
+            const num = Number.isFinite(stop.sequence_order) ? String(stop.sequence_order) : '—';
             return (
               <TouchableOpacity
                 key={stop.id}
@@ -299,7 +319,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowTitle}>{stop.name}</Text>
-                  <Text style={styles.rowSubtitle}>{routeName(activeStop?.route_id)}</Text>
+                  <Text style={styles.rowSubtitle}>{routeName(stop.route_id)}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
               </TouchableOpacity>
@@ -339,10 +359,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             ref={map}
             destinationPlace={place}
             hideOccupancy
-            routes={[]}
-            terminals={stops}
+            {...journeyMapProps}
             vehicles={displayed}
-            userLocation={locationFresh ? location.coords : null}
+            userLocation={locationFresh ? fix : null}
             selectedVehicle={targetVehicle}
             isOffline={!isConnected}
             onSelectVehicle={selectVehicle}
@@ -352,6 +371,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           </View>
         </View>
 
+        {journeyControls}
         <View style={[styles.boardingStatusRow, isProhibited && styles.boardingStatusDanger]}>
           <Ionicons
             name={isProhibited ? 'warning' : boarding.kind === 'allowed' ? 'checkmark-circle' : 'information-circle'}
@@ -372,7 +392,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           <View style={styles.stopBadgePill}>
             <Text style={styles.stopBadgeText}>{stopBadgeCode}</Text>
           </View>
-          <Text style={[styles.rowTitle, { fontSize: 17 }]}>{activeStop?.name || 'Choose a verified stop'}</Text>
+          <Text style={[styles.rowTitle, { fontSize: 17 }]}>{boardingStop?.name || 'Boarding stop not selected'}</Text>
         </View>
 
         <View style={s.divider} />
@@ -437,16 +457,16 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             ref={map}
             destinationPlace={place}
             hideOccupancy
-            routes={[]}
-            terminals={stops}
+            {...journeyMapProps}
             vehicles={displayed}
-            userLocation={locationFresh ? location.coords : null}
+            userLocation={locationFresh ? fix : null}
             selectedVehicle={currentSelected}
             isOffline={!isConnected}
             onSelectVehicle={selectVehicle}
           />
         </View>
 
+        {journeyControls}
         <View style={styles.bottomSheetSurface}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetHeading}>You're riding {unit.body_number}</Text>
@@ -458,7 +478,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             </View>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Route</Text>
-              <Text style={styles.kvValue}>{routeName(activeStop?.route_id)}</Text>
+              <Text style={styles.kvValue}>{routeName(vehicles.find(v => v.vehicle_id === unit.vehicle_id)?.route_id)}</Text>
             </View>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Direction</Text>
@@ -529,7 +549,6 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           </Text>
         </TouchableOpacity>
 
-        {!!transitNotice && <Text style={s.muted}>{transitNotice}</Text>}
         <Text style={s.muted}>{vehicleError || (!displayed.length ? 'No current vehicle locations available.' : 'Select a unit on the map.')}</Text>
       </View>
 
@@ -539,10 +558,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           ref={map}
           destinationPlace={place}
           hideOccupancy
-          routes={[]}
-          terminals={stops}
+          {...journeyMapProps}
           vehicles={displayed}
-          userLocation={locationFresh ? location.coords : null}
+          userLocation={locationFresh ? fix : null}
           selectedVehicle={currentSelected}
           isOffline={!isConnected}
           onSelectVehicle={selectVehicle}
@@ -555,6 +573,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
         </View>
       </View>
 
+      {journeyControls}
       {/* Bottom Sheet Card */}
       <View style={styles.bottomSheetSurface}>
         <View style={styles.sheetHandle} />
@@ -566,7 +585,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.stopHeroName}>{activeStop?.name || 'Choose a verified stop'}</Text>
-            <Text style={styles.rowSubtitle}>Check the loading area before boarding</Text>
+            <Text style={styles.rowSubtitle}>Select a stop, then choose Board here or Alight here</Text>
           </View>
         </View>
 
@@ -579,8 +598,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             <Ionicons name="bus-outline" size={19} color={Colors.brandGreen} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>{routeName(activeStop?.route_id)}</Text>
-            <Text style={styles.rowSubtitle}>{activeStop?.name || 'Destination unavailable'}</Text>
+            <Text style={styles.rowTitle}>{routeName(selectedRouteId || undefined)}</Text>
+            <Text style={styles.rowSubtitle}>{alightingStop?.name || 'Alighting stop not selected'}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
         </TouchableOpacity>

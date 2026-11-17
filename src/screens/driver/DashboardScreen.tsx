@@ -11,6 +11,9 @@ import * as Location from 'expo-location';
 import { realRows } from '../../utils/realData';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLocation } from '../../contexts/LocationContext';
+import { useNetwork } from '../../contexts/NetworkContext';
+import { fromDeviceLocation, locationDescription, locationQuality, type MeasuredFix } from '../../services/locationQuality';
 import { startAnomalyDetection, stopAnomalyDetection } from '../../services/anomalyDetector';
 import {
   offlineTransit,
@@ -29,6 +32,8 @@ type ShiftUnit = { bodyNumber: string; plateNumber: string; busyElsewhere?: bool
 
 export default function DashboardScreen() {
   const { user } = useAuth();
+  const { fix, now, foreground, errorMsg: locationError, enableLocation } = useLocation();
+  const { isConnected } = useNetwork();
   const [routes, setRoutes] = useState<any[]>([]);
   const [mapRoutes, setMapRoutes] = useState<RouteData[]>([]);
   const [mapTerminals, setMapTerminals] = useState<TerminalData[]>([]);
@@ -43,14 +48,16 @@ export default function DashboardScreen() {
   const [telemetryError, setTelemetryError] = useState('');
   const [shiftError, setShiftError] = useState('');
   const [starting, setStarting] = useState(false);
-  const [currentPosition, setCurrentPosition] = useState<Location.LocationObjectCoords | null>(null);
+  const [currentPosition, setCurrentPosition] = useState<MeasuredFix | null>(null);
+  const [publishedAt, setPublishedAt] = useState<number | null>(null);
   const [passengerCount, setPassengerCount] = useState<number | null>(null);
   const [maxCapacity, setMaxCapacity] = useState<number | null>(null);
   const [shiftStartedAt, setShiftStartedAt] = useState<string>('Unavailable');
   const [locationGranted, setLocationGranted] = useState<boolean>(false);
   const [passengerSheetOpen, setPassengerSheetOpen] = useState(false);
   const [endShiftSheetOpen, setEndShiftSheetOpen] = useState(false);
-  const locationSub = useRef<Location.LocationSubscription | null>(null);
+  const publishing = useRef(false);
+  const activeVehicle = useRef<string | null>(null);
 
   const checkLocationPerm = useCallback(async () => {
     try {
@@ -63,7 +70,8 @@ export default function DashboardScreen() {
 
   const requestLocationPerm = async () => {
     try {
-      const perm = await Location.requestForegroundPermissionsAsync();
+      await enableLocation();
+      const perm = await Location.getForegroundPermissionsAsync();
       setLocationGranted(perm.status === 'granted');
       if (perm.status === 'granted') setShiftError('');
     } catch {
@@ -75,46 +83,31 @@ export default function DashboardScreen() {
     void checkLocationPerm();
   }, [checkLocationPerm]);
 
-  const publishPosition = useCallback(async (activeVehicleId: string, coords: Location.LocationObjectCoords) => {
-    const rawKph = coords.speed != null && coords.speed >= 0 ? coords.speed * 3.6 : null;
-    if (rawKph != null && rawKph > 130) {
-      setTelemetryError('');
-      return;
-    }
-    const { error } = await supabase.from('vehicle_positions').insert({
-      vehicle_id: activeVehicleId,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      speed: rawKph,
-      heading: coords.heading != null && coords.heading >= 0 ? coords.heading : null,
-    });
-    if (error) throw new Error(error.message);
-    setCurrentPosition(coords);
-    setTelemetryError('');
-  }, []);
-
   const startGpsTracking = useCallback(
-    async (activeVehicleId: string, permissionGranted = false) => {
-      if (!permissionGranted) {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        setLocationGranted(status === 'granted');
-        if (status !== 'granted') throw new Error('Allow location access to monitor this active shift.');
-      }
-      locationSub.current?.remove();
-      locationSub.current = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
-        async (loc) => {
-          setCurrentPosition(loc.coords);
-          try {
-            await publishPosition(activeVehicleId, loc.coords);
-          } catch {
-            setTelemetryError('GPS is not reaching the fleet monitor. Check your connection.');
-          }
-        }
-      );
+    async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      setLocationGranted(status === 'granted');
+      if (status !== 'granted') throw new Error('Allow location access to monitor this active shift.');
+      if (!await Location.hasServicesEnabledAsync()) throw new Error('Device location services are disabled.');
     },
-    [publishPosition]
+    []
   );
+
+  useEffect(() => {
+    activeVehicle.current = isActive ? vehicleId : null;
+    return () => { activeVehicle.current = null; };
+  }, [isActive, vehicleId]);
+  useEffect(() => {
+    if (!isActive || !vehicleId || !fix || !foreground) return;
+    setCurrentPosition(previous => !previous || fix.timestamp > previous.timestamp ? fix : previous);
+    if (locationError || !isConnected || locationQuality(fix, now) !== 'live' || (publishedAt != null && publishedAt >= fix.timestamp) || publishing.current) return;
+    publishing.current = true;
+    void offlineTransit.publishPosition(vehicleId, fix).then(() => {
+      if (activeVehicle.current === vehicleId) { setPublishedAt(fix.timestamp); setTelemetryError(''); }
+    }).catch(() => {
+      if (activeVehicle.current === vehicleId) setTelemetryError('Position was not published. Check connection and telemetry schema; retrying with fresh GPS.');
+    }).finally(() => { publishing.current = false; });
+  }, [isActive, vehicleId, fix?.timestamp, now, foreground, isConnected, locationError, publishedAt]);
 
   useEffect(() => {
     void offlineTransit.getTransitData().then((data) => {
@@ -129,10 +122,6 @@ export default function DashboardScreen() {
     });
 
     return () => {
-      if (locationSub.current) {
-        locationSub.current.remove();
-        locationSub.current = null;
-      }
       stopAnomalyDetection();
     };
   }, []);
@@ -221,9 +210,9 @@ export default function DashboardScreen() {
       setIsActive(true);
       startAnomalyDetection(data.id);
       try {
-        await startGpsTracking(data.id);
-      } catch {
-        setTelemetryError('GPS monitoring is paused. Allow location access and reopen this shift.');
+        await startGpsTracking();
+      } catch (error) {
+        setTelemetryError(error instanceof Error ? error.message : 'GPS monitoring is paused.');
       }
     })();
     return () => {
@@ -254,11 +243,10 @@ export default function DashboardScreen() {
           .update({ is_active: false, passenger_count: 0 })
           .eq('id', vehicleId);
         if (error) throw new Error(error.message);
-        locationSub.current?.remove();
-        locationSub.current = null;
         stopAnomalyDetection();
         setVehicleId(null);
         setCurrentPosition(null);
+        setPublishedAt(null);
         setPassengerCount(0);
         setTelemetryError('');
         setEndShiftSheetOpen(false);
@@ -285,10 +273,14 @@ export default function DashboardScreen() {
           'This unit is already on a shift. Select another unit or ask a supervisor to end its current shift.'
         );
 
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const permission = await Location.getForegroundPermissionsAsync();
       setLocationGranted(permission.status === 'granted');
       if (permission.status !== 'granted') throw new Error('Allow location access to start a live shift.');
+      if (!isConnected) throw new Error('Connect to the internet before starting a shift.');
+      await startGpsTracking();
       const firstFix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const measured = fromDeviceLocation(firstFix);
+      if (locationQuality(measured) !== 'live') throw new Error('Wait for a fresh GPS fix with accuracy within 30 m before starting.');
       const created = await supabase
         .from('vehicles')
         .insert({
@@ -312,8 +304,9 @@ export default function DashboardScreen() {
       } else {
         setShiftStartedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
       }
-      await publishPosition(newVehicleId, firstFix.coords);
-      await startGpsTracking(newVehicleId, true);
+      await offlineTransit.publishPosition(newVehicleId, measured);
+      setCurrentPosition(measured);
+      setPublishedAt(measured.timestamp);
       setVehicleId(newVehicleId);
       setPassengerCount(0);
       setIsActive(true);
@@ -323,8 +316,6 @@ export default function DashboardScreen() {
       triggerHaptic('error');
       let rollbackFailed = false;
       if (insertedId) {
-        locationSub.current?.remove();
-        locationSub.current = null;
         const rollback = await supabase
           .from('vehicles')
           .update({ is_active: false, ended_at: new Date().toISOString() })
@@ -342,7 +333,8 @@ export default function DashboardScreen() {
   };
 
   const currentRouteName = routes.find((r) => r.id === selectedRoute)?.name || 'Route unavailable';
-  const currentSpeedKph = currentPosition?.speed != null && currentPosition.speed >= 0 ? Math.round(currentPosition.speed * 3.6) : null;
+  const gpsUsable = foreground && !locationError && locationQuality(currentPosition, now) === 'live';
+  const currentSpeedKph = gpsUsable && currentPosition?.speed != null ? Math.round(currentPosition.speed) : null;
   const seatStatus = maxCapacity == null || passengerCount == null ? null :
     passengerCount >= maxCapacity
       ? 'Puno'
@@ -351,7 +343,7 @@ export default function DashboardScreen() {
         : 'Maluwag';
 
   const liveVehicle: VehicleData | null =
-    vehicleId && currentPosition
+    vehicleId && currentPosition && gpsUsable
       ? {
           id: vehicleId,
           vehicle_id: vehicleId,
@@ -362,6 +354,8 @@ export default function DashboardScreen() {
           longitude: currentPosition.longitude,
           speed: currentSpeedKph,
           heading: currentPosition.heading != null && currentPosition.heading >= 0 ? currentPosition.heading : null,
+          accuracy: currentPosition.accuracy,
+          recorded_at: new Date(currentPosition.timestamp).toISOString(),
           passenger_count: passengerCount,
           max_capacity: maxCapacity,
           is_full: maxCapacity == null || passengerCount == null ? null : passengerCount >= maxCapacity,
@@ -474,7 +468,7 @@ export default function DashboardScreen() {
                   <Ionicons name="checkmark" size={15} color={Colors.brandGreen} />
                   <Text style={styles.locationEnabledTitle}>Location enabled</Text>
                 </View>
-                <Text style={styles.fieldHelper}>Your GPS location will be shared while on duty.</Text>
+                <Text style={styles.fieldHelper}>Foreground only: keep this app open and the screen active during your shift.</Text>
               </View>
             </View>
           ) : (
@@ -551,21 +545,25 @@ export default function DashboardScreen() {
               terminals={mapTerminals}
               vehicles={liveVehicle ? [liveVehicle] : []}
               selectedVehicle={liveVehicle}
+              selectedRouteId={selectedRoute}
               fleetMode
             />
             <View style={styles.gpsOverlayPill}>
               <View style={styles.greenDot} />
               <Text style={styles.gpsOverlayText}>
-                {currentPosition ? 'GPS updated just now' : 'Waiting for GPS fix…'}
+                {locationDescription(currentPosition, now)}
               </Text>
             </View>
           </View>
 
-          {!!telemetryError && (
+          <Text style={styles.fieldHelper}>Foreground only. Background or a locked screen can pause tracking.</Text>
+          <Text style={styles.fieldHelper}>{!isConnected ? 'Offline — position is not shared.' : publishedAt ? `Last shared measurement: ${new Date(publishedAt).toLocaleTimeString()} (${Math.max(0, Math.floor((now - publishedAt) / 1000))}s ago)` : 'No position published yet.'}</Text>
+          {(!!telemetryError || !!locationError) && (
             <Text accessibilityRole="alert" style={styles.shiftError}>
-              {telemetryError}
+              {locationError || telemetryError}
             </Text>
           )}
+          {!!locationError && <TouchableOpacity accessibilityRole="button" onPress={requestLocationPerm} style={styles.keepActiveBtn}><Text>Enable location / retry</Text></TouchableOpacity>}
 
           {/* 2-Column Telemetry */}
           <View style={styles.telemetryGrid}>
@@ -592,7 +590,7 @@ export default function DashboardScreen() {
           <View style={styles.routeStatusRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />
-              <Text style={styles.onRouteText}>On route</Text>
+              <Text style={styles.onRouteText}>Shift active · route adherence unverified</Text>
             </View>
             <Text style={styles.startedTimeText}>Started {shiftStartedAt}</Text>
           </View>

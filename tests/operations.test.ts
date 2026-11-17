@@ -93,13 +93,13 @@ test('summarizeDrivers sorts active shifts first then alphabetically', () => {
   assert.equal(summary[1].totalTrips, 0);
 });
 
-test('pickLatestFreshPositions drops stale >120s rows and keeps newest per vehicle', () => {
+test('pickLatestFreshPositions drops stale measured rows and keeps newest per vehicle', () => {
   const now = Date.parse('2026-11-17T08:05:00Z');
   const latest = pickLatestFreshPositions(
     [
-      { vehicle_id: 'v1', latitude: 14.56, longitude: 121.03, speed: 15, heading: 0, timestamp: '2026-11-17T08:04:00Z' },
-      { vehicle_id: 'v1', latitude: 14.57, longitude: 121.03, speed: 18, heading: 90, timestamp: '2026-11-17T08:04:45Z' },
-      { vehicle_id: 'v2', latitude: 14.55, longitude: 121.02, speed: 10, heading: 0, timestamp: '2026-11-17T08:01:00Z' },
+      { vehicle_id: 'v1', latitude: 14.56, longitude: 121.03, speed: 15, heading: 0, timestamp: '2026-11-17T08:04:00Z', captured_at: '2026-11-17T08:04:00Z' },
+      { vehicle_id: 'v1', latitude: 14.57, longitude: 121.03, speed: 18, heading: 90, timestamp: '2026-11-17T08:04:45Z', captured_at: '2026-11-17T08:04:45Z' },
+      { vehicle_id: 'v2', latitude: 14.55, longitude: 121.02, speed: 10, heading: 0, timestamp: '2026-11-17T08:01:00Z', captured_at: '2026-11-17T08:01:00Z' },
     ],
     now
   );
