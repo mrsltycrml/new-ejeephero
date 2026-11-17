@@ -5,43 +5,55 @@ import { passengerStyles as s } from '../../components/PassengerUI';
 import { Colors } from '../../constants/theme';
 
 export default function MoreScreen({ navigation }: any) {
-  const links = [
+  const cards = [
     {
       screen: 'PassengerDirectory',
-      name: 'Route & stop directory',
-      desc: 'Browse Route 1 stops, operating hours, fare tables, and trip planner.',
-      icon: 'bus-outline' as const,
+      tag: 'ROUTES & STOPS',
+      name: 'Route directory & planner',
+      desc: 'Explore all Route 1 terminals, fares, and stop-to-stop trip planning.',
+      icon: 'bus' as const,
     },
     {
       screen: 'PassengerWeather',
-      name: 'Makati weather & advisory',
-      desc: 'Live temperature, rain conditions, and commuter travel advisories.',
-      icon: 'partly-sunny-outline' as const,
-    },
-    {
-      screen: 'PassengerAssistant',
-      name: 'esakaybot assistant',
-      desc: 'Ask questions about routes, stops, operating hours, and fares.',
-      icon: 'sparkles-outline' as const,
+      tag: 'LIVE ADVISORY',
+      name: 'Makati weather radar',
+      desc: 'Real-time temperature, rain forecast, and commuter safety advisories.',
+      icon: 'thunderstorm' as const,
     },
     {
       screen: 'PassengerAbout',
+      tag: 'ELECTRIC TRANSIT',
       name: 'About eSAKAY',
-      desc: 'Meralco electric mobility service and safe boarding guide.',
-      icon: 'information-circle-outline' as const,
+      desc: 'Learn about Meralco’s zero-emission electric jeepney network.',
+      icon: 'leaf' as const,
     },
   ];
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
-      <View>
-        <Text style={s.eyebrow}>Commuter Hub</Text>
-        <Text style={s.title}>Travel information</Text>
-        <Text style={s.subtitle}>Routes, live weather, AI assistant, and service guides.</Text>
-      </View>
+      {/* AI ASSISTANT HERO CARD */}
+      <TouchableOpacity
+        accessibilityRole="button"
+        onPress={() => navigation.getParent()?.navigate('PassengerAssistant')}
+        style={s.heroBanner}
+        activeOpacity={0.9}
+      >
+        <View style={[s.row, { justifyContent: 'space-between' }]}>
+          <View style={s.pillDark}>
+            <Ionicons name="sparkles" size={14} color={Colors.brandMintLight} />
+            <Text style={{ fontSize: 11, fontWeight: '800', color: Colors.brandMintLight }}>AI TRANSIT CONCIERGE</Text>
+          </View>
+          <Ionicons name="arrow-forward-circle" size={26} color={Colors.brandMintLight} />
+        </View>
+        <Text style={s.heroTitle}>Ask esakaybot</Text>
+        <Text style={s.heroSubtitle}>
+          Instant answers on Route 1 stops, operating hours, discounted fares, and active e-jeeps.
+        </Text>
+      </TouchableOpacity>
 
-      <View style={{ gap: 12 }}>
-        {links.map((item) => (
+      {/* BENTO GRID */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+        {cards.map((item) => (
           <TouchableOpacity
             key={item.screen}
             accessibilityRole="button"
@@ -49,32 +61,33 @@ export default function MoreScreen({ navigation }: any) {
             style={[
               s.section,
               {
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: 18,
+                flexGrow: 1,
+                flexBasis: 260,
+                justifyContent: 'space-between',
                 gap: 14,
               },
             ]}
           >
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: Colors.sand,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Ionicons name={item.icon} size={22} color={Colors.ink} />
+            <View style={[s.row, { justifyContent: 'space-between' }]}>
+              <View
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 14,
+                  backgroundColor: Colors.ink,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name={item.icon} size={22} color={Colors.brandMintLight} />
+              </View>
+              <Ionicons name="chevron-forward-circle-outline" size={22} color={Colors.subtleGray} />
             </View>
-            <View style={{ flex: 1, gap: 3 }}>
+            <View style={{ gap: 4 }}>
+              <Text style={s.eyebrow}>{item.tag}</Text>
               <Text style={s.sectionTitle}>{item.name}</Text>
               <Text style={s.muted}>{item.desc}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
           </TouchableOpacity>
         ))}
       </View>

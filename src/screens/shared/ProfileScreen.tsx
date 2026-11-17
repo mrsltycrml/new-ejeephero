@@ -167,7 +167,7 @@ export default function ProfileScreen() {
     <FormScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.avatarCard}>
         <View style={styles.avatarCircle}>
-          <Ionicons name="person" size={30} color={Colors.ink} />
+          <Ionicons name="person" size={26} color={Colors.brandMintLight} />
         </View>
         <View style={styles.heroIdentity}>
           <Text style={styles.nameHeader}>{fullName || (isAdmin ? 'Admin' : 'No Name Set')}</Text>
@@ -457,25 +457,31 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
   avatarCard: {
-    paddingVertical: 8,
+    backgroundColor: Colors.ink,
+    borderRadius: 22,
+    padding: 22,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 22,
+    borderWidth: 1,
+    borderColor: Colors.brandSurfaceDark,
   },
   avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.sand,
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: Colors.brandSurfaceDark,
+    borderWidth: 1,
+    borderColor: Colors.brandMint,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 18,
+    marginRight: 16,
   },
   heroIdentity: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   nameHeader: {
-    color: Colors.ink,
+    color: Colors.white,
     fontSize: 22,
-    fontWeight: '600',
+    fontWeight: '800',
     marginBottom: 4,
     letterSpacing: -0.5,
   },
@@ -483,11 +489,11 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     flexShrink: 1,
     ...(Platform.OS === 'web' ? { overflowWrap: 'anywhere' as any } : {}),
-    color: Colors.subtleGray,
-    fontSize: 12,
+    color: Colors.brandMintLight,
+    fontSize: 13,
     lineHeight: 18,
-    fontWeight: '500',
-    marginBottom: 10,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   roleBadge: {
     flexDirection: 'row',

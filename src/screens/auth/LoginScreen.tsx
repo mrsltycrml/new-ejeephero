@@ -363,11 +363,15 @@ export default function LoginScreen({ navigation }: any) {
       contentContainerStyle={styles.scrollContainer}
       showsVerticalScrollIndicator={false}
     >
-        <View style={styles.logoContainer}>
-          <ESakayLogo width={220} />
+        <View style={styles.heroCard}>
+          <ESakayLogo width={186} />
+          <View style={styles.heroPill}>
+            <Ionicons name="flash" size={12} color={Colors.brandMintLight} />
+            <Text style={styles.heroPillText}>ELECTRIC TRANSIT NETWORK</Text>
+          </View>
+          <Text accessibilityRole="header" style={styles.heroTitle}>Sign in to eSAKAY</Text>
+          <Text style={styles.heroSub}>Real-time Makati–Mandaluyong e-jeepney tracking, fares, and commuter safety.</Text>
         </View>
-
-        <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '700', letterSpacing: -0.6, color: Colors.ink, marginBottom: 24 }}>Sign in</Text>
         {isClerkConfigured ? (
           <ClerkSignInForm navigation={navigation} />
         ) : (
@@ -418,6 +422,43 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     gap: 10,
   },
+  heroCard: {
+    backgroundColor: Colors.ink,
+    borderRadius: 22,
+    padding: 24,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: Colors.brandSurfaceDark,
+  },
+  heroPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.brandSurfaceDark,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginTop: 4,
+  },
+  heroPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: Colors.brandMintLight,
+  },
+  heroTitle: {
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: -0.8,
+    color: Colors.white,
+  },
+  heroSub: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#A7F3D0',
+  },
   jeepneyBadge: {
     width: 64,
     height: 64,
@@ -445,7 +486,7 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: Colors.paper,
-    borderRadius: 8,
+    borderRadius: 20,
     padding: 24,
     marginBottom: 18,
     borderWidth: 1,

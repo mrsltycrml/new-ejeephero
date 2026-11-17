@@ -105,22 +105,94 @@ export default function PassengerHomeScreen({ route }: any) {
 
   return (
     <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={s.content}>
-      {/* Hero Header */}
-      <View style={[s.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
-        <View style={{ flex: 1, minWidth: 190 }}>
-          <Text style={s.eyebrow}>Makati – Mandaluyong Loop</Text>
-          <Text style={s.title}>Where are you going?</Text>
-          <Text style={s.subtitle}>Search a destination or tap a stop to track active e-jeeps.</Text>
+      {/* MAP-FIRST HERO COCKPIT */}
+      <View style={[s.heroBanner, { padding: 0, overflow: 'hidden', gap: 0 }]}>
+        {/* Top Dark Command Header */}
+        <View style={{ padding: 18, paddingBottom: 14, gap: 12 }}>
+          <View style={[s.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
+            <View style={{ flex: 1, minWidth: 180 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.brandMintLight }} />
+                <Text style={s.eyebrow}>Route 01 · Electric Transit Cockpit</Text>
+              </View>
+              <Text style={s.heroTitle}>Where are you going?</Text>
+            </View>
+            <SOSButton
+              activeVehicleId={unit?.vehicle_id}
+              activeVehicleBody={unit?.body_number}
+              activeVehiclePlate={unit?.plate_number || undefined}
+              activeVehicleIsSample={unit?.source === 'sample'}
+            />
+          </View>
+
+          {/* Mode Switcher + Route Status Bar */}
+          <View style={[s.row, { justifyContent: 'space-between' }]}>
+            <View style={s.pillDark}>
+              <Ionicons name="analytics-outline" size={13} color={Colors.brandMintLight} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#E2E8F0' }}>
+                {destination ? `${displayed.length} units on ${destination.name}` : 'Select a stop below to show units'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', backgroundColor: Colors.brandSurfaceDark, borderRadius: 999, padding: 3, borderWidth: 1, borderColor: '#1E463E' }}>
+              {(['live', 'sample'] as const).map(value => {
+                const active = mode === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => selectMode(value)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                      backgroundColor: active ? Colors.brandMint : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: active ? Colors.ink : '#94A3B8' }}>
+                      {value === 'live' ? 'LIVE GPS' : 'SAMPLE FLEET'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         </View>
-        <SOSButton
-          activeVehicleId={unit?.vehicle_id}
-          activeVehicleBody={unit?.body_number}
-          activeVehiclePlate={unit?.plate_number || undefined}
-          activeVehicleIsSample={unit?.source === 'sample'}
-        />
+
+        {/* Full-Bleed Map Viewport at Top */}
+        <View style={{ height: 350, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#1E463E' }}>
+          <LeafletMap
+            ref={map}
+            destinationPlace={place}
+            hideOccupancy
+            routes={[]}
+            terminals={[]}
+            vehicles={displayed}
+            userLocation={locationFresh && mode === 'live' ? location.coords : null}
+            selectedVehicle={currentSelected}
+            isOffline={mode === 'live' && !isConnected}
+            onSelectVehicle={selectVehicle}
+          />
+        </View>
+
+        {/* Telemetry Status Footer */}
+        <View style={{ paddingHorizontal: 18, paddingVertical: 11, backgroundColor: Colors.brandSurfaceDark, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="radio-outline" size={16} color={Colors.brandMintLight} />
+          <Text style={{ flex: 1, fontSize: 12, color: '#A7F3D0', fontWeight: '600' }}>
+            {!destination
+              ? 'Tap any numbered stop card below or search a street to filter units.'
+              : mode === 'sample'
+                ? 'Sample preview active · Tap a vehicle marker to test boarding.'
+                : !isConnected
+                  ? 'Offline · Reconnect for live telemetry.'
+                  : errorMsg
+                    ? 'Enable device location to auto-detect your boarded e-jeep.'
+                    : signal}
+          </Text>
+        </View>
       </View>
 
-      {/* Active Ride Banner */}
+      {/* ACTIVE RIDE TRANSPONDER CARD */}
       {unit && (
         <View
           onLayout={e => {
@@ -130,45 +202,124 @@ export default function PassengerHomeScreen({ route }: any) {
             }
           }}
           accessibilityLiveRegion="polite"
-          style={[s.section, { backgroundColor: Colors.ink, borderColor: Colors.ink }]}
+          style={[s.heroBanner, { backgroundColor: '#064E3B', borderColor: Colors.brandMint }]}
         >
           <View style={[s.row, { justifyContent: 'space-between' }]}>
-            <View style={{ flex: 1, gap: 3 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4ADE80' }} />
-                <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: '#94A3B8' }}>
-                  {unit.source === 'sample' ? 'Sample Ride Active' : 'Current Ride'}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 19, fontWeight: '800', color: Colors.white }}>
-                {unit.body_number} · Plate {unit.plate_number}
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={s.eyebrow}>{unit.source === 'sample' ? 'SAMPLE TRANSPONDER LINKED' : 'LIVE RIDE TRANSPONDER'}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: Colors.white }}>
+                {unit.body_number} · {unit.plate_number}
               </Text>
             </View>
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => { endRide(); setQuery(''); setSearchOpen(true); setSelected(null); }}
-              style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.14)' }}
+              style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.16)' }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.white }}>End ride</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.white }}>End ride</Text>
             </TouchableOpacity>
           </View>
-          <Text style={{ fontSize: 12, lineHeight: 18, color: '#CBD5E1' }}>
-            {signal} SOS automatically attaches this unit's body and plate number.
-          </Text>
+          <Text style={{ fontSize: 12, color: '#D1FAE5' }}>{signal} SOS automatically includes this vehicle.</Text>
         </View>
       )}
 
-      {/* Destination Search & Quick Stops */}
+      {/* SELECTED VEHICLE BOARDING SHEET */}
+      {currentSelected && (
+        <View
+          onLayout={e => {
+            selectionY.current = e.nativeEvent.layout.y;
+            scroll.current?.scrollTo({ y: selectionY.current - 12, animated: true });
+          }}
+          style={[s.heroBanner]}
+        >
+          <View style={[s.row, { justifyContent: 'space-between' }]}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={s.eyebrow}>{currentSelected.is_sample ? 'SAMPLE E-JEEP UNIT' : 'LIVE BROADCASTING UNIT'}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: Colors.white }}>{currentSelected.body_number}</Text>
+              <Text style={{ fontSize: 13, color: '#A7F3D0', fontWeight: '600' }}>Plate {currentSelected.plate_number}</Text>
+            </View>
+            {currentSelected.is_sample ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => {
+                  triggerHaptic('success');
+                  scrollToRide.current = true;
+                  setUnit({ vehicle_id: currentSelected.vehicle_id, body_number: currentSelected.body_number, plate_number: currentSelected.plate_number, source: 'sample' });
+                  setSelected(null);
+                }}
+                style={s.buttonMint}
+              >
+                <Ionicons name="checkmark-circle" size={18} color={Colors.ink} />
+                <Text style={{ fontSize: 14, fontWeight: '900', color: Colors.ink }}>Preview boarding</Text>
+              </TouchableOpacity>
+            ) : nearby.some(v => v.vehicle_id === currentSelected.vehicle_id) ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => {
+                  triggerHaptic('success');
+                  scrollToRide.current = true;
+                  setUnit({ vehicle_id: currentSelected.vehicle_id, body_number: currentSelected.body_number, plate_number: currentSelected.plate_number, source: 'confirmed' });
+                  setSelected(null);
+                }}
+                style={s.buttonMint}
+              >
+                <Ionicons name="checkmark-circle" size={18} color={Colors.ink} />
+                <Text style={{ fontSize: 14, fontWeight: '900', color: Colors.ink }}>I boarded this unit</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={{ fontSize: 12, color: '#A7F3D0', maxWidth: 160 }}>Board at a designated stop. GPS verifies your ride.</Text>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* DESTINATION SEARCH & NUMBERED STOP CAROUSEL */}
       <View style={s.section}>
         <View style={[s.row, { justifyContent: 'space-between' }]}>
-          <Text style={s.sectionTitle}>Destination</Text>
+          <View>
+            <Text style={s.eyebrow}>Destination Finder</Text>
+            <Text style={s.sectionTitle}>Choose stop or search street</Text>
+          </View>
           {destination && !searchOpen && (
-            <View style={s.pill}>
-              <Ionicons name="git-branch-outline" size={13} color={Colors.ink} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.ink }}>Route 1</Text>
-            </View>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setSearchOpen(true)} style={s.pill}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: Colors.ink }}>Change</Text>
+            </TouchableOpacity>
           )}
         </View>
+
+        {/* Numbered Route Stop Cards */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
+          {stops.map((stop, idx) => {
+            const active = destination?.id === stop.id && !place;
+            return (
+              <TouchableOpacity
+                key={stop.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => chooseDestination(stop)}
+                style={{
+                  width: 156,
+                  padding: 13,
+                  borderRadius: 16,
+                  backgroundColor: active ? Colors.ink : Colors.sand,
+                  borderWidth: 1.5,
+                  borderColor: active ? Colors.brandMint : Colors.border,
+                  gap: 8,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: active ? Colors.brandMint : Colors.paper }}>
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: Colors.ink }}>STOP 0{idx + 1}</Text>
+                  </View>
+                  <Ionicons name={active ? 'checkmark-circle' : 'arrow-forward-circle-outline'} size={18} color={active ? Colors.brandMintLight : Colors.subtleGray} />
+                </View>
+                <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: '800', color: active ? Colors.white : Colors.ink, lineHeight: 17 }}>
+                  {stop.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
         <View style={[s.row, { flexWrap: 'nowrap' }]}>
           <TextInput
@@ -188,7 +339,7 @@ export default function PassengerHomeScreen({ route }: any) {
             returnKeyType="search"
             enterKeyHint="search"
             clearButtonMode="while-editing"
-            placeholder="Search a place, street, or landmark"
+            placeholder="Or type any building, street, or landmark…"
             placeholderTextColor={Colors.subtleGray}
             style={[s.input, { flex: 1, minWidth: 0, flexShrink: 1 }]}
           />
@@ -198,44 +349,13 @@ export default function PassengerHomeScreen({ route }: any) {
             disabled={searching || query.trim().length < 3}
             accessibilityState={{ disabled: searching || query.trim().length < 3 }}
             onPress={searchPlaces}
-            style={[s.button, { minWidth: 50 }, (searching || query.trim().length < 3) && { opacity: 0.5 }]}
+            style={[s.buttonMint, { minWidth: 52 }, (searching || query.trim().length < 3) && { opacity: 0.45 }]}
           >
-            <Ionicons name="search-outline" size={20} color={Colors.white} />
+            <Ionicons name="search" size={20} color={Colors.ink} />
           </TouchableOpacity>
         </View>
 
-        {/* Quick Stop Chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-          {stops.map(stop => {
-            const active = destination?.id === stop.id && !place;
-            return (
-              <TouchableOpacity
-                key={stop.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => chooseDestination(stop)}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 999,
-                  backgroundColor: active ? Colors.ink : Colors.sand,
-                  borderWidth: 1,
-                  borderColor: active ? Colors.ink : Colors.border,
-                }}
-              >
-                <Ionicons name="bus-outline" size={14} color={active ? Colors.white : Colors.subtleGray} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? Colors.white : Colors.ink }}>
-                  {stop.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {searching && <Text accessibilityLiveRegion="polite" style={s.muted}>Searching places…</Text>}
+        {searching && <Text accessibilityLiveRegion="polite" style={s.muted}>Searching Metro Manila places…</Text>}
         {!!searchError && <Text accessibilityRole="alert" style={s.body}>{searchError}</Text>}
 
         {searchOpen && (
@@ -247,11 +367,11 @@ export default function PassengerHomeScreen({ route }: any) {
                 onPress={() => choosePlace(value)}
                 style={{ minHeight: 52, paddingVertical: 12, flexDirection: 'row', gap: 10, alignItems: 'center', borderBottomWidth: 1, borderColor: Colors.border }}
               >
-                <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: Colors.sand, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="location-outline" size={18} color={Colors.ink} />
+                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="location" size={17} color={Colors.brandMintLight} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.body, { fontWeight: '600' }]}>{value.name}</Text>
+                  <Text style={[s.body, { fontWeight: '700' }]}>{value.name}</Text>
                   <Text style={s.muted}>{value.address}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} />
@@ -262,7 +382,7 @@ export default function PassengerHomeScreen({ route }: any) {
             )}
             {!searched && results.length > 0 && (
               <>
-                <Text style={[s.eyebrow, { marginTop: 4, marginBottom: 6 }]}>Route landmarks</Text>
+                <Text style={[s.eyebrow, { marginTop: 4, marginBottom: 6 }]}>Matching Route Landmarks</Text>
                 {results.map(stop => (
                   <TouchableOpacity
                     key={stop.id}
@@ -271,9 +391,9 @@ export default function PassengerHomeScreen({ route }: any) {
                     style={{ minHeight: 48, paddingVertical: 11, flexDirection: 'row', gap: 10, alignItems: 'center', borderBottomWidth: 1, borderColor: Colors.border }}
                   >
                     <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: Colors.sand, alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="bus-outline" size={16} color={Colors.ink} />
+                      <Ionicons name="bus" size={15} color={Colors.ink} />
                     </View>
-                    <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>{stop.name}</Text>
+                    <Text style={[s.body, { flex: 1, fontWeight: '700' }]}>{stop.name}</Text>
                     <Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} />
                   </TouchableOpacity>
                 ))}
@@ -283,12 +403,12 @@ export default function PassengerHomeScreen({ route }: any) {
         )}
 
         {place && !searchOpen && (
-          <View style={{ padding: 12, borderRadius: 10, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, gap: 4 }}>
+          <View style={{ padding: 14, borderRadius: 14, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, gap: 4 }}>
             <Text style={s.label}>{place.name}</Text>
             <Text style={s.muted}>{place.address}</Text>
             {placeMatch ? (
               <>
-                <Text style={[s.body, { fontWeight: '600', marginTop: 2 }]}>
+                <Text style={[s.body, { fontWeight: '700', marginTop: 2 }]}>
                   {placeMatch.verified ? 'Nearest recorded stop' : 'Nearby route landmark'}: {placeMatch.stop.name}
                 </Text>
                 <Text style={s.muted}>
@@ -301,155 +421,22 @@ export default function PassengerHomeScreen({ route }: any) {
           </View>
         )}
 
-        {destination && !searchOpen && (
-          <View style={[s.row, { justifyContent: 'space-between' }]}>
-            <Text style={[s.muted, { flex: 1 }]}>Route 1 · MRT Buendia–Mandaluyong City Hall</Text>
-            <TouchableOpacity accessibilityRole="button" onPress={() => setSearchOpen(true)} style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
-              <Text style={s.link}>Change destination</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}>
           <Text style={s.muted}>Place search: OpenStreetMap / Photon · Metro Manila</Text>
         </TouchableOpacity>
       </View>
 
-      <PassengerStopGuide
-        openRequest={route?.params?.showStopGuide}
-        boarding={boarding}
-        zones={zones}
-        landmarks={stops}
-        onRefresh={refreshZones}
-        loading={zonesLoading}
-        loadError={zonesError}
-      />
-
-      {/* Map & Fleet View */}
-      <View style={[s.section, { padding: 0, overflow: 'hidden', gap: 0 }]}>
-        <View style={[s.row, { padding: 16, justifyContent: 'space-between' }]}>
-          <View style={{ gap: 2 }}>
-            <Text style={s.sectionTitle}>{destination ? `${displayed.length} units on this route` : 'Live Route Map'}</Text>
-            <Text style={s.muted}>{mode === 'live' ? 'Real-time GPS telemetry' : 'Interactive sample preview'}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', backgroundColor: Colors.sand, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: Colors.border }}>
-            {(['live', 'sample'] as const).map(value => {
-              const active = mode === value;
-              return (
-                <TouchableOpacity
-                  key={value}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  onPress={() => selectMode(value)}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    borderRadius: 8,
-                    backgroundColor: active ? Colors.ink : 'transparent',
-                  }}
-                >
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: active ? Colors.white : Colors.subtleGray }}>
-                    {value === 'live' ? 'Live units' : 'Sample units'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={{ height: 400, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border }}>
-          <LeafletMap
-            ref={map}
-            destinationPlace={place}
-            hideOccupancy
-            routes={[]}
-            terminals={[]}
-            vehicles={displayed}
-            userLocation={locationFresh && mode === 'live' ? location.coords : null}
-            selectedVehicle={currentSelected}
-            isOffline={mode === 'live' && !isConnected}
-            onSelectVehicle={selectVehicle}
-          />
-        </View>
-
-        <View style={{ padding: 16, gap: 6, backgroundColor: Colors.sand }}>
-          <Text style={s.muted}>
-            {!destination
-              ? 'Choose a destination above to show matching units on the map.'
-              : mode === 'sample'
-                ? 'Sample positions for testing. Tap a unit marker to preview boarding.'
-                : !isConnected
-                  ? 'Offline. Connect to see current units.'
-                  : displayed.length
-                    ? 'Units serving this route. Confirm the direction with the driver before boarding.'
-                    : 'No available units are broadcasting on this route.'}
-          </Text>
-          {mode === 'live' && (
-            <Text style={s.muted}>{errorMsg ? 'Allow location access in your device settings to detect your ride.' : signal}</Text>
-          )}
-        </View>
-      </View>
-
-      {/* Selected Vehicle Drawer Card */}
-      {currentSelected && (
-        <View
-          onLayout={e => {
-            selectionY.current = e.nativeEvent.layout.y;
-            scroll.current?.scrollTo({ y: selectionY.current - 12, animated: true });
-          }}
-          style={[s.section, { borderColor: Colors.ink }]}
-        >
-          <View style={[s.row, { justifyContent: 'space-between' }]}>
-            <View style={{ flex: 1, gap: 3 }}>
-              <View style={s.row}>
-                <Text style={s.sectionTitle}>{currentSelected.body_number}</Text>
-                <View style={[s.pill, { backgroundColor: currentSelected.is_sample ? Colors.warningBg : Colors.successBg, borderColor: 'transparent' }]}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: currentSelected.is_sample ? Colors.warning : Colors.success }}>
-                    {currentSelected.is_sample ? 'Sample unit' : 'Live location'}
-                  </Text>
-                </View>
-              </View>
-              <Text style={s.body}>Plate {currentSelected.plate_number}</Text>
-            </View>
-            {currentSelected.is_sample ? (
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={() => {
-                  triggerHaptic('success');
-                  scrollToRide.current = true;
-                  setUnit({ vehicle_id: currentSelected.vehicle_id, body_number: currentSelected.body_number, plate_number: currentSelected.plate_number, source: 'sample' });
-                  setSelected(null);
-                }}
-                style={s.button}
-              >
-                <Text style={s.buttonText}>Preview boarding</Text>
-              </TouchableOpacity>
-            ) : nearby.some(v => v.vehicle_id === currentSelected.vehicle_id) ? (
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={() => {
-                  triggerHaptic('success');
-                  scrollToRide.current = true;
-                  setUnit({ vehicle_id: currentSelected.vehicle_id, body_number: currentSelected.body_number, plate_number: currentSelected.plate_number, source: 'confirmed' });
-                  setSelected(null);
-                }}
-                style={s.button}
-              >
-                <Text style={s.buttonText}>I boarded this unit</Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={s.muted}>Board at a marked stop. GPS will check your unit as you travel.</Text>
-            )}
-          </View>
-        </View>
-      )}
-
-      {/* Units List */}
+      {/* ACTIVE FLEET ROSTER FOR SELECTED STOP */}
       {destination && (
         <View style={s.section}>
           <View style={[s.row, { justifyContent: 'space-between' }]}>
-            <Text style={s.sectionTitle}>Units for your destination</Text>
-            <Text style={s.muted}>{displayed.length} available</Text>
+            <View>
+              <Text style={s.eyebrow}>Dispatched E-Jeeps</Text>
+              <Text style={s.sectionTitle}>Units serving {destination.name}</Text>
+            </View>
+            <View style={s.pill}>
+              <Text style={s.label}>{displayed.length} active</Text>
+            </View>
           </View>
           {displayed.map(v => (
             <TouchableOpacity
@@ -464,26 +451,36 @@ export default function PassengerHomeScreen({ route }: any) {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
-                padding: 12,
-                borderRadius: 10,
+                padding: 14,
+                borderRadius: 14,
                 backgroundColor: Colors.sand,
                 borderWidth: 1,
                 borderColor: Colors.border,
               }}
             >
-              <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="bus" size={20} color={Colors.ink} />
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="bus" size={20} color={Colors.brandMintLight} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.label, { fontSize: 14 }]}>{v.body_number} · {v.plate_number}</Text>
-                <Text style={s.muted}>{v.is_sample ? 'Sample unit' : 'Live GPS location'}</Text>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: Colors.ink }}>{v.body_number} · {v.plate_number}</Text>
+                <Text style={s.muted}>{v.is_sample ? 'Sample fleet unit · Tap to preview' : 'Live GPS telemetry · Tap to locate'}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+              <Ionicons name="locate" size={18} color={Colors.brandMint} />
             </TouchableOpacity>
           ))}
-          {!displayed.length && <Text style={s.body}>No units to show. Try the sample fleet to preview the journey.</Text>}
+          {!displayed.length && <Text style={s.body}>No units to show. Switch to Sample Fleet on the map to preview the journey.</Text>}
         </View>
       )}
+
+      <PassengerStopGuide
+        openRequest={route?.params?.showStopGuide}
+        boarding={boarding}
+        zones={zones}
+        landmarks={stops}
+        onRefresh={refreshZones}
+        loading={zonesLoading}
+        loadError={zonesError}
+      />
     </FormScrollView>
   );
 }

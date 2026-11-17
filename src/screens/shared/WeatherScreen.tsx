@@ -112,30 +112,31 @@ export default function WeatherScreen() {
   };
   const ac = advisory ? advisoryColors[advisory.severity] : advisoryColors.safe;
 
-  const weatherIcon = weather.weather[0].main.toLowerCase().includes('rain') ? 'rainy-outline' : weather.weather[0].main.toLowerCase().includes('cloud') ? 'cloudy-outline' : 'partly-sunny-outline';
+  const weatherIcon = weather.weather[0].main.toLowerCase().includes('rain') ? 'rainy' : weather.weather[0].main.toLowerCase().includes('cloud') ? 'cloudy' : 'partly-sunny';
   return <ScrollView style={styles.page} contentContainerStyle={styles.container}>
-    <View style={styles.header}>
-      <Text style={styles.eyebrow}>Live Commuter Conditions</Text>
-      <Text style={styles.title}>Weather in Makati</Text>
-      <Text style={styles.subtitle}>{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}</Text>
-    </View>
     <View style={styles.mainCard}>
-      <View style={styles.weatherIcon}><Ionicons name={weatherIcon} size={44} color={Colors.ink} /></View>
-      <View style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.eyebrow}>Makati Transit Weather</Text>
+          <Text style={styles.title}>{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}</Text>
+        </View>
+        <View style={styles.weatherIcon}><Ionicons name={weatherIcon} size={36} color={Colors.brandMintLight} /></View>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12, marginTop: 8 }}>
         <Text style={styles.temp}>{Math.round(weather.main.temp)}°C</Text>
         <Text style={styles.condition}>{weather.weather[0].description}</Text>
       </View>
     </View>
-    {advisory && <View style={[styles.advisoryCard, { backgroundColor: ac.bg, borderColor: ac.border }]}><Ionicons name={advisory.severity === 'safe' ? 'checkmark-circle-outline' : 'alert-circle-outline'} size={21} color={ac.text} /><View style={{ flex: 1 }}><Text style={[styles.advisoryTitle, { color: ac.text }]}>{advisory.severity === 'danger' ? t('weather.travelAdvisory') : advisory.severity === 'caution' ? t('weather.caution') : t('weather.travelConditions')}</Text><Text style={[styles.advisoryText, { color: ac.text }]}>{advisory.message}</Text></View></View>}
+    {advisory && <View style={[styles.advisoryCard, { backgroundColor: ac.bg, borderColor: ac.border }]}><Ionicons name={advisory.severity === 'safe' ? 'checkmark-circle' : 'alert-circle'} size={22} color={ac.text} /><View style={{ flex: 1 }}><Text style={[styles.advisoryTitle, { color: ac.text }]}>{advisory.severity === 'danger' ? t('weather.travelAdvisory') : advisory.severity === 'caution' ? t('weather.caution') : t('weather.travelConditions')}</Text><Text style={[styles.advisoryText, { color: ac.text }]}>{advisory.message}</Text></View></View>}
     <View style={styles.detailsGrid}>
       {[
-        { icon: 'water-outline' as const, label: 'Humidity', value: reading(weather.main.humidity, '%') },
-        { icon: 'leaf-outline' as const, label: 'Wind speed', value: reading(weather.wind?.speed, ' m/s') },
-        { icon: 'thermometer-outline' as const, label: 'Feels like', value: reading(weather.main.feels_like, '°C', true) },
-        { icon: 'speedometer-outline' as const, label: 'Pressure', value: reading(weather.main.pressure, ' hPa') },
-        { icon: 'sunny-outline' as const, label: 'Sunrise', value: sunLabel(weather.sys?.sunrise) },
-        { icon: 'moon-outline' as const, label: 'Sunset', value: sunLabel(weather.sys?.sunset) },
-      ].map((item) => <View key={item.label} style={styles.detailCard}><View style={styles.detailIcon}><Ionicons name={item.icon} size={18} color={Colors.ink} /></View><Text style={styles.detailLabel}>{item.label}</Text><Text style={styles.detailValue}>{item.value}</Text></View>)}
+        { icon: 'water' as const, label: 'Humidity', value: reading(weather.main.humidity, '%') },
+        { icon: 'speedometer' as const, label: 'Wind speed', value: reading(weather.wind?.speed, ' m/s') },
+        { icon: 'thermometer' as const, label: 'Feels like', value: reading(weather.main.feels_like, '°C', true) },
+        { icon: 'compass' as const, label: 'Pressure', value: reading(weather.main.pressure, ' hPa') },
+        { icon: 'sunny' as const, label: 'Sunrise', value: sunLabel(weather.sys?.sunrise) },
+        { icon: 'moon' as const, label: 'Sunset', value: sunLabel(weather.sys?.sunset) },
+      ].map((item) => <View key={item.label} style={styles.detailCard}><View style={styles.detailIcon}><Ionicons name={item.icon} size={17} color={Colors.brandMintLight} /></View><Text style={styles.detailLabel}>{item.label}</Text><Text style={styles.detailValue}>{item.value}</Text></View>)}
     </View>
   </ScrollView>;
 }
@@ -143,21 +144,21 @@ export default function WeatherScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.canvas },
   page: { flex: 1, backgroundColor: Colors.canvas },
-  container: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 18, paddingBottom: 36, gap: 16 },
+  container: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 16 },
   header: { marginBottom: 2 },
-  eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.9, textTransform: 'uppercase', color: Colors.subtleGray, marginBottom: 2 },
-  title: { fontSize: 30, fontWeight: '800', letterSpacing: -0.7, color: Colors.ink },
+  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', color: Colors.brandMintLight, marginBottom: 4 },
+  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: Colors.white },
   subtitle: { fontSize: 14, color: Colors.subtleGray, marginTop: 4 },
-  mainCard: { flexDirection: 'row', alignItems: 'center', gap: 18, backgroundColor: Colors.paper, borderRadius: 14, padding: 22, borderWidth: 1, borderColor: Colors.border },
-  weatherIcon: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border },
-  temp: { fontSize: 44, fontWeight: '800', color: Colors.ink, fontVariant: ['tabular-nums'] },
-  condition: { fontSize: 15, color: Colors.subtleGray, fontWeight: '600', marginTop: 2, textTransform: 'capitalize' },
-  advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderWidth: 1, borderRadius: 12, padding: 16 },
-  advisoryTitle: { fontSize: 14, fontWeight: '700' },
+  mainCard: { backgroundColor: Colors.ink, borderRadius: 22, padding: 24, borderWidth: 1, borderColor: Colors.brandSurfaceDark, gap: 6 },
+  weatherIcon: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: Colors.brandSurfaceDark, borderWidth: 1, borderColor: '#1E463E' },
+  temp: { fontSize: 52, fontWeight: '900', color: Colors.brandMintLight, fontVariant: ['tabular-nums'] },
+  condition: { fontSize: 16, color: '#A7F3D0', fontWeight: '700', textTransform: 'capitalize' },
+  advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderWidth: 1, borderRadius: 16, padding: 16 },
+  advisoryTitle: { fontSize: 14, fontWeight: '800' },
   advisoryText: { fontSize: 13, lineHeight: 19, marginTop: 3 },
   detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  detailCard: { flexGrow: 1, flexBasis: 145, backgroundColor: Colors.paper, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 6 },
-  detailIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: Colors.sand, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  detailLabel: { fontSize: 12, color: Colors.subtleGray, fontWeight: '600' },
-  detailValue: { fontSize: 18, color: Colors.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  detailCard: { flexGrow: 1, flexBasis: 145, backgroundColor: Colors.paper, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 6 },
+  detailIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  detailLabel: { fontSize: 12, color: Colors.subtleGray, fontWeight: '700' },
+  detailValue: { fontSize: 20, color: Colors.ink, fontWeight: '900', fontVariant: ['tabular-nums'] },
 });

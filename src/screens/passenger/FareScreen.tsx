@@ -10,11 +10,11 @@ import { loadPassengerPlanningData } from '../../services/passengerDataService';
 import { findVerifiedSavings, quotePassengerFare, verifiedRideDistance } from '../../services/passengerFare';
 import type { FarePassengerType } from '../../services/fareCalculator';
 
-const TYPES: { id: FarePassengerType; name: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'regular', name: 'Regular', icon: 'person-outline' },
-  { id: 'student', name: 'Student', icon: 'school-outline' },
-  { id: 'senior', name: 'Senior citizen', icon: 'heart-outline' },
-  { id: 'pwd', name: 'PWD', icon: 'accessibility-outline' },
+const TYPES: { id: FarePassengerType; name: string; tag: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'regular', name: 'Regular', tag: 'Standard', icon: 'person' },
+  { id: 'student', name: 'Student', tag: '20% Discount', icon: 'school' },
+  { id: 'senior', name: 'Senior citizen', tag: '20% Discount', icon: 'heart' },
+  { id: 'pwd', name: 'PWD', tag: '20% Discount', icon: 'accessibility' },
 ];
 const peso = (n: number) => `₱${n.toFixed(2)}`;
 
@@ -51,50 +51,99 @@ export default function FareScreen() {
 
   return (
     <FormScrollView style={s.screen} contentContainerStyle={s.content}>
-      <View>
-        <Text style={s.eyebrow}>Tariff & Concessions</Text>
-        <Text style={s.title}>Fare calculator</Text>
-        <Text style={s.subtitle}>Estimate your e-jeepney fare before boarding.</Text>
+      {/* DIGITAL BOARDING PASS HERO TICKET */}
+      <View style={s.heroBanner}>
+        <View style={[s.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={s.eyebrow}>eSAKAY Digital Tariff Pass</Text>
+            <Text style={s.heroTitle}>Fare calculator</Text>
+            <Text style={s.heroSubtitle}>MRT Buendia ↔ Mandaluyong City Hall</Text>
+          </View>
+          <View style={s.pillDark}>
+            <Ionicons name="flash" size={13} color={Colors.brandMintLight} />
+            <Text style={{ fontSize: 11, fontWeight: '800', color: Colors.brandMintLight }}>ROUTE 01</Text>
+          </View>
+        </View>
+
+        {/* Perforated Divider */}
+        <View style={{ height: 1, borderStyle: 'dashed', borderWidth: 1, borderColor: '#1E463E', marginVertical: 4 }} />
+
+        {/* Live Fare Display Inside Ticket */}
+        <View style={[s.row, { justifyContent: 'space-between', alignItems: 'flex-end' }]}>
+          <View style={{ gap: 4, flex: 1 }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: '#94A3B8' }}>
+              {quote ? quote.basis : 'Estimated Fare'}
+            </Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.white }}>
+              {TYPES.find(t => t.id === type)?.name} · {Number.isFinite(km) && km != null ? `${Number(km).toFixed(2)} km` : 'Select stops / distance'}
+            </Text>
+            {type !== 'regular' && (
+              <Text style={{ fontSize: 12, color: Colors.brandMintLight, fontWeight: '600' }}>
+                Valid Student / Senior / PWD ID required
+              </Text>
+            )}
+          </View>
+          <Text style={{ fontSize: 44, fontWeight: '900', color: Colors.brandMintLight, fontVariant: ['tabular-nums'] }}>
+            {quote ? peso(quote.amount) : '—'}
+          </Text>
+        </View>
+
+        {quote && (
+          quote.official ? (
+            <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL(quote.source!)}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.brandMintLight }}>View official LTFRB fare matrix →</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={{ fontSize: 12, lineHeight: 17, color: '#94A3B8' }}>
+              First 4 km: ₱{type === 'regular' ? ESAKAY_OPERATIONS.regularBaseFare : ESAKAY_OPERATIONS.discountedBaseFare} (+₱1/km after 4 km). Confirm against the unit matrix.
+            </Text>
+          )
+        )}
       </View>
 
+      {/* PASSENGER CATEGORY 2x2 BENTO GRID */}
       <View style={s.section}>
-        <View style={[s.row, { justifyContent: 'space-between' }]}>
-          <Text style={s.sectionTitle}>MRT Buendia – Mandaluyong City Hall</Text>
-          <View style={s.pill}>
-            <Ionicons name="flash-outline" size={13} color={Colors.ink} />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.ink }}>Modern E-Jeep</Text>
-          </View>
+        <Text style={s.eyebrow}>Step 1 · Passenger Concession</Text>
+        <Text style={s.sectionTitle}>Select passenger type</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {TYPES.map(item => {
+            const selected = type === item.id;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => { triggerHaptic('light'); setType(item.id); }}
+                style={{
+                  flexGrow: 1,
+                  flexBasis: 140,
+                  padding: 14,
+                  borderRadius: 16,
+                  backgroundColor: selected ? Colors.ink : Colors.sand,
+                  borderWidth: 1.5,
+                  borderColor: selected ? Colors.brandMint : Colors.border,
+                  gap: 6,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Ionicons name={item.icon} size={18} color={selected ? Colors.brandMintLight : Colors.ink} />
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: selected ? Colors.brandMintLight : Colors.subtleGray }}>
+                    {item.tag}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: selected ? Colors.white : Colors.ink }}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Passenger Type Selector */}
-        <View style={{ gap: 6 }}>
-          <Text style={s.label}>Passenger category</Text>
-          <View style={s.row}>
-            {TYPES.map(item => {
-              const selected = type === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => { triggerHaptic('light'); setType(item.id); }}
-                  style={[
-                    s.button,
-                    s.secondary,
-                    { flexGrow: 1, paddingHorizontal: 12 },
-                    selected && { borderColor: Colors.ink, backgroundColor: Colors.ink },
-                  ]}
-                >
-                  <Ionicons name={item.icon} size={16} color={selected ? Colors.white : Colors.ink} />
-                  <Text style={[s.label, { color: selected ? Colors.white : Colors.ink }]}>{item.name}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+        <View style={s.divider} />
 
-        {/* Segmented Mode Toggle */}
-        <View style={{ flexDirection: 'row', backgroundColor: Colors.sand, borderRadius: 10, padding: 4, borderWidth: 1, borderColor: Colors.border }}>
+        {/* DISTANCE VS STOPS SWITCHER */}
+        <Text style={s.eyebrow}>Step 2 · Trip Distance</Text>
+        <View style={{ flexDirection: 'row', backgroundColor: Colors.sand, borderRadius: 14, padding: 4, borderWidth: 1, borderColor: Colors.border }}>
           {(['distance', 'stops'] as const).map(value => {
             const active = mode === value;
             return (
@@ -105,15 +154,15 @@ export default function FareScreen() {
                 onPress={() => { triggerHaptic('light'); setMode(value); }}
                 style={{
                   flex: 1,
-                  minHeight: 40,
-                  borderRadius: 8,
+                  minHeight: 42,
+                  borderRadius: 10,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: active ? Colors.paper : 'transparent',
+                  backgroundColor: active ? Colors.ink : 'transparent',
                 }}
               >
-                <Text style={[s.label, { color: active ? Colors.ink : Colors.subtleGray }]}>
-                  {value === 'distance' ? 'Enter distance' : 'Choose stops'}
+                <Text style={{ fontSize: 13, fontWeight: '800', color: active ? Colors.white : Colors.subtleGray }}>
+                  {value === 'distance' ? 'Enter distance (km)' : 'Choose route stops'}
                 </Text>
               </TouchableOpacity>
             );
@@ -134,7 +183,7 @@ export default function FareScreen() {
             />
             <Text style={s.muted}>Use the road distance for your journey.</Text>
             {distance !== '' && (!Number.isFinite(km) || Number(km) <= 0 || Number(km) > 200) && (
-              <Text accessibilityRole="alert" style={[s.muted, { color: Colors.primaryRed }]}>
+              <Text accessibilityRole="alert" style={[s.muted, { color: Colors.primaryRed, fontWeight: '700' }]}>
                 Enter a distance greater than 0 and up to 200 km.
               </Text>
             )}
@@ -152,57 +201,26 @@ export default function FareScreen() {
             )}
           </View>
         )}
-
-        {/* Transit Ticket Quote Card */}
-        {quote && (
-          <View style={{ backgroundColor: Colors.sand, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.border, gap: 10 }}>
-            <View style={[s.row, { justifyContent: 'space-between' }]}>
-              <View style={{ gap: 2 }}>
-                <Text style={s.eyebrow}>{quote.basis}</Text>
-                <Text style={[s.label, { fontSize: 15 }]}>
-                  {TYPES.find(t => t.id === type)?.name} · {Number(km).toFixed(2)} km
-                </Text>
-              </View>
-              <Text style={{ fontSize: 36, fontWeight: '800', color: Colors.ink, fontVariant: ['tabular-nums'] }}>
-                {peso(quote.amount)}
-              </Text>
-            </View>
-            {quote.official ? (
-              <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL(quote.source!)}>
-                <Text style={s.link}>View LTFRB fare matrix</Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={s.muted}>
-                First 4 km: ₱{type === 'regular' ? ESAKAY_OPERATIONS.regularBaseFare : ESAKAY_OPERATIONS.discountedBaseFare}. Add ₱1 per km after 4 km. Operator-provided rates; confirm against the fare matrix displayed in the unit.
-              </Text>
-            )}
-            {type !== 'regular' && (
-              <Text style={[s.muted, { fontWeight: '600', color: Colors.ink }]}>
-                Bring your valid student, senior citizen, or PWD identification.
-              </Text>
-            )}
-          </View>
-        )}
       </View>
 
-      {/* Walk & Save Section */}
+      {/* WALK & SAVE */}
       <View style={s.section}>
         <View style={s.row}>
-          <View style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: Colors.successBg, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="walk-outline" size={20} color={Colors.success} />
+          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="walk" size={20} color={Colors.brandMintLight} />
           </View>
           <View style={{ flex: 1 }}>
+            <Text style={s.eyebrow}>Smart Commute</Text>
             <Text style={s.sectionTitle}>Walk & save</Text>
-            <Text style={s.muted}>Compare boarding at a nearby stop to reduce your fare.</Text>
           </View>
         </View>
-        <View style={[s.row, { justifyContent: 'space-between', backgroundColor: Colors.sand, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: Colors.border }]}>
+        <View style={[s.row, { justifyContent: 'space-between', backgroundColor: Colors.sand, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.border }]}>
           <Text style={[s.label, { flex: 1 }]}>Step-free walking routes only</Text>
-          <Switch accessibilityLabel="Step-free walking routes only" value={stepFree} onValueChange={setStepFree} trackColor={{ true: Colors.ink }} />
+          <Switch accessibilityLabel="Step-free walking routes only" value={stepFree} onValueChange={setStepFree} trackColor={{ true: Colors.brandMint }} />
         </View>
         {savings.length ? (
           savings.map(item => (
-            <View key={item.stop.id} style={{ backgroundColor: Colors.successBg, borderRadius: 10, padding: 14, gap: 6 }}>
+            <View key={item.stop.id} style={{ backgroundColor: Colors.successBg, borderRadius: 14, padding: 16, gap: 6 }}>
               <Text style={[s.sectionTitle, { color: Colors.success }]}>
                 Walk {item.minutes} min, save {peso(item.savings)}
               </Text>
@@ -216,7 +234,7 @@ export default function FareScreen() {
         ) : (
           <Text style={s.muted}>
             {mode !== 'stops' || !origin || !destination
-              ? 'Choose your boarding stop and destination to check nearby options.'
+              ? 'Choose your boarding stop and destination to check nearby walking savings.'
               : 'No verified cheaper walking option is available for this journey.'}
           </Text>
         )}

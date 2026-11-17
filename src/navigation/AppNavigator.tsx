@@ -48,36 +48,37 @@ const Tab = createBottomTabNavigator();
 
 const commonScreenOptions = {
   headerTitleAlign: 'left' as const,
-  tabBarActiveTintColor: Colors.ink,
+  tabBarActiveTintColor: Colors.brandMintLight,
   tabBarInactiveTintColor: Colors.tabInactive,
   tabBarStyle: {
-    backgroundColor: Colors.paper,
+    backgroundColor: Colors.ink,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: 6,
+    borderTopColor: Colors.brandSurfaceDark,
+    paddingTop: 8,
     paddingBottom: 6,
-    height: 62,
-    elevation: 0,
+    height: 64,
+    elevation: 12,
   },
-  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' as const, letterSpacing: 0.1 },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: '800' as const, letterSpacing: 0.3 },
   tabBarIconStyle: { marginTop: 1 },
   headerStyle: {
-    backgroundColor: Colors.paper,
+    backgroundColor: Colors.ink,
   },
   headerShadowVisible: false,
-  headerTintColor: Colors.ink,
+  headerTintColor: Colors.white,
   headerTitleStyle: {
     fontWeight: '800' as const,
     fontSize: 18,
+    color: Colors.white,
   },
 };
 
 function ServiceHeaderActions({ onAccount, onAlerts, onBot, alertsLabel = "Open driver alerts", open }: { onAccount: () => void; onAlerts?: () => void; onBot?: () => void; alertsLabel?: string; open: boolean }) {
   const { width } = useWindowDimensions();
   return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 12 }}>
-    {onBot && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open esakaybot" onPress={onBot} style={{ minWidth: 42, height: 38, paddingHorizontal: 11, justifyContent: 'center', flexDirection: "row", gap: 6, alignItems: "center", borderRadius: 999, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border }}><Ionicons name="sparkles-outline" size={15} color={Colors.ink} />{width >= 360 && <Text style={{ color: Colors.ink, fontWeight: "700", fontSize: 12 }}>esakaybot</Text>}</TouchableOpacity>}
-    {onAlerts && <TouchableOpacity accessibilityRole="button" accessibilityLabel={alertsLabel} onPress={onAlerts} style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="notifications-outline" size={18} color={Colors.ink} /></TouchableOpacity>}
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open account menu" accessibilityState={{ expanded: open }} onPress={onAccount} style={{ height: 38, minWidth: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 999, backgroundColor: open ? Colors.ink : Colors.sand, borderWidth: 1, borderColor: open ? Colors.ink : Colors.border }}><Ionicons name="person-circle-outline" size={19} color={open ? Colors.white : Colors.ink} />{width >= 520 && <Text style={{ color: open ? Colors.white : Colors.ink, fontWeight: '700', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={12} color={open ? Colors.white : Colors.ink} /></TouchableOpacity>
+    {onBot && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open esakaybot" onPress={onBot} style={{ minWidth: 42, height: 38, paddingHorizontal: 12, justifyContent: 'center', flexDirection: "row", gap: 6, alignItems: "center", borderRadius: 999, backgroundColor: Colors.brandSurfaceDark, borderWidth: 1, borderColor: Colors.brandMint }}><Ionicons name="sparkles" size={14} color={Colors.brandMintLight} />{width >= 360 && <Text style={{ color: Colors.brandMintLight, fontWeight: "800", fontSize: 12 }}>esakaybot</Text>}</TouchableOpacity>}
+    {onAlerts && <TouchableOpacity accessibilityRole="button" accessibilityLabel={alertsLabel} onPress={onAlerts} style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: Colors.brandSurfaceDark, borderWidth: 1, borderColor: '#1E463E', alignItems: 'center', justifyContent: 'center' }}><Ionicons name="notifications-outline" size={18} color={Colors.white} /></TouchableOpacity>}
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open account menu" accessibilityState={{ expanded: open }} onPress={onAccount} style={{ height: 38, minWidth: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 999, backgroundColor: open ? Colors.brandMint : Colors.brandSurfaceDark, borderWidth: 1, borderColor: open ? Colors.brandMintLight : '#1E463E' }}><Ionicons name="person-circle-outline" size={19} color={Colors.white} />{width >= 520 && <Text style={{ color: Colors.white, fontWeight: '800', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={12} color={Colors.white} /></TouchableOpacity>
   </View>;
 }
 
@@ -144,19 +145,19 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
   );
 };
 
-const PassengerStack = () => <PassengerJourneyProvider><Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.paper }, headerTintColor: Colors.ink }}><Stack.Screen name="PassengerTabs" component={PassengerTabs} options={{ headerShown: false }} /><Stack.Screen name="PassengerProfile" component={ProfileScreen} options={{ title: 'Account settings' }} /><Stack.Screen name="PassengerDirectory" component={DirectoryScreen} options={{ title: 'Route information' }} /><Stack.Screen name="PassengerAbout" component={AboutScreen} options={{ title: 'About eSAKAY' }} /><Stack.Screen name="PassengerWeather" component={WeatherScreen} options={{ title: 'Weather' }} /><Stack.Screen name="PassengerAssistant" component={HeroBotScreen} options={{ title: 'esakaybot' }} /></Stack.Navigator></PassengerJourneyProvider>;
-const DriverStack = () => <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.paper }, headerTintColor: Colors.ink }}><Stack.Screen name="DriverTabs" component={DriverTabs} options={{ headerShown: false }} /><Stack.Screen name="DriverProfile" component={ProfileScreen} options={{ title: 'Account settings' }} /></Stack.Navigator>;
+const PassengerStack = () => <PassengerJourneyProvider><Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.ink }, headerTintColor: Colors.white, headerTitleStyle: { fontWeight: '800', fontSize: 17 } }}><Stack.Screen name="PassengerTabs" component={PassengerTabs} options={{ headerShown: false }} /><Stack.Screen name="PassengerProfile" component={ProfileScreen} options={{ title: 'Account settings' }} /><Stack.Screen name="PassengerDirectory" component={DirectoryScreen} options={{ title: 'Route information' }} /><Stack.Screen name="PassengerAbout" component={AboutScreen} options={{ title: 'About eSAKAY' }} /><Stack.Screen name="PassengerWeather" component={WeatherScreen} options={{ title: 'Weather' }} /><Stack.Screen name="PassengerAssistant" component={HeroBotScreen} options={{ title: 'esakaybot' }} /></Stack.Navigator></PassengerJourneyProvider>;
+const DriverStack = () => <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.ink }, headerTintColor: Colors.white, headerTitleStyle: { fontWeight: '800', fontSize: 17 } }}><Stack.Screen name="DriverTabs" component={DriverTabs} options={{ headerShown: false }} /><Stack.Screen name="DriverProfile" component={ProfileScreen} options={{ title: 'Account settings' }} /></Stack.Navigator>;
 
 function AdminHeaderActions({ onAlerts, onProfile, alertCount, activePanel }: { onAlerts: () => void; onProfile: () => void; alertCount: number; activePanel: AdminPanel }) {
   const { width } = useWindowDimensions();
   const compact = width < 520;
   return <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 6 : 10, marginRight: 12 }}>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Violation alerts${alertCount ? `, ${alertCount} recent` : ''}`} accessibilityState={{ expanded: activePanel === 'alerts' }} onPress={onAlerts} style={{ minWidth: 40, height: 38, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: activePanel === 'alerts' ? Colors.ink : Colors.sand, borderWidth: 1, borderColor: activePanel === 'alerts' ? Colors.ink : Colors.border }}>
-      <Ionicons name="notifications-outline" size={18} color={activePanel === 'alerts' ? Colors.white : Colors.ink} />
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Violation alerts${alertCount ? `, ${alertCount} recent` : ''}`} accessibilityState={{ expanded: activePanel === 'alerts' }} onPress={onAlerts} style={{ minWidth: 40, height: 38, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: activePanel === 'alerts' ? Colors.brandMint : Colors.brandSurfaceDark, borderWidth: 1, borderColor: activePanel === 'alerts' ? Colors.brandMintLight : '#1E463E' }}>
+      <Ionicons name="notifications-outline" size={18} color={Colors.white} />
       {alertCount > 0 && <View style={{ position: 'absolute', right: -2, top: -2, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 3, backgroundColor: Colors.primaryRed, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>{alertCount > 99 ? '99+' : alertCount}</Text></View>}
     </TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open admin profile" accessibilityState={{ expanded: activePanel === 'profile' }} onPress={onProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 42, height: 38, paddingHorizontal: compact ? 10 : 12, borderRadius: 999, backgroundColor: activePanel === 'profile' ? Colors.ink : Colors.sand, borderWidth: 1, borderColor: activePanel === 'profile' ? Colors.ink : Colors.border }}>
-      <Ionicons name="person-circle-outline" size={19} color={activePanel === 'profile' ? Colors.white : Colors.ink} />{!compact && <Text style={{ color: activePanel === 'profile' ? Colors.white : Colors.ink, fontWeight: '700', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={12} color={activePanel === 'profile' ? Colors.white : Colors.ink} />
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open admin profile" accessibilityState={{ expanded: activePanel === 'profile' }} onPress={onProfile} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 42, height: 38, paddingHorizontal: compact ? 10 : 12, borderRadius: 999, backgroundColor: activePanel === 'profile' ? Colors.brandMint : Colors.brandSurfaceDark, borderWidth: 1, borderColor: activePanel === 'profile' ? Colors.brandMintLight : '#1E463E' }}>
+      <Ionicons name="person-circle-outline" size={19} color={Colors.white} />{!compact && <Text style={{ color: Colors.white, fontWeight: '800', fontSize: 12 }}>Account</Text>}<Ionicons name="chevron-down" size={12} color={Colors.white} />
     </TouchableOpacity>
   </View>;
 }
@@ -198,11 +199,11 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
   return (
     <View style={{ flex: 1 }}><Tab.Navigator screenOptions={({ navigation }) => ({
       ...commonScreenOptions,
-      tabBarActiveTintColor: Colors.ink,
-      tabBarInactiveTintColor: Colors.subtleGray,
-      tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: Math.max(6, insets.bottom), height: 60 + insets.bottom },
-      headerStyle: { backgroundColor: Colors.paper },
-      headerTintColor: Colors.navy,
+      tabBarActiveTintColor: Colors.brandMintLight,
+      tabBarInactiveTintColor: Colors.tabInactive,
+      tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: Math.max(6, insets.bottom), height: 62 + insets.bottom },
+      headerStyle: { backgroundColor: Colors.ink },
+      headerTintColor: Colors.white,
       headerRight: () => <AdminHeaderActions alertCount={alertCount} activePanel={activePanel} onAlerts={() => setActivePanel((open) => open === 'alerts' ? null : 'alerts')} onProfile={() => setActivePanel((open) => open === 'profile' ? null : 'profile')} />,
       headerTitle: () => <TouchableOpacity
         accessibilityRole="button"
@@ -234,7 +235,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
   );
 };
 
-const AdminStack = () => <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.paper }, headerTintColor: Colors.navy, headerTitleStyle: { fontWeight: '700', fontSize: 18 } }}>
+const AdminStack = () => <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: Colors.ink }, headerTintColor: Colors.white, headerTitleStyle: { fontWeight: '800', fontSize: 18 } }}>
   <Stack.Screen name="AdminTabs" component={AdminTabs} options={{ headerShown: false }} />
   <Stack.Screen name="AdminProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
 </Stack.Navigator>;

@@ -108,77 +108,73 @@ export default function SafetyScreen({ navigation }: any) {
 
   return (
     <FormScrollView style={s.screen} contentContainerStyle={s.content}>
-      <View>
-        <Text style={s.eyebrow}>Commuter Protection</Text>
-        <Text style={s.title}>Safety</Text>
-        <Text style={s.subtitle}>Emergency SOS dispatch, active ride telemetry, and local hotlines.</Text>
-      </View>
-
-      {/* SOS & Ride Status Card */}
-      <View style={s.section}>
-        <View style={[s.row, { justifyContent: 'space-between' }]}>
-          <Text style={s.sectionTitle}>Get help quickly</Text>
-          <View style={[s.pill, unit && { backgroundColor: Colors.successBg, borderColor: 'transparent' }]}>
-            <Ionicons name={unit ? 'radio-outline' : 'shield-outline'} size={13} color={unit ? Colors.success : Colors.subtleGray} />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: unit ? Colors.success : Colors.subtleGray }}>
-              {unit ? `${unit.source === 'sample' ? 'Sample' : 'Active'} · ${unit.body_number}` : 'No active ride'}
+      {/* DARK EMERGENCY COMMAND HERO */}
+      <View style={[s.heroBanner, { backgroundColor: '#1C0A0A', borderColor: '#7F1D1D' }]}>
+        <View style={[s.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.eyebrow, { color: '#FCA5A5' }]}>Emergency Dispatch Console</Text>
+            <Text style={s.heroTitle}>Safety & SOS</Text>
+          </View>
+          <View style={{ paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, backgroundColor: unit ? Colors.successBg : '#3F1515' }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: unit ? Colors.success : '#FCA5A5' }}>
+              {unit ? `LINKED · ${unit.body_number}` : 'TRANSPONDER STANDBY'}
             </Text>
           </View>
         </View>
-        <Text style={s.body}>
-          SOS gives you 5 seconds to cancel, then attempts to send your GPS location and unit details to your saved contacts.
+
+        <Text style={{ fontSize: 14, lineHeight: 20, color: '#FECACA' }}>
+          Pressing Emergency SOS starts a 5-second cancellation window, then dispatches your GPS coordinates and boarded vehicle identity to your trusted contacts.
         </Text>
+
         <SOSButton
           activeVehicleId={unit?.vehicle_id}
           activeVehicleBody={unit?.body_number}
           activeVehiclePlate={unit?.plate_number || undefined}
           activeVehicleIsSample={unit?.source === 'sample'}
         />
-        <Text style={s.muted}>
-          If automatic messaging is unavailable, open Messages and tap Send. You can call a hotline at any time.
-        </Text>
 
-        <View style={{ padding: 14, borderRadius: 10, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, gap: 6 }}>
-          <Text style={s.label}>
-            {unit ? `${unit.source === 'sample' ? 'Sample ride' : 'Current ride'} · ${unit.body_number}` : 'Unit not detected yet'}
+        <View style={{ padding: 14, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(252,165,165,0.2)', gap: 4 }}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.white }}>
+            {unit ? `${unit.source === 'sample' ? 'Sample ride' : 'Current ride'} · ${unit.body_number} (Plate ${unit.plate_number || 'N/A'})` : 'No active vehicle linked yet'}
           </Text>
-          <Text style={s.muted}>
-            {unit
-              ? `Plate ${unit.plate_number || 'unavailable'} · Added to SOS automatically.`
-              : 'Choose your destination on the dashboard. The app checks your unit as you travel; no body or plate number to type.'}
+          <Text style={{ fontSize: 12, color: '#FCA5A5' }}>
+            {unit ? signal : 'Select your destination on the cockpit map to link your ride automatically.'}
           </Text>
-          {unit && <Text style={s.muted}>{signal}</Text>}
         </View>
 
-        <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Map')} style={[s.button, s.secondary]}>
-          <Ionicons name="map-outline" size={17} color={Colors.ink} />
-          <Text style={s.label}>View journey on map</Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('Map')}
+          style={{ minHeight: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}
+        >
+          <Ionicons name="map-outline" size={17} color={Colors.white} />
+          <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.white }}>Open live route map</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Emergency Contacts Card */}
+      {/* TRUSTED CIRCLE CONTACTS */}
       <View style={s.section}>
         <View style={[s.row, { justifyContent: 'space-between' }]}>
           <View>
+            <Text style={s.eyebrow}>Trusted Circle</Text>
             <Text style={s.sectionTitle}>Emergency contacts</Text>
-            <Text style={s.muted}>Up to 5 trusted recipients for SOS alerts</Text>
           </View>
           <View style={s.pill}>
-            <Text style={s.label}>{contacts.length} / 5</Text>
+            <Text style={s.label}>{contacts.length} / 5 saved</Text>
           </View>
         </View>
 
         {loading && (
           <View style={{ gap: 10, paddingVertical: 6 }}>
-            <SkeletonBlock height={54} />
-            <SkeletonBlock height={54} />
+            <SkeletonBlock height={58} />
+            <SkeletonBlock height={58} />
           </View>
         )}
 
         {!loading && !contacts.length && (
-          <View style={{ padding: 16, borderRadius: 10, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, gap: 4 }}>
-            <Text style={s.label}>No emergency contacts saved yet</Text>
-            <Text style={s.muted}>Add someone you trust so they can receive your live GPS location and ride details.</Text>
+          <View style={{ padding: 16, borderRadius: 14, backgroundColor: Colors.sand, borderWidth: 1, borderColor: Colors.border, gap: 4 }}>
+            <Text style={s.label}>Your Trusted Circle is empty</Text>
+            <Text style={s.muted}>Add up to 5 family members or friends to receive your live location during an emergency.</Text>
           </View>
         )}
 
@@ -190,22 +186,23 @@ export default function SafetyScreen({ navigation }: any) {
             style={[
               s.row,
               {
-                padding: 12,
-                borderRadius: 10,
+                padding: 14,
+                borderRadius: 16,
                 backgroundColor: Colors.sand,
                 borderWidth: 1,
                 borderColor: Colors.border,
               },
             ]}
           >
-            <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="person-outline" size={19} color={Colors.ink} />
+            <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 16, fontWeight: '900', color: Colors.brandMintLight }}>
+                {(c.contact_name || 'C').charAt(0).toUpperCase()}
+              </Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>{c.contact_name}</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: Colors.ink }}>{c.contact_name}</Text>
               <Text style={s.muted}>
-                {c.phone_number}
-                {c.localOnly ? ' · On this device' : ' · Synced'}
+                {c.phone_number} · {c.localOnly ? 'On this device' : 'Cloud synced'}
               </Text>
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Edit ${c.contact_name}`} onPress={() => startEdit(c)} style={{ padding: 10 }}>
@@ -220,7 +217,7 @@ export default function SafetyScreen({ navigation }: any) {
         {feedback !== '' && <Text accessibilityRole="alert" style={s.body}>{feedback}</Text>}
 
         {formOpen ? (
-          <View style={{ gap: 12, paddingTop: 6, borderTopWidth: 1, borderTopColor: Colors.border }}>
+          <View style={{ gap: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
             <Text style={s.label}>Contact name</Text>
             <TextInput accessibilityLabel="Contact name" style={s.input} value={name} onChangeText={setName} maxLength={80} placeholder="Name" placeholderTextColor={Colors.subtleGray} />
             <Text style={s.label}>Mobile number</Text>
@@ -242,10 +239,10 @@ export default function SafetyScreen({ navigation }: any) {
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => { setEditing(false); setName(''); setPhone(''); setFormOpen(true); setFeedback(''); }}
-              style={[s.button, s.secondary]}
+              style={s.button}
             >
-              <Ionicons name="add-circle-outline" size={19} color={Colors.ink} />
-              <Text style={s.label}>Add emergency contact</Text>
+              <Ionicons name="person-add-outline" size={18} color={Colors.brandMintLight} />
+              <Text style={s.buttonText}>Add emergency contact</Text>
             </TouchableOpacity>
           )
         )}
