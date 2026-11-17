@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { buildTransitChatContext } from './context.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,53 +50,20 @@ Deno.serve(async (req) => {
     const budget = await supabase.rpc('claim_chat_request', { p_user_id: resolvedUserId });
     if (budget.error || budget.data !== true) return new Response(JSON.stringify({ error: 'Please wait a minute before sending another message.' }), { status: 429, headers: corsHeaders });
 
-    // Fetch real-time routes, terminals, and live unit count from Supabase for context injection
-    let contextText = "";
+    let contextText = buildTransitChatContext(null, null);
     try {
-      const [{ data: routesData }, { data: terminalsData }, { count: activeUnitCount }] = await Promise.all([
+      const [routes, terminals] = await Promise.all([
         supabase
           .from("routes")
-          .select("id,name,description,operating_hours,base_fare,per_km_rate,base_distance_km,fare_effective_date,is_coming_soon")
-          .eq('is_archived', false)
+          .select('*')
           .order("is_coming_soon", { ascending: true }),
         supabase
           .from("terminals")
-          .select("name,route_id,sequence_order,is_esakay_hub,is_well_lit,cctv_monitored")
+          .select('*')
           .order("sequence_order"),
-        supabase
-          .from("vehicles")
-          .select("id", { count: "exact", head: true })
-          .eq("is_active", true),
       ]);
-
-      if (routesData && terminalsData) {
-        contextText = "SYSTEM CONTEXT (Makati e-Jeepney Transit Directory & Safety Data):\n";
-        routesData.forEach((route: any) => {
-          const stops = terminalsData
-            .filter((t: any) => t.route_id === route.id)
-            .map((t: any) => {
-              const tags = [
-                t.is_esakay_hub ? "eSakay Hub" : null,
-                t.is_well_lit && t.cctv_monitored ? "Safe Night Stop (Well-Lit + CCTV)" : null,
-              ].filter(Boolean);
-              return tags.length > 0 ? `${t.name} [${tags.join(", ")}]` : t.name;
-            })
-            .join(" ➔ ");
-
-          const baseFare = Number(route.base_fare ?? 15).toFixed(2);
-          const discountBase = (Number(route.base_fare ?? 15) * 0.8).toFixed(2);
-          const perKm = Number(route.per_km_rate ?? 2.2).toFixed(2);
-          const baseKm = Number(route.base_distance_km ?? 4);
-          const statusTag = route.is_coming_soon ? " [COMING SOON]" : " [ACTIVE]";
-
-          contextText += `\n* Route: "${route.name}"${statusTag}\n  - Description: ${route.description}\n  - Operating Hours: ${route.operating_hours}\n  - Operator-reported estimate: Regular base fare ₱${baseFare} (Student/Senior/PWD base ₱${discountBase}) for first ${baseKm} km, plus ₱${perKm}/km for every category thereafter. This is not a verified LTFRB fare table.\n  - Route landmarks (official boarding points require posted confirmation): ${stops || "Coming Soon"}\n`;
-        });
-        contextText +=
-          `\nLive active units broadcasting GPS right now: ${activeUnitCount ?? 0}.\nUse the above data to answer the user's transit question accurately. You are ONLY allowed to answer questions related to Makati e-Jeepneys, routes, terminals, fares, discounts (Student/Senior/PWD), safe night stops, operating hours, SOS/safety features, and transit services. If the user asks an unrelated question, politely decline and explain that your purpose is to help passengers with the Makati e-Jeepney Transit Tracker system. Keep responses concise, well-structured, and helpful in Taglish/English. Use bullet points (-) for lists with a blank line between each item for mobile readability. Do not use markdown bolding or asterisks; return plain text only.`;
-      }
-    } catch (dbErr: any) {
-      console.error("Failed to load transit context from database:", dbErr?.message ?? dbErr);
-    }
+      contextText = buildTransitChatContext(routes.error ? null : routes.data, terminals.error ? null : terminals.data);
+    } catch { /* Keep the unavailable context when reference reads fail. */ }
 
     const webhookId = Deno.env.get("BOTPRESS_WEBHOOK_ID") ?? "";
     const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") ?? "";
@@ -158,7 +126,7 @@ Deno.serve(async (req) => {
       const payloadJson = JSON.parse(atob(payloadBase64));
       const botpressUserId = payloadJson.id;
 
-      const fullMessage = contextText ? `${contextText}\n\nUser Message: ${trimmedMessage}` : trimmedMessage;
+      const fullMessage = `${contextText}\n\nUser Message: ${trimmedMessage}`;
 
       const msgRes = await fetch(`${botpressBaseUrl}/messages`, {
         method: "POST",
@@ -221,7 +189,7 @@ Deno.serve(async (req) => {
           model: "deepseek-chat",
           temperature: 0.2,
           messages: [
-            { role: "system", content: contextText || "You are esakaybot, a Makati e-Jeepney transit assistant." },
+            { role: "system", content: contextText },
             ...recentHistory,
             { role: "user", content: trimmedMessage },
           ],

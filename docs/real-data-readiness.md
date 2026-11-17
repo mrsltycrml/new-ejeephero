@@ -87,3 +87,5 @@ The GPS and sample-filter changes include `20261118010000_exclude_sample_fleet_u
 Publish the verified reference records and refresh the shared route/stop catalog in the app. Confirm that an empty successful response clears old records, while a failed response is identified as unavailable or dated cached data. Adding a row alone does not make a route or stop verified.
 
 The local preview at `http://localhost:8091` uses the application's existing sign-in flow and connected data. There is no generated test login. A successful local preview or web export is not a deployment of database migrations, routing functions, or the public application.
+
+Redeploy `herobot-chat` with its updated context builder before using the assistant in production. It no longer supplies default fares, unsourced safety labels or active-shift counts as current GPS information. The chat directs operational quotations and navigation to the sourced Fare and Map screens; its generated prose is not a new source of verified operational data.

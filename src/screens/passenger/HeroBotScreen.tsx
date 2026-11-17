@@ -21,7 +21,7 @@ export default function HeroBotScreen() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Use the marked loading bay near the station exit. Check the map in ejeephero to confirm the stop before boarding.',
+      content: 'Ask me about using eSAKAY. Check Map for available stops and current vehicle locations, and Fare for a sourced fare quote. Missing information will be shown as unavailable.',
     },
   ]);
   const [input, setInput] = useState('');
