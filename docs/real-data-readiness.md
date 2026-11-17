@@ -88,6 +88,8 @@ Publish the verified reference records and refresh the shared route/stop catalog
 
 The local preview at `http://localhost:8091` uses the application's existing sign-in flow and connected data. There is no generated test login. A successful local preview or web export is not a deployment of database migrations, routing functions, or the public application.
 
+The existing live application is [ejeephero.carlosbusuego15.workers.dev](https://ejeephero.carlosbusuego15.workers.dev), verified to show the sign-in page on 18 November 2026. It serves the existing release until the reviewed changes are deployed.
+
 Redeploy `herobot-chat` with its updated context builder before using the assistant in production. It no longer supplies default fares, unsourced safety labels or active-shift counts as current GPS information. The chat directs operational quotations and navigation to the sourced Fare and Map screens; its generated prose is not a new source of verified operational data.
 
 See [walking directions setup](walking-directions-setup.md) for the additional migration, server-only routing configuration, authentication, quota limits and exact source-data fields.

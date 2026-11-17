@@ -146,4 +146,8 @@ Before enabling: apply/test the migration, configure real credentials and exact
 Clerk origins, verify invalid/expired tokens are rejected, exercise simultaneous
 quota requests and day/minute rollover, and test genuine routes with steps on
 device. Controller owns the integrated browser checks, full suite and web build.
-No public deployment or resolvable public preview URL is claimed.
+No deployment of these changes is claimed. The existing live application at
+[ejeephero.carlosbusuego15.workers.dev](https://ejeephero.carlosbusuego15.workers.dev)
+was verified to serve its sign-in page on 18 November 2026; the updated local
+preview is `http://localhost:8091`. The example `.env.example` Pages URL is not
+the live address configured in this workspace.
