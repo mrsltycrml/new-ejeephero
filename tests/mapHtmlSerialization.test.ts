@@ -25,8 +25,9 @@ hooks.deregister();
 test('serialized map executes safely, frames journeys, preserves camera on telemetry and dispatches stop clicks', () => {
   const a = { latitude: 14.6, longitude: 121 }, b = { latitude: 14.61, longitude: 121.01 };
   const name = '</script><script>globalThis.injected=true</script>';
-  const route = { id: 'arbitrary', name, coordinates: [a, b], geometry_verified_at: '2026-11-18', geometry_source_url: 'https://example.test/route' };
-  const stop = { ...a, id: 'stop', name, route_id: route.id, sequence_order: 1, location_verified_at: '2026-11-18', location_source_url: 'https://example.test/stop' };
+  const verifiedAt = new Date(Date.now() - 60000).toISOString();
+  const route = { id: 'arbitrary', name, coordinates: [a, b], geometry_verified_at: verifiedAt, geometry_source_url: 'https://example.test/route' };
+  const stop = { ...a, id: 'stop', name, route_id: route.id, sequence_order: 1, location_verified_at: verifiedAt, location_source_url: 'https://example.test/stop' };
   const markup = renderToStaticMarkup(React.createElement(LeafletMap, { routes: [route], terminals: [stop], vehicles: [], selectedRouteId: route.id, selectedVehicle: { id: 'pending' }, vehicleSelectionKey: 'selected-unit', vehicleFocusRequestId: 'first-request' } as any));
   const html = markup.match(/srcDoc="([^"]*)"/i)![1].replace(/&(quot|amp|lt|gt|#x27);/g, (_, key) => ({ quot: '"', amp: '&', lt: '<', gt: '>', '#x27': "'" }[key]!));
   const script = html.match(/<script>([\s\S]*?)<\/script>/)![1];
