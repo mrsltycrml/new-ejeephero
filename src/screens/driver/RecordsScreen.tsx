@@ -3,6 +3,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { Ionicons } from '@expo/vector-icons';
 import { SkeletonBlock } from '../../components/AppUI';
 import { useAuth } from '../../contexts/AuthContext';
+import { realRows } from '../../utils/realData';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
 import {
@@ -17,27 +18,6 @@ import { calculateSafetyScore } from '../../utils/operationsSummary';
 type SpeedRecord = { id: string; created_at: string; speed_kph: number; limit_kph: number; score_deduction: number | null };
 type RouteRecord = { id: string; created_at: string; status: string; reason: string | null };
 
-const previewEnabled = typeof __DEV__ !== 'undefined' && __DEV__;
-
-function sampleRecordsForPeriod(period: ReportingPeriod): { speeds: SpeedRecord[]; routes: RouteRecord[] } {
-  const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-  const speeds: SpeedRecord[] = [
-    { id: 'sample-speed-1', created_at: hoursAgo(72), speed_kph: 24, limit_kph: 20, score_deduction: 2 },
-  ];
-  const routes: RouteRecord[] = [
-    {
-      id: 'sample-route-review',
-      created_at: hoursAgo(2),
-      status: 'pending_review',
-      reason: 'Final checkpoint was not reached; route under review.',
-    },
-  ];
-  return {
-    speeds: speeds.filter((item) => periodContains(item.created_at, period)),
-    routes: routes.filter((item) => periodContains(item.created_at, period)),
-  };
-}
-
 async function readDriverRecords<T>(
   table: 'speed_events' | 'trip_violations',
   columns: string,
@@ -50,7 +30,7 @@ async function readDriverRecords<T>(
   for (let offset = 0; ; offset += pageSize) {
     const result = await supabase
       .from(table)
-      .select(columns)
+      .select('*')
       .eq('driver_id', driverId)
       .gte('created_at', start)
       .lt('created_at', end)
@@ -58,7 +38,7 @@ async function readDriverRecords<T>(
       .range(offset, offset + pageSize - 1);
     if (result.error) throw result.error;
     const page = (result.data || []) as T[];
-    records.push(...page);
+    records.push(...realRows(page));
     if (page.length < pageSize) return records;
   }
 }
@@ -68,11 +48,13 @@ export default function RecordsScreen() {
   const [period, setPeriod] = useState<ReportingPeriod>(currentReportingPeriod('day'));
   const [speeds, setSpeeds] = useState<SpeedRecord[]>([]);
   const [routes, setRoutes] = useState<RouteRecord[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id) {
+      setLoadError('Sign in to view records.');
       setLoading(false);
       return;
     }
@@ -84,14 +66,13 @@ export default function RecordsScreen() {
         readDriverRecords<SpeedRecord>('speed_events', 'id,created_at,speed_kph,limit_kph,score_deduction', user.id, start, end),
         readDriverRecords<RouteRecord>('trip_violations', 'id,created_at,status,reason', user.id, start, end),
       ]);
-      const useSamples = previewEnabled && speedRecords.length === 0 && routeRecords.length === 0;
-      const rows = useSamples ? sampleRecordsForPeriod(period) : { speeds: speedRecords, routes: routeRecords };
-      setSpeeds(rows.speeds);
-      setRoutes(rows.routes);
+      setSpeeds(speedRecords);
+      setRoutes(routeRecords);
+      setLoadError('');
     } catch {
-      const rows = sampleRecordsForPeriod(period);
-      setSpeeds(rows.speeds);
-      setRoutes(rows.routes);
+      setSpeeds([]);
+      setRoutes([]);
+      setLoadError('Records unavailable. Pull to refresh.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -189,7 +170,7 @@ export default function RecordsScreen() {
           <SkeletonBlock height={140} />
           <SkeletonBlock height={180} />
         </View>
-      ) : (
+      ) : loadError ? <Text accessibilityRole="alert">{loadError}</Text> : (
         <>
           {/* Pale-Green Score Box */}
           <View style={styles.scorePanel}>
@@ -239,7 +220,7 @@ export default function RecordsScreen() {
               <Text style={styles.pendingTitle}>
                 {pendingCount > 0
                   ? `${pendingCount} route flag${pendingCount === 1 ? '' : 's'} awaiting review`
-                  : '1 route flag awaiting review'}
+                  : 'No route flags awaiting review'}
               </Text>
               <Text style={styles.pendingSub}>Pending flags are not confirmed deductions.</Text>
             </View>

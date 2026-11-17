@@ -8,8 +8,7 @@ import { FormScrollView, triggerHaptic } from '../../components/AppUI';
 import { useLocation } from '../../contexts/LocationContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
-import { offlineTransit, MAKATI_OFFICIAL_TERMINALS, type TerminalData, type VehicleData } from '../../services/offlineTransitService';
-import { SAMPLE_PASSENGER_VEHICLES } from '../../constants/samplePassengerFleet';
+import { offlineTransit, type RouteData, type TerminalData, type VehicleData } from '../../services/offlineTransitService';
 import { loadLoadingZones } from '../../services/passengerDataService';
 import { evaluateBoardingLocation, type LoadingZone } from '../../services/passengerSafety';
 import { searchPassengerPlaces } from '../../services/placeSearchService';
@@ -19,11 +18,11 @@ import { Colors } from '../../constants/theme';
 export default function PassengerHomeScreen({ route, navigation }: any) {
   const { location } = useLocation();
   const { isConnected } = useNetwork();
-  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, nearby, endRide } = usePassengerJourney();
+  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, endRide } = usePassengerJourney();
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const map = useRef<LeafletMapRef>(null);
 
-  const [stops, setStops] = useState<TerminalData[]>(MAKATI_OFFICIAL_TERMINALS);
+  const [stops, setStops] = useState<TerminalData[]>([]);
   const [query, setQuery] = useState(place?.name || destination?.name || '');
   const [searchOpen, setSearchOpen] = useState(false);
   const [boardingOpen, setBoardingOpen] = useState(false);
@@ -32,7 +31,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const [searchError, setSearchError] = useState('');
   const [searched, setSearched] = useState(false);
   const searchVersion = useRef(0);
-  const [mode, setMode] = useState<'live' | 'sample'>('live');
+  const [routes, setRoutes] = useState<RouteData[]>([]);
+  const [transitNotice, setTransitNotice] = useState('Loading routes…');
   const [selected, setSelected] = useState<VehicleData | null>(null);
   const [zones, setZones] = useState<LoadingZone[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -64,7 +64,11 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     offlineTransit
       .getTransitData()
       .then((data) => {
-        if (active) setStops(data.terminals);
+        if (active) {
+          setStops(data.terminals);
+          setRoutes(data.routes);
+          setTransitNotice(data.status === 'ready' ? (data.routes.length ? '' : 'No published active routes.') : data.syncedAt ? `Routes cached at ${new Date(data.syncedAt).toLocaleString()}; refresh unavailable.` : 'Route data unavailable.');
+        }
       })
       .catch(() => {});
     setZonesLoading(true);
@@ -98,18 +102,19 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     lastWarning.current = warningKey;
   }, [warningKey]);
 
-  const activeStop = destination || stops[0] || MAKATI_OFFICIAL_TERMINALS[0];
+  const activeStop = destination ? stops.find(stop => stop.id === destination.id) ?? null : null;
   const stopIndex = Math.max(0, stops.findIndex((st) => st.id === activeStop?.id));
-  const stopBadgeCode = `STOP ${String(stopIndex + 1).padStart(2, '0')}`;
+  const stopBadgeCode = activeStop ? `STOP ${String(stopIndex + 1).padStart(2, '0')}` : 'UNAVAILABLE';
+  const routeName = (id?: string) => routes.find(item => item.id === id)?.name || 'Route unavailable';
 
   const results = stops.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
-  const allModeVehicles = mode === 'sample' || !vehicles.length ? SAMPLE_PASSENGER_VEHICLES : isConnected ? vehicles : [];
+  const allModeVehicles = isConnected ? vehicles.filter(vehicle => !vehicle.is_sample && now - Date.parse(vehicle.recorded_at || '') <= 20_000) : [];
   const displayed = activeStop
     ? allModeVehicles.filter((v) => v.route_id === activeStop.route_id)
     : allModeVehicles;
   const currentSelected = selected
-    ? displayed.find((v) => v.vehicle_id === selected.vehicle_id) || displayed[0] || null
-    : displayed[0] || SAMPLE_PASSENGER_VEHICLES[0] || null;
+    ? displayed.find((v) => v.vehicle_id === selected.vehicle_id) || null
+    : null;
   const locationFresh = location && now - location.timestamp < 60_000;
 
   const chooseDestination = (stop: TerminalData) => {
@@ -119,7 +124,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     setQuery(stop.name);
     setSearchOpen(false);
     setSelected(null);
-    map.current?.centerOn(stop.latitude || 14.568, stop.longitude || 121.033, 15);
+    map.current?.centerOn(stop.latitude, stop.longitude, 15);
   };
 
   const searchPlaces = async () => {
@@ -151,24 +156,19 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     map.current?.centerOn(value.latitude, value.longitude, 15);
   };
 
-  const selectMode = (value: 'live' | 'sample') => {
-    triggerHaptic('light');
-    setMode(value);
-    setSelected(null);
-  };
-
   const selectVehicle = (vehicle: VehicleData) => {
     triggerHaptic('light');
     setSelected(vehicle);
   };
 
-  const boardUnit = (vehicle: VehicleData, sampleOverride = false) => {
+  const boardUnit = (vehicle: VehicleData) => {
+    if (vehicle.is_sample || !nearby.some(item => item.vehicle_id === vehicle.vehicle_id)) return;
     triggerHaptic('success');
     setUnit({
       vehicle_id: vehicle.vehicle_id,
       body_number: vehicle.body_number,
       plate_number: vehicle.plate_number,
-      source: sampleOverride || vehicle.is_sample ? 'sample' : 'confirmed',
+      source: 'confirmed',
     });
     setBoardingOpen(false);
   };
@@ -270,7 +270,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
                 <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowTitle}>{stop.name}</Text>
-                  <Text style={styles.rowSubtitle}>Makati – Mandaluyong corridor</Text>
+                  <Text style={styles.rowSubtitle}>{routeName(stop.route_id)}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
               </TouchableOpacity>
@@ -299,7 +299,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowTitle}>{stop.name}</Text>
-                  <Text style={styles.rowSubtitle}>Route 1</Text>
+                  <Text style={styles.rowSubtitle}>{routeName(activeStop?.route_id)}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
               </TouchableOpacity>
@@ -316,7 +316,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
 
   // 2) WHERE TO BOARD VIEW (Board 02 left)
   if (boardingOpen) {
-    const targetVehicle = currentSelected || SAMPLE_PASSENGER_VEHICLES[0];
+    const targetVehicle = currentSelected;
     const canBoardLive = targetVehicle && !targetVehicle.is_sample && nearby.some((v) => v.vehicle_id === targetVehicle.vehicle_id);
     const isProhibited = boarding.kind === 'prohibited';
 
@@ -344,26 +344,26 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             vehicles={displayed}
             userLocation={locationFresh ? location.coords : null}
             selectedVehicle={targetVehicle}
-            isOffline={mode === 'live' && !isConnected}
+            isOffline={!isConnected}
             onSelectVehicle={selectVehicle}
           />
           <View style={styles.loadingBayOverlay}>
-            <Text style={styles.loadingBayOverlayText}>Loading bay</Text>
+            <Text style={styles.loadingBayOverlayText}>{boarding.kind === 'allowed' ? 'Loading bay' : 'Loading area unverified'}</Text>
           </View>
         </View>
 
         <View style={[styles.boardingStatusRow, isProhibited && styles.boardingStatusDanger]}>
           <Ionicons
-            name={isProhibited ? 'warning' : 'checkmark-circle'}
+            name={isProhibited ? 'warning' : boarding.kind === 'allowed' ? 'checkmark-circle' : 'information-circle'}
             size={22}
             color={isProhibited ? Colors.primaryRed : Colors.brandGreen}
           />
           <View style={{ flex: 1 }}>
             <Text style={[styles.rowTitle, isProhibited && { color: Colors.primaryRed }]}>
-              {isProhibited ? 'No loading in this area' : "You're in a loading area"}
+              {boarding.title}
             </Text>
             <Text style={styles.rowSubtitle}>
-              {isProhibited ? boarding.detail : 'Board only within the marked bay.'}
+              {boarding.detail}
             </Text>
           </View>
         </View>
@@ -372,7 +372,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           <View style={styles.stopBadgePill}>
             <Text style={styles.stopBadgeText}>{stopBadgeCode}</Text>
           </View>
-          <Text style={[styles.rowTitle, { fontSize: 17 }]}>{activeStop?.name || 'MRT Buendia'}</Text>
+          <Text style={[styles.rowTitle, { fontSize: 17 }]}>{activeStop?.name || 'Choose a verified stop'}</Text>
         </View>
 
         <View style={s.divider} />
@@ -387,29 +387,25 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
                 <Text style={styles.unitCodeText}>{targetVehicle.body_number}</Text>
                 <Text style={styles.rowSubtitle}>Plate {targetVehicle.plate_number}</Text>
               </View>
-              <Text style={styles.rowSubtitle}>Route 1 · Toward Mandaluyong City Hall</Text>
+              <Text style={styles.rowSubtitle}>{routeName(targetVehicle.route_id)}</Text>
             </View>
             <View style={styles.seatBadge}>
-              <Text style={styles.seatBadgeText}>{targetVehicle.status || 'Maluwag'}</Text>
+              <Text style={styles.seatBadgeText}>{targetVehicle.status || 'Occupancy unavailable'}</Text>
             </View>
           </View>
         )}
 
         <TouchableOpacity
           accessibilityRole="button"
-          onPress={() => targetVehicle && boardUnit(targetVehicle, !canBoardLive)}
+          disabled={!canBoardLive}
+          accessibilityState={{ disabled: !canBoardLive }}
+          onPress={() => targetVehicle && canBoardLive && boardUnit(targetVehicle)}
           style={s.button}
         >
           <Text style={s.buttonText}>I boarded this unit</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => targetVehicle && boardUnit(targetVehicle, true)}
-          style={styles.demoLinkBtn}
-        >
-          <Text style={styles.demoLinkText}>Preview boarding (demo)</Text>
-        </TouchableOpacity>
+        {!canBoardLive && <Text style={s.muted}>Select a nearby unit with current GPS to confirm your ride.</Text>}
 
         <PassengerStopGuide
           openRequest={route?.params?.showStopGuide}
@@ -446,7 +442,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             vehicles={displayed}
             userLocation={locationFresh ? location.coords : null}
             selectedVehicle={currentSelected}
-            isOffline={mode === 'live' && !isConnected}
+            isOffline={!isConnected}
             onSelectVehicle={selectVehicle}
           />
         </View>
@@ -458,15 +454,15 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           <View style={styles.kvList}>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Plate</Text>
-              <Text style={styles.kvValue}>{unit.plate_number || 'ABC 1234'}</Text>
+              <Text style={styles.kvValue}>{unit.plate_number || 'Unavailable'}</Text>
             </View>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Route</Text>
-              <Text style={styles.kvValue}>Route 1</Text>
+              <Text style={styles.kvValue}>{routeName(activeStop?.route_id)}</Text>
             </View>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Direction</Text>
-              <Text style={styles.kvValue}>{destination?.name || 'Mandaluyong City Hall'}</Text>
+              <Text style={styles.kvValue}>{destination?.name || 'Unavailable'}</Text>
             </View>
           </View>
 
@@ -533,27 +529,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           </Text>
         </TouchableOpacity>
 
-        <View style={styles.segmentWrap}>
-          {(['live', 'sample'] as const).map((value) => {
-            const active = mode === value;
-            return (
-              <TouchableOpacity
-                key={value}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => selectMode(value)}
-                style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-              >
-                {active && value === 'live' && (
-                  <Ionicons name="checkmark" size={15} color={Colors.brandGreen} />
-                )}
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                  {value === 'live' ? 'Live GPS' : 'Sample fleet'}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {!!transitNotice && <Text style={s.muted}>{transitNotice}</Text>}
+        <Text style={s.muted}>{vehicleError || (!displayed.length ? 'No current vehicle locations available.' : 'Select a unit on the map.')}</Text>
       </View>
 
       {/* Street Map */}
@@ -565,15 +542,15 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           routes={[]}
           terminals={stops}
           vehicles={displayed}
-          userLocation={locationFresh && mode === 'live' ? location.coords : null}
+          userLocation={locationFresh ? location.coords : null}
           selectedVehicle={currentSelected}
-          isOffline={mode === 'live' && !isConnected}
+          isOffline={!isConnected}
           onSelectVehicle={selectVehicle}
         />
         <View style={styles.updatedPill}>
           <View style={styles.liveDot} />
           <Text style={styles.updatedPillText}>
-            {mode === 'live' && !isConnected ? 'Offline mode' : 'Updated just now'}
+            {!isConnected ? 'Offline' : currentSelected?.recorded_at ? `GPS measured ${new Date(currentSelected.recorded_at).toLocaleTimeString()}` : 'No unit selected'}
           </Text>
         </View>
       </View>
@@ -581,14 +558,14 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
       {/* Bottom Sheet Card */}
       <View style={styles.bottomSheetSurface}>
         <View style={styles.sheetHandle} />
-        <Text style={styles.nearbyLabel}>Nearby boarding stop</Text>
+        <Text style={styles.nearbyLabel}>Selected stop</Text>
 
         <View style={styles.stopHeroRow}>
           <View style={styles.stopBadgePill}>
             <Text style={styles.stopBadgeText}>{stopBadgeCode}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.stopHeroName}>{activeStop?.name || 'MRT Buendia'}</Text>
+            <Text style={styles.stopHeroName}>{activeStop?.name || 'Choose a verified stop'}</Text>
             <Text style={styles.rowSubtitle}>Check the loading area before boarding</Text>
           </View>
         </View>
@@ -602,8 +579,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             <Ionicons name="bus-outline" size={19} color={Colors.brandGreen} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>Route 1</Text>
-            <Text style={styles.rowSubtitle}>Toward Mandaluyong City Hall</Text>
+            <Text style={styles.rowTitle}>{routeName(activeStop?.route_id)}</Text>
+            <Text style={styles.rowSubtitle}>{activeStop?.name || 'Destination unavailable'}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
         </TouchableOpacity>
@@ -907,15 +884,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.brandGreen,
   },
-  demoLinkBtn: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  demoLinkText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
+
   rideHeaderBar: {
     flexDirection: 'row',
     alignItems: 'center',

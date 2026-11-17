@@ -101,7 +101,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       isInside: geofenceResult?.currentZone?.id === t.id,
       isSelected: selectedTerminal?.id === t.id,
     })),
-    vehicles: vehicles.map(v => ({
+    vehicles: vehicles.filter(v => !v.is_sample).map(v => ({
       id: v.id,
       body_number: v.body_number,
       plate_number: v.plate_number,
@@ -112,7 +112,6 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       max_capacity: v.max_capacity,
       speed: v.speed,
       isSpeeding: Boolean(v.isSpeeding),
-      isSample: Boolean(v.is_sample),
       isSelected: selectedVehicle?.id === v.id,
     })),
     userLocation: userLocation || null,
@@ -555,7 +554,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           var isPuno = veh.status === 'Puno';
           var isSakto = veh.status === 'Sakto';
           var statusColor = veh.isSpeeding ? '#D32F2F' : (isPuno ? '#F44336' : (isSakto ? '#FF9800' : '#4CAF50'));
-          var vehicleStatusText = veh.isSample ? 'Sample' : (data.hideOccupancy ? 'Live' : (veh.isSpeeding ? 'SPEEDING' : veh.status));
+          var vehicleStatusText = data.hideOccupancy ? 'GPS position' : (veh.isSpeeding ? 'SPEEDING' : (veh.status || 'Occupancy unavailable'));
           if (data.hideOccupancy) statusColor = '#B63D32';
 
           var vHtml = '<div class="vehicle-marker-wrapper">' +

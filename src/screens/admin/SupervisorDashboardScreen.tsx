@@ -18,8 +18,8 @@ import { offlineTransit } from '../../services/offlineTransitService';
 import type { RouteData, TerminalData, VehicleData } from '../../services/offlineTransitService';
 import { useRoute } from '@react-navigation/native';
 import { ESAKAY_OPERATIONS } from '../../constants/esakayOperations';
-import { SAMPLE_UNITS } from '../../constants/sampleFleet';
-import { SAMPLE_ROUTE_CUTS, SAMPLE_SPEED_OFFENSES } from '../../constants/sampleMonitoring';
+import DirectoryScreen from '../passenger/DirectoryScreen';
+import { realRows } from '../../utils/realData';
 import {
   currentReportingPeriod,
   formatReportingPeriod,
@@ -46,7 +46,6 @@ type Violation = {
   created_at: string;
   driverName?: string;
   unitDisplay?: string;
-  isSample?: boolean;
 };
 
 type SpeedEvent = {
@@ -87,49 +86,6 @@ type Scorecard = {
 
 type UnitChoice = { key: string; label: string; routeId: string };
 
-type ManagedRouteItem = {
-  id: string;
-  name: string;
-  corridor: string;
-  status: 'Active' | 'Draft' | 'Inactive';
-  stops: string[];
-  assignedDrivers: { driverName: string; unitCode: string; plate: string; onShift?: boolean }[];
-  activeShifts: number;
-};
-
-const INITIAL_MANAGED_ROUTES: ManagedRouteItem[] = [
-  {
-    id: 'route-1',
-    name: 'Route 1',
-    corridor: 'MRT Buendia ↔ Mandaluyong City Hall',
-    status: 'Active',
-    stops: ['MRT Buendia', 'Washington', 'Makati City Hall', 'Hulo', 'Mandaluyong City Hall'],
-    assignedDrivers: [
-      { driverName: 'Juan Dela Cruz', unitCode: 'EJ-024', plate: 'ABC 1234', onShift: true },
-      { driverName: 'Maria Santos', unitCode: 'EJ-031', plate: 'DEF 5678', onShift: true },
-    ],
-    activeShifts: 2,
-  },
-  {
-    id: 'route-2',
-    name: 'Route 2',
-    corridor: 'Circuit Makati ↔ Guadalupe Nuevo',
-    status: 'Draft',
-    stops: ['Circuit Makati', 'J.P. Rizal', 'Poblacion', 'Guadalupe Nuevo'],
-    assignedDrivers: [],
-    activeShifts: 0,
-  },
-  {
-    id: 'route-3',
-    name: 'Route 3',
-    corridor: 'Ayala Triangle ↔ Poblacion',
-    status: 'Inactive',
-    stops: ['Ayala Triangle', 'Paseo de Roxas', 'Makati Ave', 'Poblacion'],
-    assignedDrivers: [],
-    activeShifts: 0,
-  },
-];
-
 let monitorChannelSequence = 0;
 
 async function readPeriodRows<T>(table: string, start: string, end: string): Promise<{ data: T[]; error: string | null }> {
@@ -145,7 +101,7 @@ async function readPeriodRows<T>(table: string, start: string, end: string): Pro
       .range(offset, offset + pageSize - 1);
     if (result.error) return { data: [], error: result.error.message };
     const page = (result.data ?? []) as T[];
-    rows.push(...page);
+    rows.push(...realRows(page));
     if (page.length < pageSize) return { data: rows, error: null };
   }
 }
@@ -189,46 +145,41 @@ export default function SupervisorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Route Management State (Boards 05, 06, 07)
-  const [manageMode, setManageMode] = useState<'none' | 'list' | 'detail' | 'add' | 'edit' | 'assign'>('none');
-  const [managedRoutes, setManagedRoutes] = useState<ManagedRouteItem[]>(INITIAL_MANAGED_ROUTES);
-  const [routeSearch, setRouteSearch] = useState('');
-  const [routeStatusFilter, setRouteStatusFilter] = useState<'All' | 'Active' | 'Draft' | 'Inactive'>('All');
-  const [selectedManagedRouteId, setSelectedManagedRouteId] = useState<string>('route-1');
-  const [newRouteName, setNewRouteName] = useState('Route 2');
-  const [newRouteOrigin, setNewRouteOrigin] = useState('Circuit Makati');
-  const [newRouteDest, setNewRouteDest] = useState('Guadalupe Nuevo');
-  const [newStopInput, setNewStopInput] = useState('');
-  const [assignDriverName, setAssignDriverName] = useState('Lito Mendoza');
-  const [assignUnitCode, setAssignUnitCode] = useState('EJ-055');
-  const [assignUnitPlate, setAssignUnitPlate] = useState('JKL 3456');
+  const [manageMode, setManageMode] = useState<'none' | 'list'>('none');
+  const [dataError, setDataError] = useState('');
+  const [transitNotice, setTransitNotice] = useState('');
 
   const loadDashboard = useCallback(async () => {
+    try {
     const { start, end } = periodRangeUtc(period);
     const [transit, vehicleResult, eventResult, violationResult, profileResult, recentSpeedResult, tripCountResult] =
       await Promise.all([
         offlineTransit.getTransitData(),
         supabase
           .from('vehicles')
-          .select('id,driver_id,route_id,body_number,plate_number,passenger_count,max_capacity,is_active')
+          .select('*')
           .order('created_at', { ascending: false })
           .limit(1000),
         readPeriodRows<SpeedEvent>('speed_events', start, end),
         readPeriodRows<Violation>('trip_violations', start, end),
-        supabase.from('profiles').select('id,email,full_name,status').eq('role', 'driver').eq('supervisor_hidden', false),
+        supabase.from('profiles').select('*').eq('role', 'driver').eq('supervisor_hidden', false),
         supabase
           .from('speed_events')
-          .select('vehicle_id')
+          .select('*')
           .gte('created_at', new Date(Date.now() - 120_000).toISOString())
           .limit(100),
-        supabase.from('vehicles').select('id', { count: 'exact', head: true }).gte('created_at', start).lt('created_at', end),
+        readPeriodRows<{ id: string }>('vehicles', start, end),
       ]);
 
-    setPeriodTripCount(tripCountResult.error ? 3 : tripCountResult.count || 3);
+    const failures = [vehicleResult, eventResult, violationResult, profileResult, recentSpeedResult, tripCountResult].filter(result => result.error);
+    if (failures.length) throw new Error('Operations data unavailable. Refresh to try again.');
+    setDataError('');
+    setTransitNotice(transit.status === 'ready' ? '' : transit.syncedAt ? `Routes cached at ${new Date(transit.syncedAt).toLocaleString()}; refresh unavailable.` : 'Route data unavailable.');
+    setPeriodTripCount(tripCountResult.data.length);
     setRoutes(transit.routes);
     setTerminals(transit.terminals);
 
-    const allUnits = vehicleResult.data ?? [];
+    const allUnits = realRows<any>(vehicleResult.data ?? []);
     const active = allUnits.filter((vehicle: any) => vehicle.is_active);
     const choices = new Map<string, UnitChoice>();
     for (const vehicle of allUnits) {
@@ -244,7 +195,7 @@ export default function SupervisorDashboardScreen() {
     const details = new Map<string, string>(
       allUnits.map((vehicle: any) => [
         vehicle.id,
-        `${vehicle.body_number || 'EJ-024'} · ${vehicle.plate_number || 'ABC 1234'}`,
+        `${vehicle.body_number || 'Unit unavailable'} · ${vehicle.plate_number || 'Plate unavailable'}`,
       ])
     );
     setUnitDetails(details);
@@ -253,7 +204,7 @@ export default function SupervisorDashboardScreen() {
     const positionsResult = active.length
       ? await supabase
           .from('vehicle_positions')
-          .select('vehicle_id,latitude,longitude,speed,heading,timestamp')
+          .select('*')
           .in(
             'vehicle_id',
             active.map((vehicle) => vehicle.id)
@@ -262,15 +213,16 @@ export default function SupervisorDashboardScreen() {
           .order('timestamp', { ascending: false })
           .limit(300)
       : { data: [], error: null };
-    const latestPosition = pickLatestFreshPositions(positionsResult.data ?? []);
-    const recentEvents = recentSpeedResult.data ?? [];
+    if (positionsResult.error) throw new Error('Vehicle locations unavailable. Refresh to try again.');
+    const latestPosition = pickLatestFreshPositions(realRows(positionsResult.data ?? []));
+    const recentEvents = realRows(recentSpeedResult.data ?? []);
     const speedingIds = new Set(recentEvents.map((event: any) => event.vehicle_id));
 
     const mappedVehicles = active.flatMap((vehicle: any) => {
       const position = latestPosition.get(vehicle.id);
       if (!position) return [];
-      const count = vehicle.passenger_count ?? 0;
-      const capacity = vehicle.max_capacity ?? 22;
+      const count = vehicle.passenger_count ?? null;
+      const capacity = vehicle.max_capacity ?? null;
       return [
         {
           id: vehicle.id,
@@ -280,12 +232,13 @@ export default function SupervisorDashboardScreen() {
           route_id: vehicle.route_id,
           latitude: position.latitude,
           longitude: position.longitude,
-          speed: position.speed ?? 0,
-          heading: position.heading ?? 0,
+          speed: position.speed ?? null,
+          recorded_at: position.timestamp,
+          heading: position.heading ?? null,
           passenger_count: count,
           max_capacity: capacity,
-          is_full: count >= capacity,
-          status: count >= capacity ? ('Puno' as const) : count >= capacity * 0.7 ? ('Sakto' as const) : ('Maluwag' as const),
+          is_full: count == null || capacity == null ? null : count >= capacity,
+          status: count == null || capacity == null ? null : count >= capacity ? ('Puno' as const) : count >= capacity * 0.7 ? ('Sakto' as const) : ('Maluwag' as const),
           isSpeeding: speedingIds.has(vehicle.id),
         },
       ];
@@ -293,7 +246,7 @@ export default function SupervisorDashboardScreen() {
     setVehicles(mappedVehicles);
 
     const profileNames = new Map(
-      (profileResult.data ?? []).map((profile: any) => [profile.id, profile.full_name || profile.email || 'Driver'])
+      realRows<any>(profileResult.data ?? []).map((profile: any) => [profile.id, profile.full_name || profile.email || 'Driver'])
     );
     setDriverNames(profileNames);
 
@@ -302,49 +255,16 @@ export default function SupervisorDashboardScreen() {
       return {
         id: vehicle.id,
         driverId: vehicle.driver_id,
-        body: vehicle.body_number || 'EJ-024',
-        plate: vehicle.plate_number || 'ABC 1234',
-        speed: position ? Number(position.speed || 0) : null,
-        lastSeen: position ? position.timestamp : new Date(Date.now() - 45 * 60_000).toISOString(),
+        body: vehicle.body_number || 'Unit unavailable',
+        plate: vehicle.plate_number || 'Plate unavailable',
+        speed: position?.speed ?? null,
+        lastSeen: position?.timestamp ?? '',
         isSpeeding: speedingIds.has(vehicle.id),
         stale: !position,
       };
     });
 
-    if (computedLiveUnits.length === 0) {
-      setLiveUnits([
-        {
-          id: 'sample-live-1',
-          driverId: 'jc',
-          body: 'EJ-024',
-          plate: 'ABC 1234',
-          speed: 18,
-          lastSeen: new Date().toISOString(),
-          isSpeeding: false,
-        },
-        {
-          id: 'sample-live-2',
-          driverId: 'ms',
-          body: 'EJ-031',
-          plate: 'DEF 5678',
-          speed: 15,
-          lastSeen: new Date().toISOString(),
-          isSpeeding: false,
-        },
-        {
-          id: 'sample-live-3',
-          driverId: 'lm',
-          body: 'EJ-042',
-          plate: 'GHI 9012',
-          speed: null,
-          lastSeen: new Date(Date.now() - 42 * 60_000).toISOString(),
-          isSpeeding: false,
-          stale: true,
-        },
-      ]);
-    } else {
-      setLiveUnits(computedLiveUnits);
-    }
+    setLiveUnits(computedLiveUnits);
 
     const violationRows = violationResult.data ?? [];
     setViolations(violationRows);
@@ -352,7 +272,7 @@ export default function SupervisorDashboardScreen() {
     const eventRows = eventResult.data ?? [];
     setSpeedEvents(eventRows as SpeedEvent[]);
 
-    const previewCards: Scorecard[] = (profileResult.data ?? []).map((profile: any) => {
+    const previewCards: Scorecard[] = realRows<any>(profileResult.data ?? []).map((profile: any) => {
       const driverId = profile.id;
       const driverEvents = eventRows.filter((event: any) => event.driver_id === driverId);
       const confirmedTrips = violationRows.filter(
@@ -367,7 +287,7 @@ export default function SupervisorDashboardScreen() {
       return {
         driverId,
         name: profileNames.get(driverId) ?? 'Driver',
-        unitLabel: 'Route 1',
+        unitLabel: allUnits.find(unit => unit.driver_id === driverId)?.body_number || 'Unit unavailable',
         status: profile.status,
         score: calculateSafetyScore(deductions, confirmedTrips),
         speedEvents: driverEvents.length,
@@ -376,17 +296,12 @@ export default function SupervisorDashboardScreen() {
       };
     });
 
-    if (previewCards.length === 0) {
-      setScorecards([
-        { driverId: 'jc', name: 'Juan Dela Cruz', unitLabel: 'EJ-024 · Route 1', status: 'approved', score: 100, speedEvents: 0, confirmedTrips: 0, pendingFlags: 1 },
-        { driverId: 'ms', name: 'Maria Santos', unitLabel: 'EJ-031 · Route 1', status: 'approved', score: 100, speedEvents: 0, confirmedTrips: 0, pendingFlags: 0 },
-        { driverId: 'lm', name: 'Lito Mendoza', unitLabel: 'EJ-042 · Route 1', status: 'approved', score: 100, speedEvents: 0, confirmedTrips: 0, pendingFlags: 0 },
-      ]);
-    } else {
-      setScorecards(previewCards);
+    setScorecards(previewCards);
+    } catch (cause) {
+      setDataError(cause instanceof Error ? cause.message : 'Operations data unavailable.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [period]);
 
   useEffect(() => {
@@ -420,12 +335,6 @@ export default function SupervisorDashboardScreen() {
   };
 
   const reviewViolation = async (violation: Violation, status: 'confirmed' | 'dismissed') => {
-    if (violation.isSample) {
-      triggerHaptic(status === 'confirmed' ? 'success' : 'medium');
-      setSelectedViolation(null);
-      setCutFilter(status);
-      return;
-    }
     const { error } = await supabase.from('trip_violations').update({ status }).eq('id', violation.id);
     if (error) {
       triggerHaptic('error');
@@ -439,30 +348,10 @@ export default function SupervisorDashboardScreen() {
 
   const unitLabel = (vehicleId: string, body?: string | null, plate?: string | null) =>
     body || plate
-      ? `${body || 'EJ-024'} · ${plate || 'ABC 1234'}`
-      : unitDetails.get(vehicleId) || 'EJ-024 · ABC 1234';
+      ? `${body || 'Unit unavailable'} · ${plate || 'Plate unavailable'}`
+      : unitDetails.get(vehicleId) || 'Unit unavailable';
 
-  const sampleSpeedRows = useMemo(
-    () => SAMPLE_SPEED_OFFENSES.filter((item) => periodContains(item.createdAt, period)),
-    [period]
-  );
-  const sampleCutRows: Violation[] = useMemo(
-    () =>
-      SAMPLE_ROUTE_CUTS.map((item) => ({
-        id: item.id,
-        driver_id: item.driver,
-        vehicle_id: item.unit,
-        reason: item.reason,
-        status: item.status === 'confirmed' ? ('confirmed' as const) : ('pending_review' as const),
-        created_at: item.createdAt,
-        driverName: item.driver,
-        unitDisplay: `${item.unit} · Route 1`,
-        isSample: true,
-      })),
-    []
-  );
-
-  const allCuts = violations.length ? violations : sampleCutRows;
+  const allCuts = violations;
   const pendingCount = allCuts.filter((item) => item.status === 'pending_review' || item.status === 'flagged').length;
 
   const mapVehicles = useMemo(
@@ -483,13 +372,7 @@ export default function SupervisorDashboardScreen() {
     [terminals, mapRouteFilter]
   );
   const shownUnitChoices = useMemo(() => {
-    const primaryRouteId = routes.find((item) => !item.is_coming_soon)?.id || '';
-    const sampleChoices = SAMPLE_UNITS.map((unit) => ({
-      key: unit.key,
-      label: `${unit.name} · ${unit.plateNumber}`,
-      routeId: primaryRouteId,
-    }));
-    const matching = [...unitChoices, ...sampleChoices].filter(
+    const matching = unitChoices.filter(
       (unit) => mapRouteFilter === 'all' || unit.routeId === mapRouteFilter
     );
     if (mapRouteFilter === 'all' && mapUnitFilter !== 'all' && !matching.some((unit) => unit.key === mapUnitFilter)) {
@@ -501,569 +384,24 @@ export default function SupervisorDashboardScreen() {
   const selectedMapVehicle =
     mapUnitFilter === 'all' ? null : mapVehicles.find((vehicle) => unitKey(vehicle) === mapUnitFilter) || null;
 
-  const selectedManagedRoute =
-    managedRoutes.find((r) => r.id === selectedManagedRouteId) || managedRoutes[0];
-
   if (loading) return <ScreenSkeleton preset="dashboard" />;
+  if (dataError) return <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}><Text accessibilityRole="alert">{dataError}</Text></ScrollView>;
 
-  // ─── ROUTE MANAGEMENT SUB-SCREENS (Boards 05, 06, 07) ───
-  if (manageMode !== 'none') {
-    // 1. ROUTES REGISTRY LIST (Board 05 middle)
-    if (manageMode === 'list') {
-      const filteredRoutes = managedRoutes.filter((r) => {
-        if (routeStatusFilter !== 'All' && r.status !== routeStatusFilter) return false;
-        return `${r.name} ${r.corridor}`.toLowerCase().includes(routeSearch.trim().toLowerCase());
-      });
-      return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-          <View style={styles.topActionRow}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => setManageMode('none')}
-              style={styles.backNavRow}
-            >
-              <Ionicons name="chevron-back" size={22} color={Colors.ink} />
-              <Text style={styles.pageTitle}>Routes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => {
-                setNewRouteName(`Route ${managedRoutes.length + 1}`);
-                setNewRouteOrigin('Circuit Makati');
-                setNewRouteDest('Guadalupe Nuevo');
-                setManageMode('add');
-              }}
-              style={styles.topAddBtn}
-            >
-              <Ionicons name="add" size={18} color={Colors.brandGreen} />
-              <Text style={styles.topAddText}>Add</Text>
-            </TouchableOpacity>
-          </View>
+  if (manageMode === 'list') return (
+    <View style={styles.container}>
+      <TouchableOpacity accessibilityRole="button" onPress={() => setManageMode('none')} style={styles.backNavRow}>
+        <Ionicons name="chevron-back" size={22} color={Colors.ink} />
+        <Text style={styles.pageTitle}>Routes</Text>
+      </TouchableOpacity>
+      <Text style={styles.rowSub}>Published routes are read-only here. Route editing and driver assignment are unavailable in this app.</Text>
+      <DirectoryScreen />
+    </View>
+  );
 
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={18} color={Colors.subtleGray} />
-            <TextInput
-              value={routeSearch}
-              onChangeText={setRouteSearch}
-              placeholder="Search routes"
-              placeholderTextColor={Colors.subtleGray}
-              style={styles.searchBarInput}
-            />
-          </View>
-
-          <View style={styles.segmentBar}>
-            {(['All', 'Active', 'Draft', 'Inactive'] as const).map((tab) => {
-              const active = routeStatusFilter === tab;
-              return (
-                <TouchableOpacity
-                  key={tab}
-                  accessibilityRole="button"
-                  onPress={() => setRouteStatusFilter(tab)}
-                  style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-                >
-                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{tab}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.dividerList}>
-            {filteredRoutes.map((r) => (
-              <TouchableOpacity
-                key={r.id}
-                accessibilityRole="button"
-                onPress={() => {
-                  setSelectedManagedRouteId(r.id);
-                  setManageMode(r.status === 'Draft' ? 'edit' : 'detail');
-                }}
-                style={styles.listRow}
-              >
-                <View style={styles.routeIconCircle}>
-                  <Ionicons name="git-branch-outline" size={19} color={Colors.brandGreen} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={styles.rowTitle}>{r.name}</Text>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        r.status === 'Active'
-                          ? styles.badgeGreen
-                          : r.status === 'Draft'
-                            ? styles.badgeAmber
-                            : styles.badgeGray,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusBadgeText,
-                          r.status === 'Active'
-                            ? styles.badgeGreenText
-                            : r.status === 'Draft'
-                              ? styles.badgeAmberText
-                              : styles.badgeGrayText,
-                        ]}
-                      >
-                        {r.status}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.rowSub}>{r.corridor}</Text>
-                  <Text style={styles.rowSub}>
-                    {r.stops.length} stops ·{' '}
-                    {r.assignedDrivers.length
-                      ? `${r.assignedDrivers.length} assigned driver${r.assignedDrivers.length === 1 ? '' : 's'}`
-                      : 'No drivers assigned'}
-                  </Text>
-                </View>
-                {r.status === 'Inactive' ? (
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setManagedRoutes((prev) =>
-                        prev.map((item) => (item.id === r.id ? { ...item, status: 'Active' } : item))
-                      );
-                    }}
-                    style={styles.restoreOutlineBtn}
-                  >
-                    <Text style={styles.restoreOutlineText}>Restore</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      );
-    }
-
-    // 2. ACTIVE ROUTE DETAILS (Board 05 right)
-    if (manageMode === 'detail' && selectedManagedRoute) {
-      const hasActiveShifts = selectedManagedRoute.activeShifts > 0;
-      return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-          <View style={styles.topActionRow}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => setManageMode('list')}
-              style={styles.backNavRow}
-            >
-              <Ionicons name="chevron-back" size={22} color={Colors.ink} />
-              <Text style={styles.pageTitle}>{selectedManagedRoute.name}</Text>
-            </TouchableOpacity>
-            <View style={[styles.statusBadge, styles.badgeGreen]}>
-              <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>
-                {selectedManagedRoute.status}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.subtitleText}>{selectedManagedRoute.corridor}</Text>
-
-          <View style={styles.mapFrameSmall}>
-            <LeafletMap routes={mapRoutes} terminals={mapTerminals} vehicles={[]} fleetMode />
-          </View>
-
-          <View style={styles.kvGroup}>
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Stops</Text>
-              <Text style={styles.kvValue}>
-                {selectedManagedRoute.stops.length} stops · 01 {selectedManagedRoute.stops[0]} → 0
-                {selectedManagedRoute.stops.length}{' '}
-                {selectedManagedRoute.stops[selectedManagedRoute.stops.length - 1]}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.topActionRow}>
-            <Text style={styles.sectionTitle}>Assigned drivers</Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => setManageMode('assign')}
-              style={styles.topAddBtn}
-            >
-              <Ionicons name="add" size={16} color={Colors.brandGreen} />
-              <Text style={styles.topAddText}>Assign driver</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.dividerList}>
-            {selectedManagedRoute.assignedDrivers.map((d) => (
-              <View key={d.driverName} style={styles.listRow}>
-                <View style={styles.initialsCircle}>
-                  <Text style={styles.initialsText}>{initialsOf(d.driverName)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>{d.driverName}</Text>
-                  <Text style={styles.rowSub}>
-                    {d.unitCode} · Plate {d.plate}
-                  </Text>
-                </View>
-                <View style={[styles.statusBadge, d.onShift ? styles.badgeGreen : styles.badgeGray]}>
-                  <Text
-                    style={[
-                      styles.statusBadgeText,
-                      d.onShift ? styles.badgeGreenText : styles.badgeGrayText,
-                    ]}
-                  >
-                    {d.onShift ? 'On shift' : 'Assigned'}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            disabled={hasActiveShifts}
-            onPress={() => setManageMode('edit')}
-            style={[styles.primaryBtn, hasActiveShifts && styles.disabledBtn]}
-          >
-            <Text style={[styles.primaryBtnText, hasActiveShifts && { color: Colors.subtleGray }]}>
-              Edit route
-            </Text>
-          </TouchableOpacity>
-          {hasActiveShifts && (
-            <Text style={styles.smallHelper}>
-              End {selectedManagedRoute.activeShifts} active shifts on {selectedManagedRoute.name} before editing stops or deleting this route.
-            </Text>
-          )}
-        </ScrollView>
-      );
-    }
-
-    // 3. ADD ROUTE (Board 06 left)
-    if (manageMode === 'add') {
-      return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => setManageMode('list')}
-            style={styles.backNavRow}
-          >
-            <Ionicons name="chevron-back" size={22} color={Colors.ink} />
-            <Text style={styles.pageTitle}>Add route</Text>
-          </TouchableOpacity>
-
-          <View style={{ gap: 6 }}>
-            <Text style={styles.fieldLabel}>Route name</Text>
-            <TextInput
-              value={newRouteName}
-              onChangeText={setNewRouteName}
-              style={styles.textInput}
-              placeholder="Route 2"
-            />
-          </View>
-
-          <View style={{ gap: 6 }}>
-            <Text style={styles.fieldLabel}>Origin</Text>
-            <TextInput
-              value={newRouteOrigin}
-              onChangeText={setNewRouteOrigin}
-              style={styles.textInput}
-              placeholder="Circuit Makati"
-            />
-          </View>
-
-          <View style={{ gap: 6 }}>
-            <Text style={styles.fieldLabel}>Destination</Text>
-            <TextInput
-              value={newRouteDest}
-              onChangeText={setNewRouteDest}
-              style={styles.textInput}
-              placeholder="Guadalupe Nuevo"
-            />
-          </View>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => {
-              const id = `route-${Date.now()}`;
-              const created: ManagedRouteItem = {
-                id,
-                name: newRouteName.trim() || 'New Route',
-                corridor: `${newRouteOrigin.trim() || 'Origin'} ↔ ${newRouteDest.trim() || 'Destination'}`,
-                status: 'Draft',
-                stops: [newRouteOrigin.trim() || 'Origin', newRouteDest.trim() || 'Destination'],
-                assignedDrivers: [],
-                activeShifts: 0,
-              };
-              setManagedRoutes((prev) => [...prev, created]);
-              setSelectedManagedRouteId(id);
-              setManageMode('edit');
-            }}
-            style={styles.primaryBtn}
-          >
-            <Text style={styles.primaryBtnText}>Continue to stops</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      );
-    }
-
-    // 4. EDIT STOPS & ACTIVATE DRAFT ROUTE (Board 06 middle & right)
-    if (manageMode === 'edit' && selectedManagedRoute) {
-      const moveStop = (idx: number, dir: -1 | 1) => {
-        const nextIdx = idx + dir;
-        if (nextIdx < 0 || nextIdx >= selectedManagedRoute.stops.length) return;
-        const copy = [...selectedManagedRoute.stops];
-        const [item] = copy.splice(idx, 1);
-        copy.splice(nextIdx, 0, item);
-        setManagedRoutes((prev) =>
-          prev.map((r) => (r.id === selectedManagedRoute.id ? { ...r, stops: copy } : r))
-        );
-      };
-      const removeStop = (idx: number) => {
-        const copy = selectedManagedRoute.stops.filter((_, i) => i !== idx);
-        setManagedRoutes((prev) =>
-          prev.map((r) => (r.id === selectedManagedRoute.id ? { ...r, stops: copy } : r))
-        );
-      };
-      const addStop = () => {
-        if (!newStopInput.trim()) return;
-        setManagedRoutes((prev) =>
-          prev.map((r) =>
-            r.id === selectedManagedRoute.id
-              ? { ...r, stops: [...r.stops, newStopInput.trim()] }
-              : r
-          )
-        );
-        setNewStopInput('');
-      };
-
-      return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-          <View style={styles.topActionRow}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => setManageMode('list')}
-              style={styles.backNavRow}
-            >
-              <Ionicons name="chevron-back" size={22} color={Colors.ink} />
-              <Text style={styles.pageTitle}>Stops & route path</Text>
-            </TouchableOpacity>
-            <View style={[styles.statusBadge, styles.badgeAmber]}>
-              <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>
-                {selectedManagedRoute.status}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.subtitleText}>
-            {selectedManagedRoute.name} · {selectedManagedRoute.corridor}
-          </Text>
-
-          <View style={styles.mapFrameSmall}>
-            <LeafletMap routes={mapRoutes} terminals={mapTerminals} vehicles={[]} fleetMode />
-          </View>
-
-          <Text style={styles.sectionTitle}>Stops ({selectedManagedRoute.stops.length})</Text>
-          <View style={styles.dividerList}>
-            {selectedManagedRoute.stops.map((stop, idx) => (
-              <View key={`${stop}-${idx}`} style={styles.listRow}>
-                <View style={styles.stopNumBox}>
-                  <Text style={styles.stopNumText}>{String(idx + 1).padStart(2, '0')}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>{stop}</Text>
-                  <Text style={styles.rowSub}>
-                    {idx === 0
-                      ? 'Origin terminal'
-                      : idx === selectedManagedRoute.stops.length - 1
-                        ? 'Destination terminal'
-                        : 'Intermediate stop'}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => moveStop(idx, -1)} style={{ padding: 6 }}>
-                  <Ionicons name="arrow-up" size={16} color={Colors.subtleGray} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => moveStop(idx, 1)} style={{ padding: 6 }}>
-                  <Ionicons name="arrow-down" size={16} color={Colors.subtleGray} />
-                </TouchableOpacity>
-                {selectedManagedRoute.stops.length > 2 && (
-                  <TouchableOpacity onPress={() => removeStop(idx)} style={{ padding: 6 }}>
-                    <Ionicons name="close" size={18} color={Colors.subtleGray} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TextInput
-              value={newStopInput}
-              onChangeText={setNewStopInput}
-              placeholder="Add stop name..."
-              placeholderTextColor={Colors.subtleGray}
-              style={[styles.textInput, { flex: 1 }]}
-            />
-            <TouchableOpacity onPress={addStop} style={[styles.outlineGreenBtn, { paddingHorizontal: 16 }]}>
-              <Text style={styles.outlineGreenText}>+ Add stop</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => {
-              triggerHaptic('success');
-              setManagedRoutes((prev) =>
-                prev.map((r) => (r.id === selectedManagedRoute.id ? { ...r, status: 'Active' } : r))
-              );
-              setManageMode('detail');
-            }}
-            style={styles.primaryBtn}
-          >
-            <Text style={styles.primaryBtnText}>Activate route</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      );
-    }
-
-    // 5. ASSIGN DRIVER & UNIT TO ROUTE (Board 07)
-    if (manageMode === 'assign' && selectedManagedRoute) {
-      return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => setManageMode('detail')}
-            style={styles.backNavRow}
-          >
-            <Ionicons name="chevron-back" size={22} color={Colors.ink} />
-            <Text style={styles.pageTitle}>Assign driver</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.subtitleText}>
-            {selectedManagedRoute.name} · {selectedManagedRoute.corridor}
-          </Text>
-
-          <Text style={styles.sectionTitle}>1. Eligible drivers</Text>
-          <View style={{ gap: 8 }}>
-            {[
-              { name: 'Lito Mendoza', sub: 'Approved · Off duty', ready: true },
-              { name: 'Juan Dela Cruz', sub: 'EJ-024 · Route 1', ready: false, tag: 'On shift' },
-              { name: 'Paolo Reyes', sub: 'Driver registration', ready: false, tag: 'Pending approval' },
-            ].map((d) => {
-              const selected = assignDriverName === d.name && d.ready;
-              return (
-                <TouchableOpacity
-                  key={d.name}
-                  disabled={!d.ready}
-                  onPress={() => setAssignDriverName(d.name)}
-                  style={[
-                    styles.radioCard,
-                    selected && styles.radioCardSelected,
-                    !d.ready && styles.radioCardDisabled,
-                  ]}
-                >
-                  <Ionicons
-                    name={selected ? 'radio-button-on' : 'radio-button-off'}
-                    size={20}
-                    color={selected ? Colors.brandGreen : Colors.subtleGray}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle}>{d.name}</Text>
-                    <Text style={styles.rowSub}>{d.sub}</Text>
-                  </View>
-                  {d.ready ? (
-                    <Text style={styles.badgeGreenText}>✓ Ready</Text>
-                  ) : (
-                    <Text style={styles.rowSub}>{d.tag}</Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <Text style={styles.sectionTitle}>2. Available units</Text>
-          <View style={{ gap: 8 }}>
-            {[
-              { code: 'EJ-055', plate: 'JKL 3456', ready: true },
-              { code: 'EJ-024', plate: 'ABC 1234', ready: false },
-            ].map((u) => {
-              const selected = assignUnitCode === u.code && u.ready;
-              return (
-                <TouchableOpacity
-                  key={u.code}
-                  disabled={!u.ready}
-                  onPress={() => {
-                    setAssignUnitCode(u.code);
-                    setAssignUnitPlate(u.plate);
-                  }}
-                  style={[
-                    styles.radioCard,
-                    selected && styles.radioCardSelected,
-                    !u.ready && styles.radioCardDisabled,
-                  ]}
-                >
-                  <Ionicons
-                    name={selected ? 'radio-button-on' : 'radio-button-off'}
-                    size={20}
-                    color={selected ? Colors.brandGreen : Colors.subtleGray}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle}>{u.code}</Text>
-                    <Text style={styles.rowSub}>Plate {u.plate} · 22 seats</Text>
-                  </View>
-                  {u.ready ? (
-                    <Text style={styles.badgeGreenText}>✓ Available</Text>
-                  ) : (
-                    <Text style={styles.rowSub}>Already on shift</Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.kvGroup}>
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Driver</Text>
-              <Text style={styles.kvValue}>{assignDriverName}</Text>
-            </View>
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Unit</Text>
-              <Text style={styles.kvValue}>
-                {assignUnitCode} · {assignUnitPlate}
-              </Text>
-            </View>
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Takes effect</Text>
-              <Text style={styles.kvValue}>Next shift</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => {
-              triggerHaptic('success');
-              setManagedRoutes((prev) =>
-                prev.map((r) =>
-                  r.id === selectedManagedRoute.id
-                    ? {
-                        ...r,
-                        assignedDrivers: [
-                          ...r.assignedDrivers.filter((d) => d.driverName !== assignDriverName),
-                          { driverName: assignDriverName, unitCode: assignUnitCode, plate: assignUnitPlate },
-                        ],
-                      }
-                    : r
-                )
-              );
-              setManageMode('detail');
-            }}
-            style={styles.primaryBtn}
-          >
-            <Text style={styles.primaryBtnText}>Save assignment</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      );
-    }
-  }
-
-  // ─── DEFAULT FLEET MONITOR SCREEN (Boards 01, 02, 05 left) ───
   const activeRouteLabel =
     mapRouteFilter === 'all'
-      ? 'Route 1'
-      : routes.find((r) => r.id === mapRouteFilter)?.name || 'Route 1';
+      ? 'All routes'
+      : routes.find((r) => r.id === mapRouteFilter)?.name || 'Route unavailable';
   const activeUnitLabel =
     mapUnitFilter === 'all'
       ? 'All units'
@@ -1127,7 +465,7 @@ export default function SupervisorDashboardScreen() {
                 setRouteMenuOpen(false);
               }}
             >
-              <Text style={styles.dropdownItemText}>Route 1 (All active)</Text>
+              <Text style={styles.dropdownItemText}>All active routes</Text>
             </TouchableOpacity>
             {routes.map((r) => (
               <TouchableOpacity
@@ -1170,6 +508,7 @@ export default function SupervisorDashboardScreen() {
           </View>
         )}
 
+        {!!transitNotice && <Text accessibilityRole="alert" style={styles.rowSub}>{transitNotice}</Text>}
         <Text style={styles.scopeDateText}>{formatReportingPeriod(period)}</Text>
 
         {/* 2x2 KPI Grid */}
@@ -1179,7 +518,7 @@ export default function SupervisorDashboardScreen() {
               <Text style={styles.kpiLabel}>Live units</Text>
               <Ionicons name="bus-outline" size={17} color={Colors.brandGreen} />
             </View>
-            <Text style={styles.kpiNumber}>{vehicles.length || 2}</Text>
+            <Text style={styles.kpiNumber}>{vehicles.length}</Text>
           </View>
 
           <View style={styles.kpiTile}>
@@ -1187,7 +526,7 @@ export default function SupervisorDashboardScreen() {
               <Text style={styles.kpiLabel}>Shifts started</Text>
               <Ionicons name="people-outline" size={17} color={Colors.ink} />
             </View>
-            <Text style={styles.kpiNumber}>{periodTripCount ?? 3}</Text>
+            <Text style={styles.kpiNumber}>{periodTripCount ?? 'Unavailable'}</Text>
           </View>
 
           <View style={styles.kpiTile}>
@@ -1241,6 +580,10 @@ export default function SupervisorDashboardScreen() {
           </View>
         )}
 
+        {activityView === 'live' && !liveUnits.length && <Text style={styles.rowSub}>No active units.</Text>}
+        {activityView === 'grades' && !scorecards.length && <Text style={styles.rowSub}>No driver records.</Text>}
+        {activityView === 'speed' && !speedEvents.length && <Text style={styles.rowSub}>No speed offenses in this period.</Text>}
+        {activityView === 'cuts' && !allCuts.length && <Text style={styles.rowSub}>No route flags in this period.</Text>}
         {/* 1) VIEW: LIVE MAP */}
         {activityView === 'map' && (
           <View style={{ gap: 12 }}>
@@ -1256,7 +599,7 @@ export default function SupervisorDashboardScreen() {
 
             <View style={styles.staleBanner}>
               <Ionicons name="warning-outline" size={18} color={Colors.warning} />
-              <Text style={styles.staleBannerText}>1 active shift has stale GPS</Text>
+              <Text style={styles.staleBannerText}>{liveUnits.filter(unit => unit.stale).length} active shifts have unavailable GPS</Text>
             </View>
 
             <View style={styles.dividerList}>
@@ -1269,8 +612,8 @@ export default function SupervisorDashboardScreen() {
                   <Ionicons name="git-branch-outline" size={19} color={Colors.brandGreen} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>Manage routes</Text>
-                  <Text style={styles.rowSub}>Create routes and assign drivers</Text>
+                  <Text style={styles.rowTitle}>View routes</Text>
+                  <Text style={styles.rowSub}>Published routes and verified stops</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
               </TouchableOpacity>
@@ -1312,7 +655,7 @@ export default function SupervisorDashboardScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>{unit.body}</Text>
                     <Text style={styles.rowSub}>
-                      {driverNames.get(unit.driverId) || 'Driver'} · Route 1
+                      {driverNames.get(unit.driverId) || 'Driver unavailable'} · {unit.plate}
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
                       <View
@@ -1328,8 +671,8 @@ export default function SupervisorDashboardScreen() {
                         ]}
                       >
                         {unit.stale
-                          ? `GPS stale · last update ${new Date(unit.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`
-                          : 'Live · updated just now'}
+                          ? 'GPS unavailable'
+                          : `GPS measured ${new Date(unit.lastSeen).toLocaleTimeString()}`}
                       </Text>
                     </View>
                   </View>
@@ -1393,7 +736,7 @@ export default function SupervisorDashboardScreen() {
                     >
                       {item.pendingFlags > 0
                         ? `${item.pendingFlags} flag awaiting review`
-                        : '✓ No deductions today'}
+                        : item.score === 100 ? 'No deductions in this period' : 'Recorded deductions applied'}
                     </Text>
                   </View>
                 </View>
@@ -1422,8 +765,7 @@ export default function SupervisorDashboardScreen() {
               })}
             </View>
 
-            {(speedEvents.length
-              ? speedEvents.map((ev) => ({
+            {(speedEvents.map((ev) => ({
                   id: ev.id,
                   driver: driverNames.get(ev.driver_id) || 'Driver',
                   unit: unitLabel(ev.vehicle_id, ev.body_number, ev.plate_number),
@@ -1431,7 +773,6 @@ export default function SupervisorDashboardScreen() {
                   limitKph: Math.round(Number(ev.limit_kph)),
                   createdAt: ev.created_at,
                 }))
-              : sampleSpeedRows
             ).map((ev) => (
               <View key={ev.id} style={styles.speedOffenseCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1515,7 +856,7 @@ export default function SupervisorDashboardScreen() {
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={styles.rowTitle}>
-                          {item.driverName || driverNames.get(item.driver_id) || 'Juan Dela Cruz'}
+                          {item.driverName || driverNames.get(item.driver_id) || 'Driver unavailable'}
                         </Text>
                         <View style={[styles.statusBadge, styles.badgeAmber]}>
                           <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>
@@ -1568,7 +909,7 @@ export default function SupervisorDashboardScreen() {
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Driver</Text>
                 <Text style={styles.kvValue}>
-                  {selectedViolation.driverName || driverNames.get(selectedViolation.driver_id) || 'Juan Dela Cruz'}
+                  {selectedViolation.driverName || driverNames.get(selectedViolation.driver_id) || 'Driver unavailable'}
                 </Text>
               </View>
               <View style={styles.kvRow}>
@@ -1595,7 +936,7 @@ export default function SupervisorDashboardScreen() {
               </View>
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Route</Text>
-                <Text style={styles.kvValue}>Route 1</Text>
+                <Text style={styles.kvValue}>Unavailable</Text>
               </View>
             </View>
 

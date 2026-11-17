@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { BottomSheetModal, ScreenSkeleton, triggerHaptic } from '../../components/AppUI';
+import AdminRegistryManager from '../../components/AdminRegistryManager';
 import { Colors } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -114,62 +115,13 @@ type UnifiedDriverRow = {
   id: string;
   name: string;
   email: string;
-  status: 'approved' | 'pending' | 'hidden';
+  status: string;
   unitCode?: string;
   routeName?: string;
   onShift?: boolean;
   registeredLabel?: string;
   activeVehicleId?: string;
-  isSample?: boolean;
 };
-
-const FALLBACK_DRIVER_ROWS: UnifiedDriverRow[] = [
-  {
-    id: 'sample-jc',
-    name: 'Juan Dela Cruz',
-    email: 'juan.delacruz@example.com',
-    status: 'approved',
-    unitCode: 'EJ-024',
-    routeName: 'Route 1',
-    onShift: true,
-    isSample: true,
-  },
-  {
-    id: 'sample-ms',
-    name: 'Maria Santos',
-    email: 'maria.santos@example.com',
-    status: 'approved',
-    unitCode: 'EJ-031',
-    routeName: 'Route 1',
-    onShift: true,
-    isSample: true,
-  },
-  {
-    id: 'sample-lm',
-    name: 'Lito Mendoza',
-    email: 'lito.mendoza@example.com',
-    status: 'approved',
-    unitCode: 'EJ-042',
-    routeName: 'Route 1',
-    onShift: false,
-    isSample: true,
-  },
-  {
-    id: 'sample-pr',
-    name: 'Paolo Reyes',
-    email: 'paolo.reyes@example.com',
-    status: 'pending',
-    registeredLabel: '17 Nov 2026',
-    isSample: true,
-  },
-  {
-    id: 'sample-rd',
-    name: 'Ramon Diaz',
-    email: 'ramon.diaz@example.com',
-    status: 'hidden',
-    isSample: true,
-  },
-];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. DRIVERS TAB (Board 03 left & middle, Board 08 left)
@@ -179,7 +131,6 @@ export function AdminDriversScreen() {
   const { data, loading, refreshing, error, refresh } = useOperationsData();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'approved' | 'pending' | 'hidden'>('all');
-  const [localSamples, setLocalSamples] = useState<UnifiedDriverRow[]>(FALLBACK_DRIVER_ROWS);
   const [reviewingDriver, setReviewingDriver] = useState<UnifiedDriverRow | null>(null);
   const [editingDriver, setEditingDriver] = useState<UnifiedDriverRow | null>(null);
   const [addingDriverOpen, setAddingDriverOpen] = useState(false);
@@ -195,23 +146,21 @@ export function AdminDriversScreen() {
   const combinedDrivers: UnifiedDriverRow[] = useMemo(() => {
     const dbRows: UnifiedDriverRow[] = dbDrivers.map((d) => {
       const shift = d.activeShift || d.latestShift;
-      const st = d.profile.status === 'pending' ? 'pending' : 'approved';
+      const st = d.profile.supervisor_hidden ? 'hidden' : d.profile.status || 'Unavailable';
       return {
         id: d.profile.id,
         name: d.profile.full_name || d.profile.email || 'Driver',
-        email: d.profile.email || 'driver@example.com',
+        email: d.profile.email || 'Email unavailable',
         status: st,
         unitCode: shift?.body_number || undefined,
-        routeName: 'Route 1',
+        routeName: data.routes.find(route => route.id === shift?.route_id)?.name || 'Route unavailable',
         onShift: Boolean(d.activeShift),
         activeVehicleId: d.activeShift?.id,
-        registeredLabel: 'Today',
+        registeredLabel: 'Registration date unavailable',
       };
     });
-    const seenEmails = new Set(dbRows.map((r) => r.email.toLowerCase()));
-    const extras = localSamples.filter((s) => !seenEmails.has(s.email.toLowerCase()));
-    return [...dbRows, ...extras];
-  }, [dbDrivers, localSamples]);
+    return dbRows;
+  }, [dbDrivers, data.routes]);
 
   const filteredDrivers = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -224,20 +173,12 @@ export function AdminDriversScreen() {
   const handleApproveReject = async (driver: UnifiedDriverRow, nextStatus: 'approved' | 'rejected') => {
     setSaving(true);
     try {
-      if (driver.isSample) {
-        setLocalSamples((prev) =>
-          nextStatus === 'rejected'
-            ? prev.filter((item) => item.id !== driver.id)
-            : prev.map((item) => (item.id === driver.id ? { ...item, status: 'approved' } : item))
-        );
-      } else {
         const { error: updateErr } = await supabase
           .from('profiles')
           .update({ status: nextStatus })
           .eq('id', driver.id);
         if (updateErr) throw new Error(updateErr.message);
         refresh();
-      }
       triggerHaptic(nextStatus === 'approved' ? 'success' : 'medium');
       setReviewingDriver(null);
     } catch (e: any) {
@@ -251,22 +192,12 @@ export function AdminDriversScreen() {
     if (!editingDriver) return;
     setSaving(true);
     try {
-      if (editingDriver.isSample) {
-        setLocalSamples((prev) =>
-          prev.map((item) =>
-            item.id === editingDriver.id
-              ? { ...item, name: editName.trim() || item.name, email: editEmail.trim() || item.email }
-              : item
-          )
-        );
-      } else {
         const { error: err } = await supabase
           .from('profiles')
           .update({ full_name: editName.trim() })
           .eq('id', editingDriver.id);
         if (err) throw new Error(err.message);
         refresh();
-      }
       triggerHaptic('success');
       setEditingDriver(null);
     } catch (e: any) {
@@ -278,49 +209,12 @@ export function AdminDriversScreen() {
 
   const handleHideRestore = async (driver: UnifiedDriverRow, hide: boolean) => {
     try {
-      if (driver.isSample) {
-        setLocalSamples((prev) =>
-          prev.map((item) => (item.id === driver.id ? { ...item, status: hide ? 'hidden' : 'approved' } : item))
-        );
-      } else {
         await setDriverHidden(driver.id, hide);
         refresh();
-      }
       triggerHaptic('medium');
       setEditingDriver(null);
     } catch (e: any) {
       Alert.alert('Could not update driver', e.message || 'Try again.');
-    }
-  };
-
-  const handleAddNewDriver = async () => {
-    if (!editName.trim() || !editEmail.trim()) return;
-    setSaving(true);
-    try {
-      const adminId = user?.id || 'admin-preview';
-      const loaded = await loadRegistry('drivers', adminId);
-      await saveRegistryRecord('drivers', adminId, loaded.mode, {
-        full_name: editName.trim(),
-        email: editEmail.trim().toLowerCase(),
-        assigned_unit: null,
-        notes: null,
-      });
-      setLocalSamples((prev) => [
-        {
-          id: `added-${Date.now()}`,
-          name: editName.trim(),
-          email: editEmail.trim().toLowerCase(),
-          status: 'approved',
-          isSample: true,
-        },
-        ...prev,
-      ]);
-      triggerHaptic('success');
-      setAddingDriverOpen(false);
-    } catch (e: any) {
-      Alert.alert('Could not add driver', e.message || 'Try again.');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -551,7 +445,7 @@ export function AdminDriversScreen() {
             <View style={styles.topActionRow}>
               <Text style={styles.title}>Edit driver</Text>
               <View style={[styles.statusBadge, styles.badgeGreen]}>
-                <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>Approved</Text>
+                <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>{editingDriver.status}</Text>
               </View>
             </View>
 
@@ -569,7 +463,7 @@ export function AdminDriversScreen() {
               <Text style={styles.fieldLabel}>Email</Text>
               <TextInput
                 value={editEmail}
-                onChangeText={setEditEmail}
+                editable={false}
                 style={styles.textInput}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -581,7 +475,7 @@ export function AdminDriversScreen() {
                 <Text style={styles.kvLabel}>Route assignment</Text>
                 <Text style={styles.kvValue}>
                   {editingDriver.unitCode
-                    ? `${editingDriver.unitCode} · ${editingDriver.routeName || 'Route 1'}`
+                    ? `${editingDriver.unitCode} · ${editingDriver.routeName || 'Route unavailable'}`
                     : 'Not assigned'}
                 </Text>
               </View>
@@ -612,7 +506,7 @@ export function AdminDriversScreen() {
             </TouchableOpacity>
             {editingDriver.onShift && (
               <Text style={styles.smallHelper}>
-                Unassign this driver from Route 1 and end active shifts before hiding their profile.
+                End this driver's active shifts before hiding their profile.
               </Text>
             )}
           </>
@@ -626,37 +520,8 @@ export function AdminDriversScreen() {
         maxWidth={480}
         contentContainerStyle={{ gap: 14 }}
       >
-        <Text style={styles.title}>Add driver</Text>
-        <View style={{ gap: 6 }}>
-          <Text style={styles.fieldLabel}>Full name</Text>
-          <TextInput
-            value={editName}
-            onChangeText={setEditName}
-            style={styles.textInput}
-            placeholder="Juan Dela Cruz"
-          />
-        </View>
-        <View style={{ gap: 6 }}>
-          <Text style={styles.fieldLabel}>Email</Text>
-          <TextInput
-            value={editEmail}
-            onChangeText={setEditEmail}
-            style={styles.textInput}
-            placeholder="driver@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          disabled={saving}
-          onPress={() => {
-            void handleAddNewDriver();
-          }}
-          style={styles.primaryBtn}
-        >
-          <Text style={styles.primaryBtnText}>Save driver</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Driver roster</Text>
+        <AdminRegistryManager kind="drivers" />
       </BottomSheetModal>
     </>
   );
@@ -676,69 +541,23 @@ type UnifiedUnitRow = {
   lastGps?: string;
   activeShiftId?: string;
   registryId?: string;
-  isSample?: boolean;
 };
-
-const FALLBACK_UNITS: UnifiedUnitRow[] = [
-  {
-    key: 'EJ-024',
-    body: 'EJ-024',
-    plate: 'ABC 1234',
-    driverName: 'Juan Dela Cruz',
-    routeName: 'Route 1',
-    state: 'on_shift',
-    shiftStarted: '08:30',
-    lastGps: 'Updated just now',
-    isSample: true,
-  },
-  {
-    key: 'EJ-031',
-    body: 'EJ-031',
-    plate: 'DEF 5678',
-    driverName: 'Maria Santos',
-    routeName: 'Route 1',
-    state: 'on_shift',
-    shiftStarted: '08:45',
-    lastGps: 'Updated just now',
-    isSample: true,
-  },
-  {
-    key: 'EJ-042',
-    body: 'EJ-042',
-    plate: 'GHI 9012',
-    driverName: 'Lito Mendoza',
-    routeName: 'Route 1',
-    state: 'stale',
-    shiftStarted: '07:55',
-    lastGps: '08:41 (42 min ago)',
-    isSample: true,
-  },
-  {
-    key: 'EJ-019',
-    body: 'EJ-019',
-    plate: 'XYZ 4321',
-    driverName: 'Unassigned',
-    routeName: 'Route 1',
-    state: 'inactive',
-    isSample: true,
-  },
-];
 
 export function AdminUnitsScreen({ navigation }: { navigation: any }) {
   const { user } = useAuth();
   const { data, loading, refreshing, error, refresh } = useOperationsData();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'on_shift' | 'inactive'>('all');
-  const [localUnits, setLocalUnits] = useState<UnifiedUnitRow[]>(FALLBACK_UNITS);
-  const [selectedUnitKey, setSelectedUnitKey] = useState<string>('EJ-042');
+  const [selectedUnitKey, setSelectedUnitKey] = useState<string>('');
   const [forceEndModalUnit, setForceEndModalUnit] = useState<UnifiedUnitRow | null>(null);
   const [editModalUnit, setEditModalUnit] = useState<UnifiedUnitRow | null>(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [formBody, setFormBody] = useState('');
   const [formPlate, setFormPlate] = useState('');
-  const [formCapacity, setFormCapacity] = useState('22');
+  const [formCapacity, setFormCapacity] = useState('');
   const [saving, setSaving] = useState(false);
-  const [registryMode, setRegistryMode] = useState<RegistryMode>('local-preview');
+  const [registryMode, setRegistryMode] = useState<RegistryMode>('database');
+  const [registryError, setRegistryError] = useState('');
   const [registryUnits, setRegistryUnits] = useState<ManagedUnit[]>([]);
 
   useEffect(() => {
@@ -746,7 +565,8 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
     void loadRegistry('units', adminId).then((res) => {
       setRegistryMode(res.mode);
       setRegistryUnits(res.rows);
-    });
+      setRegistryError('');
+    }).catch(() => setRegistryError('Fleet registry unavailable.'));
   }, [user?.id]);
 
   const dbUnits = useMemo(() => summarizeUnits(data.shifts), [data.shifts]);
@@ -761,37 +581,36 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
       return {
         key: u.key,
         body: u.bodyNumber || u.plateNumber || 'Unit',
-        plate: u.plateNumber || 'ABC 1234',
+        plate: u.plateNumber || 'Plate unavailable',
         driverName: driversMap.get(shift.driver_id) || 'Driver',
-        routeName: 'Route 1',
+        routeName: data.routes.find(route => route.id === shift.route_id)?.name || 'Route unavailable',
         state: u.activeShift ? 'on_shift' : 'inactive',
         shiftStarted: new Date(shift.created_at).toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
           hour12: false,
         }),
-        lastGps: 'Updated just now',
+        lastGps: 'GPS unavailable',
         activeShiftId: u.activeShift?.id,
       };
     });
     const seen = new Set(fromDb.map((u) => u.body.toUpperCase()));
     const fromReg: UnifiedUnitRow[] = registryUnits
-      .filter((r) => !seen.has(r.body_number.toUpperCase()))
+      .filter((r) => !r.deleted_at && !seen.has(r.body_number.toUpperCase()))
       .map((r) => {
         seen.add(r.body_number.toUpperCase());
         return {
           key: r.body_number.toUpperCase(),
           body: r.body_number,
-          plate: r.plate_number || 'ABC 1234',
+          plate: r.plate_number || 'Plate unavailable',
           driverName: r.assigned_driver || 'Unassigned',
-          routeName: r.route_name || 'Route 1',
-          state: r.deleted_at ? 'inactive' : 'on_shift',
+          routeName: r.route_name || 'Route unavailable',
+          state: 'inactive',
           registryId: r.id,
         };
       });
-    const extras = localUnits.filter((s) => !seen.has(s.body.toUpperCase()));
-    return [...fromDb, ...fromReg, ...extras];
-  }, [dbUnits, driversMap, registryUnits, localUnits]);
+    return [...fromDb, ...fromReg];
+  }, [dbUnits, driversMap, registryUnits, data.routes]);
 
   const filteredUnits = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -813,9 +632,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         await forceEndShift(forceEndModalUnit.activeShiftId);
         refresh();
       } else {
-        setLocalUnits((prev) =>
-          prev.map((u) => (u.key === forceEndModalUnit.key ? { ...u, state: 'inactive' } : u))
-        );
+        throw new Error('No active shift is available to end.');
       }
       triggerHaptic('medium');
       setForceEndModalUnit(null);
@@ -831,6 +648,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
     setSaving(true);
     try {
       const adminId = user?.id || 'admin-preview';
+      if (!isNew && !editModalUnit?.registryId) throw new Error('This shift has no editable registry entry.');
       await saveRegistryRecord(
         'units',
         adminId,
@@ -838,23 +656,14 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         {
           body_number: formBody.trim(),
           plate_number: formPlate.trim() || null,
-          route_name: 'Route 1',
+          route_name: isNew ? '' : registryUnits.find(unit => unit.id === editModalUnit?.registryId)?.route_name || '',
           assigned_driver: null,
-          notes: `${formCapacity || '22'} seats`,
+          notes: formCapacity.trim() ? `${formCapacity} seats` : null,
         },
         isNew ? undefined : editModalUnit?.registryId
       );
       const updated = await loadRegistry('units', adminId);
       setRegistryUnits(updated.rows);
-      if (!isNew && editModalUnit) {
-        setLocalUnits((prev) =>
-          prev.map((u) =>
-            u.key === editModalUnit.key
-              ? { ...u, body: formBody.trim(), plate: formPlate.trim() || u.plate }
-              : u
-          )
-        );
-      }
       triggerHaptic('success');
       setEditModalUnit(null);
       setAddModalOpen(false);
@@ -873,9 +682,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         const updated = await loadRegistry('units', adminId);
         setRegistryUnits(updated.rows);
       } else {
-        setLocalUnits((prev) =>
-          prev.map((u) => (u.key === unit.key ? { ...u, state: makeInactive ? 'inactive' : 'on_shift' } : u))
-        );
+        throw new Error('This shift has no editable registry entry.');
       }
       triggerHaptic('medium');
       setEditModalUnit(null);
@@ -903,7 +710,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
             onPress={() => {
               setFormBody('');
               setFormPlate('');
-              setFormCapacity('22');
+              setFormCapacity('');
               setAddModalOpen(true);
             }}
             style={styles.topAddBtn}
@@ -947,6 +754,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         </View>
 
         {!!error && <Text style={styles.errorBanner}>{error}</Text>}
+        {!!registryError && <Text accessibilityRole="alert" style={styles.errorBanner}>{registryError}</Text>}
 
         <View style={styles.dividerList}>
           {filteredUnits.map((u) => {
@@ -1052,7 +860,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
               onPress={() => {
                 setFormBody(selectedUnit.body);
                 setFormPlate(selectedUnit.plate);
-                setFormCapacity('22');
+                setFormCapacity('');
                 setEditModalUnit(selectedUnit);
               }}
               style={[styles.outlineGreenBtn, { flex: 1 }]}
@@ -1120,12 +928,12 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
               </View>
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Shift started</Text>
-                <Text style={styles.kvValue}>{forceEndModalUnit.shiftStarted || '07:55'}</Text>
+                <Text style={styles.kvValue}>{forceEndModalUnit.shiftStarted || 'Unavailable'}</Text>
               </View>
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Last GPS update</Text>
                 <Text style={[styles.kvValue, { color: Colors.warning }]}>
-                  {forceEndModalUnit.lastGps || '08:41 (42 min ago)'}
+                  {forceEndModalUnit.lastGps || 'Unavailable'}
                 </Text>
               </View>
               <View style={styles.kvRow}>
@@ -1205,7 +1013,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
           <TextInput
             value={formBody}
             onChangeText={setFormBody}
-            placeholder="EJ-055"
+            placeholder="Body number"
             style={styles.textInput}
           />
         </View>
@@ -1265,7 +1073,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function AdminReportsScreen() {
   const { user } = useAuth();
-  const { data } = useOperationsData();
+  const { data, loading, error } = useOperationsData();
   const [period, setPeriod] = useState<ReportingPeriod>(currentReportingPeriod('day'));
   const [previewOpen, setPreviewOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -1297,7 +1105,7 @@ export function AdminReportsScreen() {
   };
 
   const shiftsCount = useMemo(
-    () => data.shifts.filter((s) => periodContains(s.created_at, period)).length || 3,
+    () => data.shifts.filter((s) => periodContains(s.created_at, period)).length,
     [data.shifts, period]
   );
   const speedCount = useMemo(
@@ -1305,7 +1113,7 @@ export function AdminReportsScreen() {
     [data.speedEvents, period]
   );
   const routeFlagsCount = useMemo(
-    () => (data.tripViolations ?? []).filter((v) => periodContains(v.created_at, period)).length || 1,
+    () => (data.tripViolations ?? []).filter((v) => periodContains(v.created_at, period)).length,
     [data.tripViolations, period]
   );
   const confirmedCutsCount = useMemo(
@@ -1317,10 +1125,10 @@ export function AdminReportsScreen() {
   );
 
   const handleSavePdf = async () => {
-    if (exporting) return;
+    if (exporting || loading || error) return;
     setExporting(true);
     try {
-      const prepared = await openAdminPeriodReport(period, [], user?.id || 'admin-preview');
+      const prepared = await openAdminPeriodReport(period, null, user?.id || 'admin-preview');
       setReadyPdf(prepared);
       downloadAdminPeriodReport(prepared);
     } catch (e: any) {
@@ -1336,6 +1144,7 @@ export function AdminReportsScreen() {
         <View style={{ gap: 2 }}>
           <Text style={styles.title}>Reports</Text>
           <Text style={styles.subtitle}>Fleet report</Text>
+          {!!error && <Text accessibilityRole="alert">{error}</Text>}
         </View>
 
         <View style={styles.segmentBar}>
@@ -1378,8 +1187,8 @@ export function AdminReportsScreen() {
           <Text style={styles.fieldLabel}>Route</Text>
           <View style={styles.selectorRowCard}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.selectorRowText}>Route 1</Text>
-              <Text style={styles.rowSub}>MRT Buendia → Mandaluyong City Hall</Text>
+              <Text style={styles.selectorRowText}>All routes</Text>
+              <Text style={styles.rowSub}>Recorded operations for the selected period</Text>
             </View>
             <Ionicons name="chevron-down" size={18} color={Colors.subtleGray} />
           </View>
@@ -1389,23 +1198,23 @@ export function AdminReportsScreen() {
         <View style={styles.kvGroup}>
           <View style={styles.kvRow}>
             <Text style={styles.kvLabel}>Shifts started</Text>
-            <Text style={styles.kvValue}>{shiftsCount}</Text>
+            <Text style={styles.kvValue}>{loading || error ? 'Unavailable' : shiftsCount}</Text>
           </View>
           <View style={styles.kvRow}>
             <Text style={styles.kvLabel}>Speed offenses</Text>
-            <Text style={styles.kvValue}>{speedCount}</Text>
+            <Text style={styles.kvValue}>{loading || error || data.speedEvents === null ? 'Unavailable' : speedCount}</Text>
           </View>
           <View style={styles.kvRow}>
             <Text style={styles.kvLabel}>Route flags</Text>
-            <Text style={styles.kvValue}>{routeFlagsCount}</Text>
+            <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : routeFlagsCount}</Text>
           </View>
           <View style={styles.kvRow}>
             <Text style={styles.kvLabel}>Confirmed cuts</Text>
-            <Text style={styles.kvValue}>{confirmedCutsCount}</Text>
+            <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : confirmedCutsCount}</Text>
           </View>
           <View style={styles.kvRow}>
             <Text style={styles.kvLabel}>Awaiting review</Text>
-            <Text style={styles.kvValue}>{Math.max(0, routeFlagsCount - confirmedCutsCount)}</Text>
+            <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : data.tripViolations.filter(item => ['pending_review', 'flagged'].includes(item.status) && periodContains(item.created_at, period)).length}</Text>
           </View>
         </View>
 
@@ -1415,6 +1224,7 @@ export function AdminReportsScreen() {
 
         <TouchableOpacity
           accessibilityRole="button"
+          disabled={loading || !!error}
           onPress={() => setPreviewOpen(true)}
           style={styles.primaryBtn}
         >
@@ -1446,38 +1256,28 @@ export function AdminReportsScreen() {
             <Text style={styles.rowSub}>{period.key}</Text>
           </View>
           <Text style={[styles.rowTitle, { fontSize: 18 }]}>Fleet report</Text>
-          <Text style={styles.rowSub}>Route 1 · MRT Buendia → Mandaluyong City Hall</Text>
+          <Text style={styles.rowSub}>All recorded routes</Text>
 
           <View style={styles.kvGroup}>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Shifts started</Text>
-              <Text style={styles.kvValue}>{shiftsCount}</Text>
+              <Text style={styles.kvValue}>{loading || error ? 'Unavailable' : shiftsCount}</Text>
             </View>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Speed offenses</Text>
-              <Text style={styles.kvValue}>{speedCount}</Text>
+              <Text style={styles.kvValue}>{loading || error || data.speedEvents === null ? 'Unavailable' : speedCount}</Text>
             </View>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Confirmed route cuts</Text>
-              <Text style={styles.kvValue}>{confirmedCutsCount}</Text>
+              <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : confirmedCutsCount}</Text>
             </View>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Awaiting review</Text>
-              <Text style={styles.kvValue}>{Math.max(0, routeFlagsCount - confirmedCutsCount)}</Text>
+              <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : data.tripViolations.filter(item => ['pending_review', 'flagged'].includes(item.status) && periodContains(item.created_at, period)).length}</Text>
             </View>
           </View>
 
-          <Text style={[styles.fieldLabel, { marginTop: 6 }]}>Driver safety grades</Text>
-          {[
-            { name: 'Juan Dela Cruz · EJ-024', score: '100 / 100' },
-            { name: 'Maria Santos · EJ-031', score: '100 / 100' },
-            { name: 'Lito Mendoza · EJ-042', score: '100 / 100' },
-          ].map((row) => (
-            <View key={row.name} style={styles.kvRow}>
-              <Text style={styles.kvLabel}>{row.name}</Text>
-              <Text style={styles.kvValue}>{row.score}</Text>
-            </View>
-          ))}
+          <Text style={styles.smallHelper}>The generated PDF includes safety grades calculated from the recorded events.</Text>
         </View>
 
         <TouchableOpacity

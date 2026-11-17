@@ -1,11 +1,11 @@
-import { TerminalData, MAKATI_OFFICIAL_TERMINALS } from './offlineTransitService';
+import type { TerminalData } from './offlineTransitService';
 
 export interface GeofenceEvaluationResult {
   isInsideLegalZone: boolean;
   currentZone: TerminalData | null;
-  nearestZone: TerminalData;
-  distanceToNearestMeters: number;
-  bearingToNearestDegrees: number;
+  nearestZone: TerminalData | null;
+  distanceToNearestMeters: number | null;
+  bearingToNearestDegrees: number | null;
   statusMessage: string;
 }
 
@@ -55,10 +55,11 @@ export const DEFAULT_CONFIGURED_BAY_RADIUS_METERS = 45;
 export function evaluateGeofence(
   userLat: number,
   userLon: number,
-  terminals: TerminalData[] = MAKATI_OFFICIAL_TERMINALS
+  terminals: TerminalData[] = []
 ): GeofenceEvaluationResult {
-  if (!terminals || terminals.length === 0) {
-    terminals = MAKATI_OFFICIAL_TERMINALS;
+  terminals = terminals.filter(stop => !stop.is_sample && stop.location_verified_at && stop.location_source_url && Number.isFinite(stop.geofence_radius_meters) && stop.geofence_radius_meters! > 0);
+  if (!Number.isFinite(userLat) || !Number.isFinite(userLon) || !terminals.length) {
+    return { isInsideLegalZone: false, currentZone: null, nearestZone: null, distanceToNearestMeters: null, bearingToNearestDegrees: null, statusMessage: 'Verified loading areas unavailable.' };
   }
 
   let nearestZone = terminals[0];

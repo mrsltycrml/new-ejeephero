@@ -7,3 +7,4 @@ import './passengerPlaces.test.ts';
 import './scriptJson.test.ts';
 import './worker.test.ts';
 import './operations.test.ts';
+import './realData.test.ts';

@@ -28,8 +28,9 @@ export default function WeatherBanner() {
         }
         const meteoRes = await fetch('https://api.open-meteo.com/v1/forecast?latitude=14.5547&longitude=121.0244&current=temperature_2m,weather_code');
         const meteo = await meteoRes.json();
-        const temp = Number(meteo?.current?.temperature_2m ?? 30);
-        const code = Number(meteo?.current?.weather_code ?? 0);
+        const temp = meteo?.current?.temperature_2m;
+        const code = meteo?.current?.weather_code;
+        if (!Number.isFinite(temp) || !Number.isFinite(code)) return;
         if (temp > 38 || code >= 51) {
           setWeather({ temp, condition: code >= 95 ? 'thunderstorm' : code >= 51 ? 'rain showers' : 'extreme heat' });
           setVisible(true);

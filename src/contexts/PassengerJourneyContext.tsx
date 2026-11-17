@@ -5,14 +5,14 @@ import { offlineTransit, type TerminalData, type VehicleData } from '../services
 import { detectRide, meters, nearbyRideUnits, type RideEvidence } from '../services/passengerJourney';
 import type { PassengerPlace } from '../services/passengerPlaces';
 
-export type PassengerUnit = { vehicle_id?: string; body_number: string; plate_number: string | null; source?: 'gps' | 'confirmed' | 'sample'; matchedAt?: number };
+export type PassengerUnit = { vehicle_id?: string; body_number: string; plate_number: string | null; source?: 'gps' | 'confirmed'; matchedAt?: number };
 type JourneyState = {
   unit: PassengerUnit | null; setUnit: (unit: PassengerUnit | null) => void;
   destination: TerminalData | null; setDestination: (stop: TerminalData | null) => void;
   place: PassengerPlace | null; setPlace: (place: PassengerPlace | null) => void;
-  vehicles: VehicleData[]; nearby: VehicleData[]; signal: string; endRide: () => void;
+  vehicles: VehicleData[]; vehicleError: string; nearby: VehicleData[]; signal: string; endRide: () => void;
 };
-const Journey = createContext<JourneyState>({ unit: null, setUnit: () => {}, destination: null, setDestination: () => {}, place: null, setPlace: () => {}, vehicles: [], nearby: [], signal: '', endRide: () => {} });
+const Journey = createContext<JourneyState>({ unit: null, setUnit: () => {}, destination: null, setDestination: () => {}, place: null, setPlace: () => {}, vehicles: [], vehicleError: '', nearby: [], signal: '', endRide: () => {} });
 export function PassengerJourneyProvider({ children }: { children: React.ReactNode }) {
   const { location } = useLocation();
   const { user } = useAuth();
@@ -20,6 +20,7 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
   const [destination, updateDestination] = useState<TerminalData | null>(null);
   const [place, setPlace] = useState<PassengerPlace | null>(null);
   const [vehicles, setVehicles] = useState<VehicleData[]>([]);
+  const [vehicleError, setVehicleError] = useState('');
   const [nearby, setNearby] = useState<VehicleData[]>([]);
   const [signal, setSignal] = useState('Choose your destination to find a unit.');
   const [now, setNow] = useState(Date.now());
@@ -40,7 +41,8 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     const refresh = async () => {
       setNow(Date.now()); if (pending) return;
       pending = true;
-      try { const data = await offlineTransit.getVehicles(); if (active) setVehicles(data); }
+      try { const data = await offlineTransit.getVehicles(); if (active) { setVehicles(data); setVehicleError(''); } }
+      catch { if (active) { setVehicles([]); setVehicleError('Vehicle locations unavailable.'); } }
       finally { pending = false; }
     };
     void refresh(); const timer = setInterval(() => { void refresh(); }, 5000);
@@ -50,7 +52,6 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     const fix = location ? { ...location.coords, timestamp: location.timestamp } : null;
     const candidates = nearbyRideUnits(fix, vehicles, now);
     setNearby(candidates.map(c => c.vehicle));
-    if (unit?.source === 'sample') { setSignal('Sample ride — unit details filled automatically.'); return; }
     if (unit) {
       const matching = candidates.find(c => c.vehicle.vehicle_id === unit.vehicle_id && c.distance <= 35);
       if (matching) { lastMatch.current = now; separated.current = 0; setSignal(unit.source === 'gps' ? 'Unit matched from your shared GPS movement.' : 'Unit confirmed. GPS is monitoring this ride.'); }
@@ -68,6 +69,6 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     if (result.unit) setUnit({ vehicle_id: result.unit.vehicle_id, body_number: result.unit.body_number, plate_number: result.unit.plate_number, source: 'gps' });
     setSignal(result.unit ? 'Unit detected. Emergency details are ready.' : result.nearby.length > 1 ? 'Several units are nearby. Tap the one you boarded to confirm.' : !fix || now - fix.timestamp > 15_000 ? 'Waiting for a fresh GPS location.' : result.evidence ? 'Checking which unit is moving with you…' : 'Your unit will be matched when you travel together.');
   }, [location, vehicles, now, unit, destination, setUnit]);
-  return <Journey.Provider value={{ unit, setUnit, destination, setDestination, place, setPlace, vehicles, nearby, signal, endRide }}>{children}</Journey.Provider>;
+  return <Journey.Provider value={{ unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, signal, endRide }}>{children}</Journey.Provider>;
 }
 export const usePassengerJourney = () => useContext(Journey);

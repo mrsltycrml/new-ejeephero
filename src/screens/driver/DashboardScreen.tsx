@@ -8,12 +8,12 @@ import {
   ScrollView,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { realRows } from '../../utils/realData';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { startAnomalyDetection, stopAnomalyDetection } from '../../services/anomalyDetector';
 import {
   offlineTransit,
-  MAKATI_PRIMARY_ROUTE,
   type RouteData,
   type TerminalData,
   type VehicleData,
@@ -25,7 +25,7 @@ import LeafletMap from '../../components/LeafletMap';
 import { BottomSheetModal, triggerHaptic } from '../../components/AppUI';
 import { loadActiveFleetUnits } from '../../services/fleetRegistryService';
 
-type ShiftUnit = { bodyNumber: string; plateNumber: string; isSample?: boolean; busyElsewhere?: boolean };
+type ShiftUnit = { bodyNumber: string; plateNumber: string; busyElsewhere?: boolean };
 
 export default function DashboardScreen() {
   const { user } = useAuth();
@@ -44,10 +44,10 @@ export default function DashboardScreen() {
   const [shiftError, setShiftError] = useState('');
   const [starting, setStarting] = useState(false);
   const [currentPosition, setCurrentPosition] = useState<Location.LocationObjectCoords | null>(null);
-  const [passengerCount, setPassengerCount] = useState(8);
-  const [maxCapacity] = useState(22);
-  const [shiftStartedAt, setShiftStartedAt] = useState<string>('08:30');
-  const [locationGranted, setLocationGranted] = useState<boolean>(true);
+  const [passengerCount, setPassengerCount] = useState<number | null>(null);
+  const [maxCapacity, setMaxCapacity] = useState<number | null>(null);
+  const [shiftStartedAt, setShiftStartedAt] = useState<string>('Unavailable');
+  const [locationGranted, setLocationGranted] = useState<boolean>(false);
   const [passengerSheetOpen, setPassengerSheetOpen] = useState(false);
   const [endShiftSheetOpen, setEndShiftSheetOpen] = useState(false);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
@@ -57,7 +57,7 @@ export default function DashboardScreen() {
       const perm = await Location.getForegroundPermissionsAsync();
       setLocationGranted(perm.status === 'granted');
     } catch {
-      setLocationGranted(true);
+      setLocationGranted(false);
     }
   }, []);
 
@@ -76,8 +76,8 @@ export default function DashboardScreen() {
   }, [checkLocationPerm]);
 
   const publishPosition = useCallback(async (activeVehicleId: string, coords: Location.LocationObjectCoords) => {
-    const rawKph = Math.max(0, (coords.speed || 0) * 3.6);
-    if (rawKph > 130) {
+    const rawKph = coords.speed != null && coords.speed >= 0 ? coords.speed * 3.6 : null;
+    if (rawKph != null && rawKph > 130) {
       setTelemetryError('');
       return;
     }
@@ -86,7 +86,7 @@ export default function DashboardScreen() {
       latitude: coords.latitude,
       longitude: coords.longitude,
       speed: rawKph,
-      heading: coords.heading || 0,
+      heading: coords.heading != null && coords.heading >= 0 ? coords.heading : null,
     });
     if (error) throw new Error(error.message);
     setCurrentPosition(coords);
@@ -117,28 +117,11 @@ export default function DashboardScreen() {
   );
 
   useEffect(() => {
-    supabase
-      .from('routes')
-      .select('*')
-      .then(async ({ data }) => {
-        const list =
-          data && data.length > 0
-            ? data
-                .filter((r: any) => !r.is_coming_soon)
-                .map((route: any) =>
-                  route.id === MAKATI_PRIMARY_ROUTE.id
-                    ? { ...route, operating_hours: ESAKAY_OPERATIONS.serviceHours }
-                    : route
-                )
-            : (await offlineTransit.getTransitData()).routes.filter((r: any) => !r.is_coming_soon);
-        setRoutes(list);
-        if (list.length > 0) {
-          setSelectedRoute((prev) => prev || list[0].id);
-        }
-      });
     void offlineTransit.getTransitData().then((data) => {
       const validRoutes = data.routes.filter((route) => !route.is_coming_soon);
+      setRoutes(validRoutes);
       setMapRoutes(validRoutes);
+      if (data.status !== 'ready') setShiftError(data.syncedAt ? `Routes cached at ${new Date(data.syncedAt).toLocaleString()}; refresh unavailable.` : 'Routes unavailable.');
       setMapTerminals(data.terminals);
       if (validRoutes.length > 0) {
         setSelectedRoute((prev) => prev || validRoutes[0].id);
@@ -163,13 +146,14 @@ export default function DashboardScreen() {
           loadActiveFleetUnits(),
           supabase
             .from('vehicles')
-            .select('body_number,plate_number,is_active,driver_id')
+            .select('*')
             .order('created_at', { ascending: false })
             .limit(500),
         ]);
         if (cancelled) return;
+        if (historyResult.error) throw historyResult.error;
         const activeElsewhere = new Set<string>();
-        for (const row of historyResult.data || []) {
+        for (const row of realRows(historyResult.data || [])) {
           const body = String(row.body_number || '').trim().toUpperCase();
           if (body && row.is_active && row.driver_id !== user?.id) {
             activeElsewhere.add(body);
@@ -180,18 +164,6 @@ export default function DashboardScreen() {
           const body = String(row.body_number || '').trim();
           const plate = String(row.plate_number || '').trim();
           if (body && plate) {
-            available.set(body.toUpperCase(), {
-              bodyNumber: body,
-              plateNumber: plate,
-              isSample: row.is_sample,
-              busyElsewhere: activeElsewhere.has(body.toUpperCase()),
-            });
-          }
-        }
-        for (const row of historyResult.data || []) {
-          const body = String(row.body_number || '').trim();
-          const plate = String(row.plate_number || '').trim();
-          if (body && plate && !available.has(body.toUpperCase())) {
             available.set(body.toUpperCase(), {
               bodyNumber: body,
               plateNumber: plate,
@@ -228,18 +200,19 @@ export default function DashboardScreen() {
     void (async () => {
       const { data } = await supabase
         .from('vehicles')
-        .select('id,route_id,body_number,plate_number,passenger_count,created_at')
+        .select('*')
         .eq('driver_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!data || cancelled) return;
+      if (!data || data.is_sample || cancelled) return;
       setVehicleId(data.id);
       setSelectedRoute(data.route_id);
       setBodyNumber(data.body_number || '');
       setPlateNumber(data.plate_number || '');
-      setPassengerCount(data.passenger_count || 0);
+      setPassengerCount(data.passenger_count ?? null);
+      setMaxCapacity(data.max_capacity ?? null);
       if (data.created_at) {
         setShiftStartedAt(
           new Date(data.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -247,23 +220,6 @@ export default function DashboardScreen() {
       }
       setIsActive(true);
       startAnomalyDetection(data.id);
-      const latest = await supabase
-        .from('vehicle_positions')
-        .select('latitude,longitude,speed,heading')
-        .eq('vehicle_id', data.id)
-        .order('timestamp', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latest.data && !cancelled)
-        setCurrentPosition({
-          latitude: latest.data.latitude,
-          longitude: latest.data.longitude,
-          speed: Number(latest.data.speed || 0) / 3.6,
-          heading: latest.data.heading || 0,
-          accuracy: 0,
-          altitude: null,
-          altitudeAccuracy: null,
-        });
       try {
         await startGpsTracking(data.id);
       } catch {
@@ -276,12 +232,13 @@ export default function DashboardScreen() {
   }, [user?.id, startGpsTracking]);
 
   const updatePassengerCount = async (nextCount: number) => {
+    if (maxCapacity == null) { setShiftError('Vehicle capacity unavailable.'); return; }
     const clamped = Math.max(0, Math.min(maxCapacity, nextCount));
     triggerHaptic('light');
+    if (!vehicleId) return;
+    const { error } = await supabase.from('vehicles').update({ passenger_count: clamped }).eq('id', vehicleId);
+    if (error) { setShiftError('Passenger count could not be saved.'); return; }
     setPassengerCount(clamped);
-    if (vehicleId) {
-      await supabase.from('vehicles').update({ passenger_count: clamped }).eq('id', vehicleId);
-    }
   };
 
   const toggleShift = async () => {
@@ -311,7 +268,7 @@ export default function DashboardScreen() {
       }
 
       if (!user?.id) throw new Error('Sign in again before starting a shift.');
-      if (!selectedRoute) throw new Error('Choose a route before starting a shift.');
+      if (!selectedRoute || !routes.some(route => route.id === selectedRoute)) throw new Error('Choose a route before starting a shift.');
       if (!units.some((unit) => unit.bodyNumber === bodyNumber && unit.plateNumber === plateNumber)) {
         throw new Error('Choose a registered unit before starting a shift.');
       }
@@ -340,12 +297,12 @@ export default function DashboardScreen() {
           body_number: bodyNumber.trim(),
           plate_number: plateNumber.trim(),
           passenger_count: 0,
-          max_capacity: maxCapacity,
           is_active: true,
         })
-        .select('id,created_at')
+        .select('*')
         .single();
       if (created.error || !created.data) throw new Error(created.error?.message || 'The shift could not be created.');
+      setMaxCapacity(created.data.max_capacity ?? null);
       const newVehicleId: string = created.data.id;
       insertedId = newVehicleId;
       if (created.data.created_at) {
@@ -384,9 +341,9 @@ export default function DashboardScreen() {
     }
   };
 
-  const currentRouteName = routes.find((r) => r.id === selectedRoute)?.name || 'Route 1';
-  const currentSpeedKph = currentPosition ? Math.round(Math.max(0, (currentPosition.speed || 0) * 3.6)) : 18;
-  const seatStatus =
+  const currentRouteName = routes.find((r) => r.id === selectedRoute)?.name || 'Route unavailable';
+  const currentSpeedKph = currentPosition?.speed != null && currentPosition.speed >= 0 ? Math.round(currentPosition.speed * 3.6) : null;
+  const seatStatus = maxCapacity == null || passengerCount == null ? null :
     passengerCount >= maxCapacity
       ? 'Puno'
       : passengerCount >= Math.ceil(maxCapacity * 0.7)
@@ -403,11 +360,11 @@ export default function DashboardScreen() {
           route_id: selectedRoute || '',
           latitude: currentPosition.latitude,
           longitude: currentPosition.longitude,
-          speed: Math.max(0, (currentPosition.speed || 0) * 3.6),
-          heading: currentPosition.heading || 0,
+          speed: currentSpeedKph,
+          heading: currentPosition.heading != null && currentPosition.heading >= 0 ? currentPosition.heading : null,
           passenger_count: passengerCount,
           max_capacity: maxCapacity,
-          is_full: passengerCount >= maxCapacity,
+          is_full: maxCapacity == null || passengerCount == null ? null : passengerCount >= maxCapacity,
           status: seatStatus,
         }
       : null;
@@ -428,10 +385,10 @@ export default function DashboardScreen() {
               accessibilityLabel="Choose route"
               accessibilityState={{ expanded: routeMenuOpen }}
             >
-              <Text style={styles.selectButtonText}>{currentRouteName || 'Route 1'}</Text>
+              <Text style={styles.selectButtonText}>{currentRouteName || 'Route unavailable'}</Text>
               <Ionicons name={routeMenuOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
             </TouchableOpacity>
-            <Text style={styles.fieldHelper}>MRT Buendia → Mandaluyong City Hall</Text>
+            <Text style={styles.fieldHelper}>{routes.find(route => route.id === selectedRoute)?.description || 'Route description unavailable'}</Text>
 
             {routeMenuOpen && (
               <View style={styles.optionList}>
@@ -617,10 +574,10 @@ export default function DashboardScreen() {
               <Text
                 style={[
                   styles.telemetryValue,
-                  currentSpeedKph > ESAKAY_OPERATIONS.operatorSpeedCapKph && { color: Colors.primaryRed },
+                  currentSpeedKph != null && currentSpeedKph > ESAKAY_OPERATIONS.operatorSpeedCapKph && { color: Colors.primaryRed },
                 ]}
               >
-                {currentSpeedKph} <Text style={styles.telemetryUnit}>km/h</Text>
+                {currentSpeedKph ?? 'Unavailable'} <Text style={styles.telemetryUnit}>km/h</Text>
               </Text>
             </View>
             <View style={styles.telemetryDivider} />
@@ -654,9 +611,9 @@ export default function DashboardScreen() {
               <Text style={styles.unitTitle}>Passengers</Text>
               <Text style={styles.unitPlate}>Update seats when safely stopped.</Text>
             </View>
-            <Text style={styles.passengerCountNum}>{passengerCount}</Text>
+            <Text style={styles.passengerCountNum}>{passengerCount ?? 'Unavailable'}</Text>
             <View style={styles.seatStatusPill}>
-              <Text style={styles.seatStatusText}>{seatStatus}</Text>
+              <Text style={styles.seatStatusText}>{seatStatus || 'Occupancy unavailable'}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
           </TouchableOpacity>
@@ -688,7 +645,7 @@ export default function DashboardScreen() {
           <View>
             <Text style={styles.sheetTitle}>Passenger count</Text>
             <Text style={styles.unitPlate}>
-              {bodyNumber || 'EJ-024'} · {currentRouteName || 'Route 1'}
+              {bodyNumber || 'Unit unavailable'} · {currentRouteName || 'Route unavailable'}
             </Text>
           </View>
           <TouchableOpacity
@@ -704,53 +661,22 @@ export default function DashboardScreen() {
         <View style={styles.stepperBox}>
           <TouchableOpacity
             style={styles.stepperBtn}
-            onPress={() => updatePassengerCount(passengerCount - 1)}
+            onPress={() => updatePassengerCount((passengerCount ?? 0) - 1)}
             accessibilityLabel="Decrease passenger count"
           >
             <Ionicons name="remove" size={24} color={Colors.ink} />
           </TouchableOpacity>
-          <Text style={styles.stepperValue}>{passengerCount}</Text>
+          <Text style={styles.stepperValue}>{passengerCount ?? 'Unavailable'}</Text>
           <TouchableOpacity
             style={styles.stepperBtn}
-            onPress={() => updatePassengerCount(passengerCount + 1)}
+            onPress={() => updatePassengerCount((passengerCount ?? 0) + 1)}
             accessibilityLabel="Increase passenger count"
           >
             <Ionicons name="add" size={24} color={Colors.ink} />
           </TouchableOpacity>
         </View>
 
-        <View style={{ gap: 8 }}>
-          <Text style={styles.fieldLabel}>Quick presets</Text>
-          <View style={styles.presetRow}>
-            {(
-              [
-                { label: 'Maluwag', count: 8, active: seatStatus === 'Maluwag' },
-                { label: 'Sakto', count: 16, active: seatStatus === 'Sakto' },
-                { label: 'Puno', count: maxCapacity, active: seatStatus === 'Puno' },
-              ] as const
-            ).map((preset) => (
-              <TouchableOpacity
-                key={preset.label}
-                style={[styles.presetChip, preset.active && styles.presetChipActive]}
-                onPress={() => updatePassengerCount(preset.count)}
-              >
-                <Ionicons
-                  name={preset.active ? 'radio-button-on' : 'radio-button-off'}
-                  size={16}
-                  color={preset.active ? Colors.brandGreen : Colors.subtleGray}
-                />
-                <Text style={[styles.presetChipText, preset.active && styles.presetChipTextActive]}>
-                  {preset.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="checkmark-circle" size={17} color={Colors.brandGreen} />
-          <Text style={styles.liveUpdatedText}>Count updated live</Text>
-        </View>
+        <Text style={styles.fieldHelper}>Enter the observed passenger count. Changes are saved to this shift.</Text>
 
         <TouchableOpacity
           accessibilityRole="button"
@@ -802,7 +728,7 @@ export default function DashboardScreen() {
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Current speed</Text>
-            <Text style={styles.summaryValue}>{currentSpeedKph} km/h</Text>
+            <Text style={styles.summaryValue}>{currentSpeedKph == null ? 'Unavailable' : `${currentSpeedKph} km/h`}</Text>
           </View>
         </View>
 

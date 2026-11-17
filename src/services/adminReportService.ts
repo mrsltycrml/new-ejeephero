@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { Asset } from 'expo-asset';
+import { realRows } from '../utils/realData';
 import { supabase } from '../lib/supabase';
 import { formatReportingPeriod, periodRangeUtc, type ReportingPeriod } from '../utils/reportingPeriod';
 import { calculateSafetyScore } from '../utils/operationsSummary';
@@ -24,7 +25,7 @@ async function allPeriodRows<T>(tableName: string, start: string, end: string): 
     const result = await supabase.from(tableName).select('*').gte('created_at', start).lt('created_at', end).order('created_at', { ascending: false }).range(offset, offset + 499);
     if (result.error) throw new Error(`Could not load ${tableName}: ${result.error.message}`);
     const page = (result.data ?? []) as T[];
-    all.push(...page);
+    all.push(...realRows(page));
     if (page.length < 500) return all;
   }
 }
@@ -50,36 +51,35 @@ async function logoBytes() {
   return { jpeg, ...jpegDimensions(jpeg) };
 }
 
-export async function openAdminPeriodReport(period: ReportingPeriod, liveUnits: ReportLiveUnit[], adminId: string): Promise<PreparedAdminReport> {
+export async function openAdminPeriodReport(period: ReportingPeriod, liveUnits: ReportLiveUnit[] | null, adminId: string): Promise<PreparedAdminReport> {
   if (Platform.OS !== 'web' || typeof window === 'undefined') throw new Error('PDF export is available in the web preview.');
   const { start, end } = periodRangeUtc(period);
   const [shifts, speeds, cuts, profileResult, routeResult, unitRegistry, driverRegistry, logo] = await Promise.all([
     allPeriodRows<Shift>('vehicles', start, end),
     allPeriodRows<Speed>('speed_events', start, end),
     allPeriodRows<Cut>('trip_violations', start, end),
-    supabase.from('profiles').select('id,full_name,email,status').eq('role', 'driver'),
-    supabase.from('routes').select('id,name'),
+    supabase.from('profiles').select('*').eq('role', 'driver'),
+    supabase.from('routes').select('*'),
     loadRegistry('units', adminId), loadRegistry('drivers', adminId), logoBytes(),
   ]);
   if (profileResult.error) throw new Error(`Could not load drivers: ${profileResult.error.message}`);
   if (routeResult.error) throw new Error(`Could not load routes: ${routeResult.error.message}`);
-  const profiles = (profileResult.data ?? []) as Profile[];
-  const routes = (routeResult.data ?? []) as Route[];
+  const profiles = realRows(profileResult.data ?? []) as Profile[];
+  const routes = realRows(routeResult.data ?? []) as Route[];
   const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
   const routeMap = new Map(routes.map((route) => [route.id, route.name]));
   const driverName = (id: string) => profileMap.get(id)?.full_name || profileMap.get(id)?.email || 'Unknown driver';
   const activeUnitRegistry = unitRegistry.rows.filter((entry) => !entry.deleted_at);
   const activeDriverRegistry = driverRegistry.rows.filter((entry) => !entry.deleted_at);
-  const currentLive = liveUnits.filter((entry) => Date.now() - Date.parse(entry.lastSeen) <= 120_000);
+  const currentLive = (liveUnits ?? []).filter((entry) => Date.now() - Date.parse(entry.lastSeen) <= 120_000);
   const periodLabel = formatReportingPeriod(period);
   const cadence = { day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Yearly' }[period.mode];
   const report = new SimplePdf(logo.jpeg, logo.width, logo.height, 'Operations report', `${periodLabel} / ${cadence}`);
   report.metrics([
-    { value: currentLive.length, label: 'Live units now' }, { value: shifts.length, label: 'Shifts started' },
+    { value: liveUnits === null ? 'Unavailable' : currentLive.length, label: 'Live units now' }, { value: shifts.length, label: 'Shifts started' },
     { value: speeds.length, label: 'Speed offenses' }, { value: cuts.length, label: 'Route flags' },
   ]);
   report.paragraph(`Generated ${dateTime(new Date().toISOString())} in Philippine time. Historical sections use the selected ${period.mode}. Current GPS is a live snapshot. Sample records are excluded.`);
-  if (unitRegistry.mode === 'local-preview' || driverRegistry.mode === 'local-preview') report.paragraph('Roster data is a local preview from this browser; it is not yet shared through the database.', '#933027');
 
   report.section('Fleet overview');
   report.paragraph(`${new Set(shifts.map((shift) => (shift.plate_number || shift.body_number || shift.id).toUpperCase())).size} units recorded shifts in this period. ${activeUnitRegistry.length} units and ${activeDriverRegistry.length} drivers are in the active managed roster.`);
@@ -96,7 +96,7 @@ export async function openAdminPeriodReport(period: ReportingPeriod, liveUnits: 
   report.table(['Started', 'Ended', 'Unit', 'Driver', 'Route', 'Status'], [85, 85, 90, 80, 130, 55], shifts.map((shift) => [dateTime(shift.created_at), dateTime(shift.ended_at), unit(shift.body_number, shift.plate_number), driverName(shift.driver_id), routeMap.get(shift.route_id) || 'Unknown route', shift.is_active ? 'On trip' : 'Ended']));
 
   report.section('Live speed telemetry');
-  report.paragraph('Current GPS snapshot when this PDF was generated, independent of the selected period.');
+  report.paragraph(liveUnits === null ? 'Current GPS snapshot unavailable for this report.' : 'Current GPS snapshot when this PDF was generated, independent of the selected period.');
   report.table(['Unit', 'Driver', 'Speed', 'Last GPS', 'Alert'], [125, 140, 70, 110, 65], currentLive.map((entry) => [unit(entry.body, entry.plate), driverName(entry.driverId), `${Math.round(entry.speed)} km/h`, dateTime(entry.lastSeen), entry.isSpeeding ? 'Speed alert' : '-']));
 
   report.section('Driver safety report cards');

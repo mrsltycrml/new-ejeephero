@@ -1,3 +1,4 @@
+import { realRows } from '../utils/realData';
 import { supabase } from '../lib/supabase';
 import {
   type FleetShift,
@@ -38,12 +39,12 @@ const PAGE_SIZE = 500;
 async function readAll<T>(table: string, columns: string, orderColumn: string, roleFilter = false): Promise<T[]> {
   const rows: T[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
-    let query = supabase.from(table).select(columns).order(orderColumn, { ascending: orderColumn !== 'created_at' });
-    if (roleFilter) query = query.eq('role', 'driver').eq('supervisor_hidden', false);
+    let query = supabase.from(table).select('*').order(orderColumn, { ascending: orderColumn !== 'created_at' });
+    if (roleFilter) query = query.eq('role', 'driver');
     const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
     if (error) throw new Error(`Could not load ${table}: ${error.message}`);
     const page = (data ?? []) as T[];
-    rows.push(...page);
+    rows.push(...realRows(page));
     if (page.length < PAGE_SIZE) return rows;
   }
 }

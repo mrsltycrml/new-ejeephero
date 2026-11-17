@@ -18,7 +18,7 @@ export function nearbyRideUnits(fix: PassengerFix | null, vehicles: VehicleData[
 // independent fresh telemetry and sustained travel together.
 export function detectRide(previous: RideEvidence | null, fix: PassengerFix | null, vehicles: VehicleData[], now: number) {
   const nearby = nearbyRideUnits(fix, vehicles, now);
-  if (!fix || nearby.length !== 1 || nearby[0].distance > 20 || !Number.isFinite(nearby[0].vehicle.speed) || nearby[0].vehicle.speed < 8) return { evidence: null, unit: null, nearby };
+  if (!fix || nearby.length !== 1 || nearby[0].distance > 20 || nearby[0].vehicle.speed == null || !Number.isFinite(nearby[0].vehicle.speed) || nearby[0].vehicle.speed < 8) return { evidence: null, unit: null, nearby };
   const vehicle = nearby[0].vehicle;
   const vehicleTime = Date.parse(vehicle.recorded_at!);
   if (previous && previous.id === vehicle.vehicle_id && (fix.timestamp <= previous.last.timestamp || vehicleTime <= previous.vehicleTime)) return { evidence: previous, unit: null, nearby };

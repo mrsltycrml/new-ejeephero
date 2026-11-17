@@ -16,14 +16,12 @@ type Props = {
   activeVehicleId?: string;
   activeVehiclePlate?: string;
   activeVehicleBody?: string;
-  activeVehicleIsSample?: boolean;
 };
 
 export default function SOSButton({
   activeVehicleId,
   activeVehiclePlate,
   activeVehicleBody,
-  activeVehicleIsSample,
 }: Props) {
   const { user, getAccessToken } = useAuth();
   const [visible, setVisible] = useState(false);
@@ -64,7 +62,6 @@ export default function SOSButton({
       id: activeVehicleId,
       plate: activeVehiclePlate,
       body: activeVehicleBody,
-      sample: activeVehicleIsSample,
     };
     setVisible(true);
     setCount(5);
@@ -133,7 +130,6 @@ export default function SOSButton({
         fix: point,
         body: vehicle.body,
         plate: vehicle.plate,
-        isSample: vehicle.sample,
       });
       setMessage(text);
       if (!list.length) {
@@ -155,7 +151,6 @@ export default function SOSButton({
           fix: point,
           vehicleBody: vehicle.body,
           vehiclePlate: vehicle.plate,
-          isSample: vehicle.sample,
         });
         if (run.current !== current) return;
         if (result.accepted === list.length && result.total === list.length && !list.some((contact) => contact.localOnly)) {
@@ -216,7 +211,7 @@ export default function SOSButton({
     }
   };
 
-  const unitLabel = `${activeVehicleBody || 'EJ-024'} · ${activeVehiclePlate || 'ABC 1234'}`;
+  const unitLabel = `${activeVehicleBody || 'Not selected'} · ${activeVehiclePlate || 'Not selected'}`;
 
   return (
     <>
@@ -296,7 +291,7 @@ export default function SOSButton({
               <View style={styles.messagePreviewBox}>
                 <Text style={styles.messagePreviewLine}>I need help.</Text>
                 <Text style={styles.messagePreviewLine}>
-                  Unit {activeVehicleBody || 'EJ-024'} · Plate {activeVehiclePlate || 'ABC 1234'}
+                  Unit {activeVehicleBody || 'Not selected'} · Plate {activeVehiclePlate || 'Not selected'}
                 </Text>
                 <Text style={styles.messagePreviewSub}>
                   {fix

@@ -8,7 +8,7 @@ import {
   type DriverInput, type ManagedDriver, type ManagedUnit, type RegistryKind, type RegistryMode, type UnitInput,
 } from '../services/fleetRegistryService';
 
-const EMPTY_UNIT: UnitInput = { body_number: '', plate_number: '', route_name: 'MRT Buendia - Mandaluyong City Hall', assigned_driver: '', notes: '' };
+const EMPTY_UNIT: UnitInput = { body_number: '', plate_number: '', route_name: '', assigned_driver: '', notes: '' };
 const EMPTY_DRIVER: DriverInput = { full_name: '', email: '', assigned_unit: '', notes: '' };
 type Row = ManagedUnit | ManagedDriver;
 
@@ -116,7 +116,6 @@ export default function AdminRegistryManager({ kind, refreshToken = 0, onRowsCha
   if (!isAdmin) return null;
   return <View style={styles.shell}>
     <View style={styles.headingActions}><Action label={`Add ${noun}`} icon="add" primary onPress={beginAdd} /><Action label={deletedView ? `Active ${kind}` : 'Recently deleted'} icon={deletedView ? 'list-outline' : 'archive-outline'} onPress={() => { resetForm(); setDeletedView(!deletedView); }} /><Action label="Refresh" icon="refresh" iconOnly={compact} onPress={() => { void refresh(); }} /></View>
-    {(formOpen || deletedView || shown.length > 0) && mode === 'local-preview' && <Text style={styles.previewNote}>Changes to this roster are saved on this device.</Text>}
     {formOpen && kind === 'drivers' && <Text style={styles.previewNote}>Adding a roster entry does not create a sign-in account. Drivers register and verify their email separately.</Text>}
     {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
     {formOpen && <View style={styles.form}>

@@ -254,10 +254,10 @@ export default function SafetyScreen() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.contactName}>
-            {unit ? `Linked unit ${unit.body_number}` : 'Linked unit EJ-024'}
+            {unit ? `Linked unit ${unit.body_number}` : 'No unit linked'}
           </Text>
           <Text style={styles.contactPhone}>
-            Plate {unit?.plate_number || 'ABC 1234'}
+            Plate {unit?.plate_number || 'Unavailable'}
           </Text>
         </View>
       </View>
@@ -265,9 +265,8 @@ export default function SafetyScreen() {
       {/* Emergency SOS Button */}
       <SOSButton
         activeVehicleId={unit?.vehicle_id}
-        activeVehicleBody={unit?.body_number || 'EJ-024'}
-        activeVehiclePlate={unit?.plate_number || 'ABC 1234'}
-        activeVehicleIsSample={unit?.source === 'sample'}
+        activeVehicleBody={unit?.body_number}
+        activeVehiclePlate={unit?.plate_number || undefined}
       />
 
       <View style={{ gap: 6 }}>

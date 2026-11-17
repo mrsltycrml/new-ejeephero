@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { realRows } from '../utils/realData';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/theme';
 import { SkeletonBlock } from './AppUI';
@@ -24,20 +25,20 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
     const [speed, routes, drivers] = await Promise.all([
       supabase.from('speed_events').select('*').order('created_at', { ascending: false }).limit(8),
       supabase.from('trip_violations').select('*').neq('status', 'dismissed').order('created_at', { ascending: false }).limit(8),
-      supabase.from('profiles').select('id,full_name,email').eq('role', 'driver'),
+      supabase.from('profiles').select('*').eq('role', 'driver'),
     ]);
     if (speed.error || routes.error) {
       setError('Alerts could not load. Try again.');
       setLoading(false);
       return;
     }
-    const names = new Map<string, string>((drivers.data ?? []).map((driver: any) => [driver.id, driver.full_name || driver.email || 'Driver']));
-    const speedRows: AlertRow[] = (speed.data ?? []).map((event: any) => ({
+    const names = new Map<string, string>(realRows(drivers.data ?? []).map((driver: any) => [driver.id, driver.full_name || driver.email || 'Driver']));
+    const speedRows: AlertRow[] = realRows(speed.data ?? []).map((event: any) => ({
       id: `speed-${event.id}`, kind: 'speed', title: names.get(event.driver_id) || 'Driver',
       detail: `${Math.round(Number(event.speed_kph))} km/h · ${event.body_number || event.plate_number || 'Unit'}`,
       time: event.created_at,
     }));
-    const routeRows: AlertRow[] = (routes.data ?? []).map((event: any) => ({
+    const routeRows: AlertRow[] = realRows(routes.data ?? []).map((event: any) => ({
       id: `route-${event.id}`, kind: 'route', title: names.get(event.driver_id) || 'Driver',
       detail: `Route cut · ${event.body_number || event.plate_number || 'Unit'} · ${String(event.status).replace('_', ' ')}`,
       time: event.created_at,

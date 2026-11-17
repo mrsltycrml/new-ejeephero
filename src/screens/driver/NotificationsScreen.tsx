@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheetModal, ScreenSkeleton } from '../../components/AppUI';
 import LeafletMap from '../../components/LeafletMap';
+import { realRows } from '../../utils/realData';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -27,39 +28,10 @@ type AlertItem = {
   statusLabel?: string;
 };
 
-const SAMPLE_ALERTS: AlertItem[] = [
-  {
-    id: 'sample-route',
-    category: 'violation',
-    title: 'Potential route cut',
-    body: 'EJ-024 · Route 1 · Awaiting review',
-    timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    severity: 'warning',
-    unitLabel: 'EJ-024 · ABC 1234',
-    routeLabel: 'Route 1',
-    statusLabel: 'Awaiting supervisor review',
-  },
-  {
-    id: 'sample-dispatch',
-    category: 'announcement',
-    title: 'Dispatch notice',
-    body: 'Board passengers only in marked bays',
-    timestamp: new Date(Date.now() - 95 * 60 * 1000).toISOString(),
-    severity: 'info',
-  },
-  {
-    id: 'sample-speed',
-    category: 'speed',
-    title: 'Operator cap exceeded',
-    body: '24 km/h recorded (20 km/h cap)',
-    timestamp: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
-    severity: 'danger',
-  },
-];
-
 export default function NotificationsScreen() {
   const { user } = useAuth();
   const [items, setItems] = useState<AlertItem[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFlag, setSelectedFlag] = useState<AlertItem | null>(null);
@@ -78,13 +50,13 @@ export default function NotificationsScreen() {
       const [announcementsRes, speedRes, violationsRes] = await Promise.all([
         supabase
           .from('announcements')
-          .select('id,title,body,created_at')
+          .select('*')
           .order('created_at', { ascending: false })
           .limit(20),
         user?.id
           ? supabase
               .from('speed_events')
-              .select('id,zone_label,policy_type,speed_kph,limit_kph,body_number,plate_number,created_at')
+              .select('*')
               .eq('driver_id', user.id)
               .order('created_at', { ascending: false })
               .limit(15)
@@ -92,16 +64,18 @@ export default function NotificationsScreen() {
         user?.id
           ? supabase
               .from('trip_violations')
-              .select('id,reason,status,body_number,plate_number,created_at')
+              .select('*')
               .eq('driver_id', user.id)
               .order('created_at', { ascending: false })
               .limit(15)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
+      if (announcementsRes.error || speedRes.error || violationsRes.error) throw new Error('Alerts unavailable. Pull to refresh.');
+      setLoadError('');
       const merged: AlertItem[] = [];
 
-      for (const a of announcementsRes.data ?? []) {
+      for (const a of realRows(announcementsRes.data ?? [])) {
         merged.push({
           id: `ann-${a.id}`,
           category: 'announcement',
@@ -112,7 +86,7 @@ export default function NotificationsScreen() {
         });
       }
 
-      for (const s of speedRes.data ?? []) {
+      for (const s of realRows(speedRes.data ?? [])) {
         merged.push({
           id: `spd-${s.id}`,
           category: 'speed',
@@ -120,11 +94,11 @@ export default function NotificationsScreen() {
           body: `${Math.round(Number(s.speed_kph))} km/h recorded (${Math.round(Number(s.limit_kph))} km/h cap)`,
           timestamp: s.created_at,
           severity: 'danger',
-          unitLabel: [s.body_number, s.plate_number].filter(Boolean).join(' · ') || 'EJ-024 · ABC 1234',
+          unitLabel: [s.body_number, s.plate_number].filter(Boolean).join(' · ') || 'Unit unavailable',
         });
       }
 
-      for (const v of violationsRes.data ?? []) {
+      for (const v of realRows(violationsRes.data ?? [])) {
         const statusLabel =
           v.status === 'confirmed'
             ? 'Confirmed route cut'
@@ -135,19 +109,20 @@ export default function NotificationsScreen() {
           id: `vio-${v.id}`,
           category: 'violation',
           title: 'Potential route cut',
-          body: `${v.body_number || 'EJ-024'} · Route 1 · ${v.status === 'confirmed' ? 'Confirmed' : 'Awaiting review'}`,
+          body: `${v.body_number || 'Unit unavailable'} · ${v.status === 'confirmed' ? 'Confirmed' : 'Awaiting review'}`,
           timestamp: v.created_at,
           severity: v.status === 'confirmed' ? 'danger' : 'warning',
-          unitLabel: [v.body_number, v.plate_number].filter(Boolean).join(' · ') || 'EJ-024 · ABC 1234',
-          routeLabel: 'Route 1',
+          unitLabel: [v.body_number, v.plate_number].filter(Boolean).join(' · ') || 'Unit unavailable',
+          routeLabel: 'Route unavailable',
           statusLabel,
         });
       }
 
       merged.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
-      setItems(merged.length ? merged : SAMPLE_ALERTS);
+      setItems(merged);
     } catch {
-      setItems(SAMPLE_ALERTS);
+      setItems([]);
+      setLoadError('Alerts unavailable. Pull to refresh.');
     } finally {
       setLoading(false);
     }
@@ -236,6 +211,8 @@ export default function NotificationsScreen() {
       >
         <View style={styles.headerBlock}>
           <Text style={styles.title}>Alerts</Text>
+        {!!loadError && <Text accessibilityRole="alert">{loadError}</Text>}
+        {!loadError && !items.length && <Text>No alerts.</Text>}
           <Text style={styles.subtitle}>Updates for your shifts.</Text>
         </View>
 
@@ -251,7 +228,7 @@ export default function NotificationsScreen() {
         {olderItems.length > 0 && (
           <>
             <View style={styles.groupBand}>
-              <Text style={styles.groupBandText}>Yesterday</Text>
+              <Text style={styles.groupBandText}>Earlier</Text>
             </View>
             <View style={styles.listSection}>{olderItems.map(renderRow)}</View>
           </>
@@ -303,11 +280,11 @@ export default function NotificationsScreen() {
               </View>
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Unit</Text>
-                <Text style={styles.kvValue}>{selectedFlag.unitLabel || 'EJ-024 · ABC 1234'}</Text>
+                <Text style={styles.kvValue}>{selectedFlag.unitLabel || 'Unit unavailable'}</Text>
               </View>
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Route</Text>
-                <Text style={styles.kvValue}>{selectedFlag.routeLabel || 'Route 1'}</Text>
+                <Text style={styles.kvValue}>{selectedFlag.routeLabel || 'Route unavailable'}</Text>
               </View>
             </View>
 

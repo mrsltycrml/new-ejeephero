@@ -12,6 +12,7 @@ export type FleetShift = {
 };
 
 export type DriverRecord = {
+  supervisor_hidden?: boolean;
   id: string;
   email: string | null;
   full_name: string | null;

@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s, PassengerSelect } from '../../components/PassengerUI';
 import { FormScrollView, SkeletonBlock, triggerHaptic } from '../../components/AppUI';
 import { Colors } from '../../constants/theme';
-import { MAKATI_PRIMARY_ROUTE } from '../../services/offlineTransitService';
 import { loadPassengerPlanningData } from '../../services/passengerDataService';
 import { findVerifiedSavings, quotePassengerFare, verifiedRideDistance } from '../../services/passengerFare';
 import type { FarePassengerType } from '../../services/fareCalculator';
@@ -21,8 +20,8 @@ export default function FareScreen() {
   const [data, setData] = useState<Awaited<ReturnType<typeof loadPassengerPlanningData>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'distance' | 'stops'>('distance');
-  const [type, setType] = useState<FarePassengerType>('student');
-  const [distance, setDistance] = useState('4.0');
+  const [type, setType] = useState<FarePassengerType>('regular');
+  const [distance, setDistance] = useState('');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [stepFree, setStepFree] = useState(false);
@@ -44,31 +43,32 @@ export default function FareScreen() {
     };
   }, []);
 
-  const route = MAKATI_PRIMARY_ROUTE;
+  const route = data?.routes[0];
   const stops = useMemo(
-    () => (data?.terminals || []).filter((t) => t.route_id === route.id && t.location_source_url && t.location_verified_at),
-    [data, route.id]
+    () => (data?.terminals || []).filter((t) => t.route_id === route?.id && t.location_source_url && t.location_verified_at),
+    [data, route?.id]
   );
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
   const matrix = data?.matrices.find(
-    (m) => m.route_id === route.id && m.effective_from <= today && (!m.effective_to || m.effective_to >= today)
+    (m) => m.route_id === route?.id && m.effective_from <= today && (!m.effective_to || m.effective_to >= today)
   );
   const km =
     mode === 'distance'
       ? distance.trim()
         ? Number(distance)
         : NaN
-      : origin && destination
-        ? verifiedRideDistance(origin, destination, route.id, data?.segments || [])
+      : origin && destination && route
+        ? verifiedRideDistance(origin, destination, route?.id, data?.segments || [])
         : null;
   const validDistance = km != null && Number.isFinite(km) && Number(km) > 0 && Number(km) <= 200;
-  const quote = validDistance ? quotePassengerFare(Number(km), type, route, matrix, today) : null;
+  const quoted = validDistance && route && matrix ? quotePassengerFare(Number(km), type, route, matrix, today) : null;
+  const quote = quoted?.official ? quoted : null;
   const savings =
-    mode === 'stops' && data
+    mode === 'stops' && data && route && matrix && quote
       ? findVerifiedSavings({
           originId: origin,
           destinationId: destination,
-          routeId: route.id,
+          routeId: route?.id,
           type,
           route,
           stops,
@@ -210,13 +210,14 @@ export default function FareScreen() {
         </Text>
       </TouchableOpacity>
 
+      {!loading && !quote && <Text style={s.muted}>Fare unavailable. A route, current sourced fare matrix and trip distance are required.</Text>}
       {/* Estimated Fare Output Card */}
       {showEstimate && quote && (
         <View style={styles.quoteCard}>
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.quoteLabel}>Estimated fare · {activeTypeInfo.name}</Text>
             <Text style={s.muted}>
-              {Number(km).toFixed(1)} km on Route 1
+              {Number(km).toFixed(1)} km on {route?.name}
             </Text>
           </View>
           <Text style={styles.quoteAmount}>{peso(quote.amount)}</Text>
@@ -271,7 +272,7 @@ export default function FareScreen() {
             <Text style={s.muted}>
               {mode !== 'stops' || !origin || !destination
                 ? 'Switch to Stops mode and choose your boarding and destination stops to compare nearby walking options.'
-                : 'No cheaper walking option is available for this stop pair.'}
+                : 'Verified walking savings unavailable for this stop pair.'}
             </Text>
           )}
         </View>

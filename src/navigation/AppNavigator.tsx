@@ -1,3 +1,4 @@
+import { loadAdminOperations } from '../services/adminOperationsService';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -381,12 +382,12 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
   const previousCount = useRef<number | null>(null);
   const loadAlertCount = useCallback(async () => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const [speed, routes] = await Promise.all([
-      supabase.from('speed_events').select('id', { count: 'exact', head: true }).gte('created_at', since),
-      supabase.from('trip_violations').select('id', { count: 'exact', head: true }).gte('created_at', since).neq('status', 'dismissed'),
-    ]);
-    if (speed.error || routes.error) return;
-    const total = (speed.count ?? 0) + (routes.count ?? 0);
+    let operations;
+    try { operations = await loadAdminOperations(); }
+    catch { setNotice('Alert count unavailable.'); return; }
+    if (!operations.speedEvents || !operations.tripViolations) { setNotice('Alert count unavailable.'); return; }
+    const total = operations.speedEvents.filter(event => event.created_at >= since).length
+      + operations.tripViolations.filter(event => event.created_at >= since && event.status !== 'dismissed').length;
     if (previousCount.current !== null && total > previousCount.current)
       setNotice(`${total - previousCount.current} new driver violation${total - previousCount.current === 1 ? '' : 's'} recorded`);
     previousCount.current = total;
