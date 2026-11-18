@@ -17,14 +17,21 @@ async function planningRows<T>(table: string): Promise<T[]> {
   throw new Error('Passenger planning data is too large to compare completely.');
 }
 
-export async function loadPassengerPlanningData(catalog?: TransitResult) {
-  const [transit, segments, walks, matrices] = await Promise.all([
-    catalog ? Promise.resolve(catalog) : offlineTransit.getTransitData(),
+export async function loadPassengerFareData() {
+  const [segments, matrices] = await Promise.all([
     planningRows<RoadSegment>('passenger_route_segments'),
-    planningRows<WalkLink>('passenger_walk_links'),
     planningRows<FareMatrix>('passenger_fare_matrices'),
   ]);
-  return { ...transit, segments, walks, matrices: matrices.sort((a, b) => String(b.effective_from).localeCompare(String(a.effective_from))) };
+  return { segments, matrices: matrices.sort((a, b) => String(b.effective_from).localeCompare(String(a.effective_from))) };
+}
+
+export async function loadPassengerPlanningData(catalog?: TransitResult) {
+  const [transit, fare, walks] = await Promise.all([
+    catalog ? Promise.resolve(catalog) : offlineTransit.getTransitData(),
+    loadPassengerFareData(),
+    planningRows<WalkLink>('passenger_walk_links'),
+  ]);
+  return { ...transit, ...fare, walks };
 }
 
 export async function loadLoadingZones(): Promise<LoadingZone[]> {

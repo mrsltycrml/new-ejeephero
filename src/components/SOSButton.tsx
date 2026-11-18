@@ -10,6 +10,7 @@ import { BottomSheetModal, triggerHaptic } from './AppUI';
 import { passengerStyles as s } from './PassengerUI';
 import EmergencyHotlines from './EmergencyHotlines';
 import { buildEmergencyMessage, type PassengerFix } from '../services/passengerSafety';
+import { validPoint } from '../services/locationQuality';
 import { callEmergencyService, loadEmergencyContacts, type EmergencyContact } from '../services/emergencyService';
 
 type Props = {
@@ -26,11 +27,9 @@ export default function SOSButton({
   const { user, getAccessToken } = useAuth();
   const [visible, setVisible] = useState(false);
   const [count, setCount] = useState<number | null>(null);
-  const [phase, setPhase] = useState<'countdown' | 'locating' | 'opening' | 'ready' | 'fallback'>('countdown');
+  const [phase, setPhase] = useState<'countdown' | 'locating' | 'opening' | 'ready' | 'accepted' | 'fallback'>('countdown');
   const [status, setStatus] = useState('');
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-  const [contactsLoaded, setContactsLoaded] = useState(false);
-  const [fix, setFix] = useState<PassengerFix | null>(null);
   const [message, setMessage] = useState('');
   const run = useRef(0);
   const busy = useRef(false);
@@ -67,10 +66,8 @@ export default function SOSButton({
     setCount(5);
     setPhase('countdown');
     setStatus('');
-    setFix(null);
     setMessage('');
     setContacts([]);
-    setContactsLoaded(false);
 
     const gpsPromise = (async (): Promise<PassengerFix | null> => {
       let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -79,7 +76,7 @@ export default function SOSButton({
           const permission = await Location.requestForegroundPermissionsAsync();
           if (permission.status !== 'granted') return null;
           const point = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
-          if (Date.now() - point.timestamp > 60_000) return null;
+          if (!validPoint(point.coords) || !Number.isFinite(point.timestamp) || Math.abs(Date.now() - point.timestamp) > 60_000) return null;
           return {
             latitude: point.coords.latitude,
             longitude: point.coords.longitude,
@@ -105,7 +102,6 @@ export default function SOSButton({
       const list = user ? await loadEmergencyContacts(user.id, token) : [];
       if (run.current === current) {
         setContacts(list);
-        setContactsLoaded(true);
       }
       return list;
     })();
@@ -120,11 +116,12 @@ export default function SOSButton({
       const [point, list] = await Promise.all([gpsPromise, contactPromise]);
       if (run.current !== current) return;
       if (!point) {
+        setMessage([list[0]?.preset_message || 'EMERGENCY! I need help. Please check on me.',
+          vehicle.body && `Body number: ${vehicle.body}`, vehicle.plate && `Plate number: ${vehicle.plate}`].filter(Boolean).join('\n'));
         setPhase('fallback');
-        setStatus("We couldn't confirm your alert. Send an SMS as a backup.");
+        setStatus('Your location is unavailable. Add your location in Messages or call a hotline.');
         return;
       }
-      setFix(point);
       const text = buildEmergencyMessage({
         message: list[0]?.preset_message,
         fix: point,
@@ -154,7 +151,7 @@ export default function SOSButton({
         });
         if (run.current !== current) return;
         if (result.accepted === list.length && result.total === list.length && !list.some((contact) => contact.localOnly)) {
-          setPhase('ready');
+          setPhase('accepted');
           setStatus('SMS provider accepted the alert for all saved contacts. Call a hotline if you need immediate help.');
           return;
         }
@@ -189,7 +186,7 @@ export default function SOSButton({
         if (run.current === current)
           setStatus('Messages will open for you to review and send.');
       } else if (await SMS.isAvailableAsync()) {
-        if (run.current === current) return;
+        if (run.current !== current) return;
         const result = await SMS.sendSMSAsync(phones, body);
         if (run.current === current)
           setStatus(
@@ -200,7 +197,7 @@ export default function SOSButton({
                 : 'Check Messages to confirm your alert was sent.'
           );
       } else if (run.current === current) {
-        setStatus('Messages is unavailable on this device. Open ejeephero on your phone or call a hotline below.');
+        setStatus('Messages is unavailable on this device. Use your phone or call a hotline below.');
       }
       if (run.current === current) setPhase('ready');
     } catch {
@@ -211,270 +208,68 @@ export default function SOSButton({
     }
   };
 
-  const unitLabel = `${activeVehicleBody || 'Not selected'} · ${activeVehiclePlate || 'Not selected'}`;
+  const preparing = phase === 'opening' || phase === 'locating';
+  const heading = preparing ? 'Preparing alert…' : phase === 'accepted' ? 'Alert accepted' : phase === 'ready' ? 'SMS status' : 'Dispatch not confirmed';
 
   return (
     <>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Emergency SOS, starts a five second cancellation timer"
-        onPress={activate}
-        style={styles.sosTrigger}
-      >
-        <Ionicons name="shield-outline" size={22} color={Colors.white} />
-        <Text style={styles.sosTriggerText}>Emergency SOS</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Emergency SOS, starts a five second cancellation timer"
+        onPress={activate} style={[s.button, styles.sosTrigger]}>
+        <Ionicons aria-hidden name="alert-circle-outline" size={24} color={Colors.white} />
+        <Text style={s.buttonText}>Emergency SOS</Text>
       </TouchableOpacity>
 
       <BottomSheetModal visible={visible} onClose={close} maxWidth={480} contentContainerStyle={{ gap: 14 }}>
-        {count !== null ? (
-          /* BOARD 03 MIDDLE: PREPARING YOUR SOS */
-          <View style={{ gap: 14 }}>
-            <Text style={styles.brandWordmark}>ejeephero</Text>
-            <Text accessibilityRole="header" style={styles.countdownHeading}>
-              Preparing your SOS
-            </Text>
-
-            <View style={styles.countdownBox}>
-              <Text accessibilityLiveRegion="polite" style={styles.countdownNumber}>
-                {count}
-              </Text>
-              <Text style={styles.countdownSub}>seconds to cancel</Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
-              <Text style={styles.infoText}>Getting your precise location...</Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Ionicons name="bus-outline" size={20} color={Colors.brandGreen} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.infoTitle}>Unit {unitLabel}</Text>
-                <Text style={styles.infoSub}>Location, time and ride details will be included.</Text>
-              </View>
-            </View>
-
-            <Text style={styles.dispatchCaption}>Dispatch starts when the countdown ends.</Text>
-
-            <TouchableOpacity accessibilityRole="button" style={styles.cancelOutlineBtn} onPress={close}>
-              <Text style={styles.cancelOutlineText}>Cancel SOS</Text>
-            </TouchableOpacity>
+        {count !== null ? <>
+          <Text accessibilityRole="header" style={s.title}>Preparing your SOS</Text>
+          <View style={styles.countdown}>
+            <Text accessibilityLiveRegion="polite" style={styles.number}>{count}</Text>
+            <Text style={s.label}>seconds to cancel</Text>
           </View>
-        ) : (
-          /* BOARD 03 RIGHT: DISPATCH NOT CONFIRMED / SMS BACKUP */
-          <View style={{ gap: 14 }}>
-            <TouchableOpacity accessibilityRole="button" onPress={close} style={styles.backSafetyRow}>
-              <Ionicons name="chevron-back" size={20} color={Colors.ink} />
-              <Text style={styles.backSafetyText}>Safety</Text>
-            </TouchableOpacity>
-
-            <View style={styles.warningTitleRow}>
-              <View style={styles.amberIconCircle}>
-                <Ionicons name="warning-outline" size={24} color={Colors.warning} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text accessibilityRole="header" style={styles.fallbackHeading}>
-                  {phase === 'locating' || phase === 'opening' ? 'Preparing alert…' : 'Dispatch not confirmed'}
-                </Text>
-                <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.subtitle}>
-                  {status || "We couldn't confirm your alert. Send an SMS as a backup."}
-                </Text>
-              </View>
+          <TouchableOpacity accessibilityRole="button" onPress={close} style={s.button}>
+            <Text style={s.buttonText}>Cancel SOS</Text>
+          </TouchableOpacity>
+          <Text style={s.body}>Dispatch starts when the countdown ends. SOS is checking your location.</Text>
+          <View style={styles.ride}>
+            <Ionicons aria-hidden name="bus-outline" size={22} color={Colors.action} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.label}>{activeVehicleBody ? `Linked unit ${activeVehicleBody}` : 'No linked unit'}</Text>
+              {activeVehiclePlate && <Text style={s.muted}>Plate {activeVehiclePlate}</Text>}
             </View>
-
-            {(phase === 'locating' || phase === 'opening') && (
-              <ActivityIndicator color={Colors.brandGreen} style={{ marginVertical: 6 }} />
-            )}
-
-            <View style={{ gap: 6 }}>
-              <Text style={s.label}>Your SOS message</Text>
-              <View style={styles.messagePreviewBox}>
-                <Text style={styles.messagePreviewLine}>I need help.</Text>
-                <Text style={styles.messagePreviewLine}>
-                  Unit {activeVehicleBody || 'Not selected'} · Plate {activeVehiclePlate || 'Not selected'}
-                </Text>
-                <Text style={styles.messagePreviewSub}>
-                  {fix
-                    ? `Location captured at ${new Date(fix.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                    : 'Location link and timestamp included'}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={s.muted}>
-              {contactsLoaded
-                ? `Messages will open for you to review and send (${contacts.length} saved contact${contacts.length === 1 ? '' : 's'}).`
-                : 'Messages will open for you to review and send.'}
-            </Text>
-
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={s.button}
-              onPress={() => {
-                void openMessages();
-              }}
-            >
-              <Text style={s.buttonText}>Open Messages</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity accessibilityRole="button" onPress={close} style={styles.backLinkCenter}>
-              <Text style={styles.backLinkText}>Back to Safety</Text>
-            </TouchableOpacity>
-
-            <View style={s.divider} />
-            <EmergencyHotlines />
           </View>
-        )}
+        </> : <>
+          <View style={styles.statusRow}>
+            {preparing ? <ActivityIndicator color={Colors.action} />
+              : <Ionicons aria-hidden name={phase === 'accepted' ? 'checkmark-circle-outline' : phase === 'ready' ? 'chatbubble-outline' : 'warning-outline'}
+                size={26} color={phase === 'accepted' ? Colors.success : phase === 'ready' ? Colors.action : Colors.warning} />}
+            <Text accessibilityRole="header" style={[s.sectionTitle, { flex: 1 }]}>{heading}</Text>
+          </View>
+          <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.body}>{status}</Text>
+          {!preparing && phase !== 'accepted' && <>
+            <TouchableOpacity accessibilityRole="button" onPress={() => void openMessages()} style={s.button}>
+              <Ionicons aria-hidden name="chatbubble-outline" size={20} color={Colors.white} /><Text style={s.buttonText}>Open Messages</Text>
+            </TouchableOpacity>
+            <Text style={s.muted}>{contacts.length ? `Review the message for ${contacts.length} saved contact${contacts.length === 1 ? '' : 's'} before sending.` : 'Choose a recipient in Messages before sending.'}</Text>
+          </>}
+          {!!message && !preparing && phase !== 'accepted' && <View style={styles.preview}>
+            <Text style={s.label}>SMS message</Text>
+            <Text selectable style={s.body}>{message}</Text>
+          </View>}
+          <EmergencyHotlines />
+          <TouchableOpacity accessibilityRole="button" onPress={close} style={[s.button, s.secondary]}>
+            <Text style={s.link}>Back to Safety</Text>
+          </TouchableOpacity>
+        </>}
       </BottomSheetModal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  sosTrigger: {
-    minHeight: 60,
-    borderRadius: 12,
-    backgroundColor: Colors.primaryRed,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 20,
-  },
-  sosTriggerText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  brandWordmark: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.brandGreen,
-  },
-  countdownHeading: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.ink,
-    textAlign: 'center',
-  },
-  countdownBox: {
-    backgroundColor: Colors.dangerBg,
-    borderRadius: 16,
-    paddingVertical: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countdownNumber: {
-    fontSize: 64,
-    fontWeight: '800',
-    color: Colors.primaryRed,
-    fontVariant: ['tabular-nums'],
-    lineHeight: 70,
-  },
-  countdownSub: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.ink,
-    marginTop: 2,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  infoText: {
-    fontSize: 15,
-    color: Colors.ink,
-    fontWeight: '500',
-  },
-  infoTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  infoSub: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    marginTop: 2,
-  },
-  dispatchCaption: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    textAlign: 'center',
-  },
-  cancelOutlineBtn: {
-    minHeight: 54,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.ink,
-    backgroundColor: Colors.paper,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  cancelOutlineText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  backSafetyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  backSafetyText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  warningTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  amberIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.warningBg,
-    borderWidth: 1,
-    borderColor: Colors.warningBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fallbackHeading: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  messagePreviewBox: {
-    backgroundColor: Colors.canvas,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    padding: 14,
-    gap: 4,
-  },
-  messagePreviewLine: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  messagePreviewSub: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    marginTop: 2,
-  },
-  backLinkCenter: {
-    alignSelf: 'center',
-    paddingVertical: 6,
-  },
-  backLinkText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
+  sosTrigger: { minHeight: 54, backgroundColor: Colors.primaryRed },
+  countdown: { padding: 16, borderRadius: 8, backgroundColor: Colors.dangerBg, alignItems: 'center' },
+  number: { fontSize: 64, fontWeight: '800', color: Colors.primaryRed, fontVariant: ['tabular-nums'] },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  ride: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12 },
+  preview: { gap: 6, padding: 12, borderLeftWidth: 3, borderColor: Colors.action, backgroundColor: Colors.canvas },
 });

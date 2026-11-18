@@ -6,6 +6,7 @@ import { RouteData, TerminalData, VehicleData } from '../services/offlineTransit
 import { GeofenceEvaluationResult } from '../services/geofencingService';
 import { buildJourneyMap, type WalkingRouteGeometry } from '../services/routeMap';
 import { locationQuality, validPoint } from '../services/locationQuality';
+import MapcnPassengerMap from './MapcnPassengerMap';
 
 export interface LeafletMapRef {
   centerOn: (latitude: number, longitude: number, zoom?: number) => void;
@@ -16,6 +17,7 @@ export interface LeafletMapRef {
 }
 
 export interface LeafletMapProps {
+  preferMapcn?: boolean;
   routes: RouteData[];
   terminals: TerminalData[];
   vehicles: VehicleData[];
@@ -38,6 +40,7 @@ export interface LeafletMapProps {
 }
 
 const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
+  preferMapcn = false,
   routes,
   terminals,
   vehicles,
@@ -61,6 +64,10 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   const webViewRef = useRef<any>(null);
   const NativeWebView = WebView as React.ComponentType<any>;
   const isWeb = Platform.OS === 'web';
+  const mapcnControls = useRef<LeafletMapRef>(null);
+  const [mapcnFailed, setMapcnFailed] = useState(false);
+  const showMapcn = isWeb && preferMapcn && !isOffline && !mapcnFailed;
+  const onMapcnFailure = React.useCallback(() => setMapcnFailed(true), []);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
@@ -68,6 +75,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   // Expose imperative methods to parent (like recenter)
   useImperativeHandle(ref, () => ({
     centerOn: (latitude: number, longitude: number, zoom = 16) => {
+      if (showMapcn) return mapcnControls.current?.centerOn(latitude, longitude, zoom);
       if (!validPoint({ latitude, longitude }) || !Number.isFinite(zoom)) return;
       const clampedZoom = Math.min(Math.max(zoom, 3), 19);
       const js = `if (window.leafletMap) { window.leafletMap.flyTo([${latitude}, ${longitude}], ${clampedZoom}, { duration: 0.8 }); }`;
@@ -78,6 +86,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       }
     },
     animateToRegion: (region) => {
+      if (showMapcn) return mapcnControls.current?.animateToRegion(region);
       if (!validPoint(region)) return;
       const rawZoom = region.latitudeDelta && region.latitudeDelta < 0.01 ? 17 : 16;
       const clampedZoom = Math.min(Math.max(rawZoom, 3), 19);
@@ -88,19 +97,18 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         webViewRef.current?.injectJavaScript(js + '; true;');
       }
     },
-  }));
+  }), [isWeb, showMapcn]);
 
   // Serializable payload for the webview
   const journeyMap = useMemo(() => buildJourneyMap({ routes, terminals, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes }), [routes, terminals, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes]);
-  const mapData = useMemo(() => ({
-    routes: journeyMap.routes.map(r => ({
+  const mapRoutes = useMemo(() => journeyMap.routes.map(r => ({
       id: r.id,
       name: r.name,
       color_code: r.color_code,
       coordinates: r.coordinates,
       isSelected: r.id === selectedRouteId,
-    })),
-    terminals: journeyMap.terminals.map(t => ({
+    })), [journeyMap.routes, selectedRouteId]);
+  const mapTerminals = useMemo(() => journeyMap.terminals.map(t => ({
       id: t.id,
       name: t.name,
       latitude: t.latitude,
@@ -109,7 +117,10 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       isInside: geofenceResult?.currentZone?.id === t.id,
       isSelected: selectedTerminal?.id === t.id,
       role: t.id === boardingStop?.id ? 'Board' : t.id === alightingStop?.id ? 'Alight' : 'Stop',
-    })),
+    })), [journeyMap.terminals, geofenceResult?.currentZone?.id, selectedTerminal?.id, boardingStop?.id, alightingStop?.id]);
+  const mapData = useMemo(() => ({
+    routes: mapRoutes,
+    terminals: mapTerminals,
     vehicles: vehicles.filter(v => !v.is_sample && ['live', 'weak'].includes(locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now))).map(v => ({
       id: v.id,
       body_number: v.body_number,
@@ -139,19 +150,17 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     hideOccupancy,
     isOffline: Boolean(isOffline),
   }), [
-    routes,
-    terminals,
+    mapRoutes,
+    mapTerminals,
     vehicles,
     userLocation,
     destinationPlace,
     hideOccupancy,
-    geofenceResult,
-    selectedTerminal,
     selectedVehicle,
     vehicleSelectionKey,
     vehicleFocusRequestId,
     isOffline,
-    journeyMap, selectedRouteId, boardingStop, alightingStop, now,
+    journeyMap, selectedRouteId, now,
   ]);
 
   const initialDataRef = useRef(mapData);
@@ -668,6 +677,9 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   };
 
   if (isWeb) {
+    if (showMapcn) {
+      return <MapcnPassengerMap data={mapData} controls={mapcnControls} onFailure={onMapcnFailure} onSelect={handleRawMessage} />;
+    }
     return (
       <View style={styles.container}>
         <iframe

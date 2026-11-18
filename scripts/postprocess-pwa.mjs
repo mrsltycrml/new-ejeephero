@@ -29,17 +29,18 @@ if (fs.existsSync(appleIconSrc)) {
   }
 }
 
+const { expo } = JSON.parse(fs.readFileSync(path.join(rootDir, 'app.json'), 'utf8'));
 const manifest = {
-  name: 'ejeephero: Makati e-Jeepney Tracker',
-  short_name: 'ejeephero',
+  name: expo.web.name,
+  short_name: expo.web.shortName,
   description: 'Real-time Makati e-Jeepney tracker, fare calculator, and commuter safety app.',
   start_url: '/',
   id: '/',
   scope: '/',
   display: 'standalone',
   orientation: 'portrait',
-  background_color: '#FFFFFF',
-  theme_color: '#FFFFFF',
+  background_color: expo.web.backgroundColor,
+  theme_color: expo.web.themeColor,
   icons: [
     {
       src: '/icon-512.png',
@@ -64,23 +65,23 @@ if (fs.existsSync(indexPath)) {
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="ejeephero" />
-    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="apple-mobile-web-app-title" content="${manifest.short_name}" />
+    <meta name="theme-color" content="${manifest.theme_color}" />
     <style>
-      html,body{margin:0!important;padding:0!important;width:100%!important;height:100vh!important;height:100dvh!important;background:#FFFFFF!important;overflow:hidden!important;overscroll-behavior:none!important}
-      #root{position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;display:flex!important;flex-direction:column!important;min-width:0!important;width:100%!important;height:100vh!important;height:100dvh!important;background:#FFFFFF!important;padding-top:env(safe-area-inset-top,0px)!important;padding-right:env(safe-area-inset-right,0px)!important;padding-bottom:env(safe-area-inset-bottom,0px)!important;padding-left:env(safe-area-inset-left,0px)!important;box-sizing:border-box!important;overflow:hidden!important}
-      input,textarea{font-size:16px!important;caret-color:#087A55}::selection{background:#E7F3EB;color:#172B24}
-      button:focus-visible,[role=button]:focus-visible,[role=tab]:focus-visible,a:focus-visible{outline:2px solid #087A55;outline-offset:2px}
+      html,body{margin:0!important;padding:0!important;width:100%!important;height:100vh!important;height:100dvh!important;background:${manifest.background_color}!important;overflow:hidden!important;overscroll-behavior:none!important}
+      #root{position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;display:flex!important;flex-direction:column!important;min-width:0!important;width:100%!important;height:100vh!important;height:100dvh!important;background:${manifest.background_color}!important;padding-top:env(safe-area-inset-top,0px)!important;padding-right:env(safe-area-inset-right,0px)!important;padding-bottom:env(safe-area-inset-bottom,0px)!important;padding-left:env(safe-area-inset-left,0px)!important;box-sizing:border-box!important;overflow:hidden!important}
+      input,textarea{font-size:16px!important;caret-color:#164BB6}::selection{background:#E9F0FF;color:#13263F}
+      button:focus-visible,[role=button]:focus-visible,[role=tab]:focus-visible,a:focus-visible{outline:2px solid #164BB6;outline-offset:2px}
       @media(hover:hover) and (pointer:fine){button,[role=button]{transition:opacity 120ms cubic-bezier(.23,1,.32,1)}}
       @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
     </style>
   `;
-  html = html.replace(/<meta name="theme-color" content="[^"]*">/g, '<meta name="theme-color" content="#FFFFFF">');
+  html = html.replace(/<meta name="theme-color" content="[^"]*">/g, `<meta name="theme-color" content="${manifest.theme_color}">`);
   if (!html.includes('rel="manifest"')) {
     html = html.replace('</head>', `${pwaMeta}</head>`);
     html = html.replace(
       /name="viewport" content="[^"]*"/,
-      'name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"',
+      'name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"',
     );
     fs.writeFileSync(indexPath, html, 'utf8');
   }

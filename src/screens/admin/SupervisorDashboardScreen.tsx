@@ -5,13 +5,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { BottomSheetModal, ScreenSkeleton, triggerHaptic } from '../../components/AppUI';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
+import { operationsStyles as ops } from './operationsStyles';
+import RouteLineEditor from '../../components/RouteLineEditor';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
 import { offlineTransit } from '../../services/offlineTransitService';
@@ -24,7 +25,6 @@ import { locationQuality, telemetryFix, type MeasuredFix } from '../../services/
 import {
   currentReportingPeriod,
   formatReportingPeriod,
-  periodContains,
   periodRangeUtc,
   type ReportingPeriod,
 } from '../../utils/reportingPeriod';
@@ -119,6 +119,15 @@ function initialsOf(name: string): string {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
+function FlagStatus({ status }: { status: Violation['status'] }) {
+  const [label, backgroundColor, color] = status === 'confirmed'
+    ? ['Confirmed', Colors.dangerBg, Colors.primaryRed]
+    : status === 'dismissed'
+      ? ['Dismissed', Colors.mutedBackground, Colors.subtleGray]
+      : ['Pending review', Colors.warningBg, Colors.warning];
+  return <Text style={[styles.flagStatus, { backgroundColor, color }]}>{label}</Text>;
+}
+
 export default function SupervisorDashboardScreen() {
   const route = useRoute<any>();
   const requestedTrackKey = typeof route.params?.trackUnitKey === 'string' ? route.params.trackUnitKey : null;
@@ -139,7 +148,6 @@ export default function SupervisorDashboardScreen() {
   const [vehicleFocusRequestId, setVehicleFocusRequestId] = useState<string | number>();
   const [routeMenuOpen, setRouteMenuOpen] = useState(false);
   const [unitMenuOpen, setUnitMenuOpen] = useState(false);
-  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [activityView, setActivityView] = useState<'map' | 'live' | 'grades' | 'speed' | 'cuts'>('map');
   const [driverNames, setDriverNames] = useState<Map<string, string>>(new Map());
   const [unitDetails, setUnitDetails] = useState<Map<string, string>>(new Map());
@@ -150,7 +158,7 @@ export default function SupervisorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [manageMode, setManageMode] = useState<'none' | 'list'>('none');
+  const [manageMode, setManageMode] = useState<'none' | 'list' | 'line'>('none');
   const [dataError, setDataError] = useState('');
   const [transitNotice, setTransitNotice] = useState('');
 
@@ -363,6 +371,10 @@ export default function SupervisorDashboardScreen() {
   const allCuts = violations;
   const pendingCount = allCuts.filter((item) => item.status === 'pending_review' || item.status === 'flagged').length;
 
+  const visibleCuts = allCuts.filter(item => cutFilter === 'pending'
+    ? item.status === 'pending_review' || item.status === 'flagged'
+    : item.status === cutFilter);
+
   const mapVehicles = useMemo(
     () =>
       vehicles.filter(
@@ -397,16 +409,24 @@ export default function SupervisorDashboardScreen() {
     return { ...unit, quality, stale: quality !== 'live', speed: quality === 'live' ? unit.fix?.speed ?? null : null };
   });
 
-  if (loading) return <ScreenSkeleton preset="dashboard" />;
-  if (dataError) return <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}><Text accessibilityRole="alert">{dataError}</Text></ScrollView>;
+  const gpsIssueCount = currentLiveUnits.filter(unit => unit.stale).length;
 
+  if (loading) return <ScreenSkeleton preset="dashboard" />;
+  if (dataError) return <ScrollView style={ops.page} contentContainerStyle={ops.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}><Text accessibilityRole="alert" style={ops.errorBanner}>{dataError}</Text></ScrollView>;
+
+  if (manageMode === 'line') return <RouteLineEditor routes={routes} onPublished={loadDashboard} onBack={() => setManageMode('list')} />;
   if (manageMode === 'list') return (
-    <View style={styles.container}>
-      <TouchableOpacity accessibilityRole="button" onPress={() => setManageMode('none')} style={styles.backNavRow}>
-        <Ionicons name="chevron-back" size={22} color={Colors.ink} />
-        <Text style={styles.pageTitle}>Routes</Text>
-      </TouchableOpacity>
-      <Text style={styles.rowSub}>Published routes are read-only here. Route editing and driver assignment are unavailable in this app.</Text>
+    <View style={ops.page}>
+      <View style={styles.routeToolbar}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to fleet monitor" onPress={() => setManageMode('none')} style={styles.backNavRow}>
+          <Ionicons name="chevron-back" size={20} color={Colors.action} />
+          <Text style={styles.routeActionText}>Fleet monitor</Text>
+        </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => setManageMode('line')} style={styles.backNavRow}>
+          <Ionicons name="git-branch-outline" size={20} color={Colors.action} />
+          <Text style={styles.routeActionText}>Set verified route line</Text>
+        </TouchableOpacity>
+      </View>
       <DirectoryScreen />
     </View>
   );
@@ -424,114 +444,30 @@ export default function SupervisorDashboardScreen() {
     live: 'Live speeds',
     grades: 'Driver grades',
     speed: 'Speeding',
-    cuts: 'Trip cuts',
+    cuts: 'Route flags',
   };
 
   return (
     <>
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
+        style={ops.page}
+        contentContainerStyle={ops.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text style={styles.pageTitle}>Fleet monitor</Text>
-
-        {/* Route & Unit Dropdown Row */}
-        <View style={styles.filterDropdownRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => {
-              setRouteMenuOpen(!routeMenuOpen);
-              setUnitMenuOpen(false);
-              setViewMenuOpen(false);
-            }}
-            style={styles.dropdownPill}
-          >
-            <Text style={styles.dropdownPillText} numberOfLines={1}>
-              {activeRouteLabel}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={Colors.subtleGray} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => {
-              setUnitMenuOpen(!unitMenuOpen);
-              setRouteMenuOpen(false);
-              setViewMenuOpen(false);
-            }}
-            style={styles.dropdownPill}
-          >
-            <Text style={styles.dropdownPillText} numberOfLines={1}>
-              {activeUnitLabel}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={Colors.subtleGray} />
-          </TouchableOpacity>
+        <View style={ops.masthead}>
+          <Text accessibilityRole="header" style={ops.mastheadTitle}>Fleet monitor</Text>
+          <Text style={ops.mastheadMeta}>{formatReportingPeriod(period)}</Text>
         </View>
 
-        {routeMenuOpen && (
-          <View style={styles.dropdownMenu}>
-            <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={() => {
-                setMapRouteFilter('all');
-                setRouteMenuOpen(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>All active routes</Text>
-            </TouchableOpacity>
-            {routes.map((r) => (
-              <TouchableOpacity
-                key={r.id}
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setMapRouteFilter(r.id);
-                  setRouteMenuOpen(false);
-                }}
-              >
-                <Text style={styles.dropdownItemText}>{r.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {unitMenuOpen && (
-          <View style={styles.dropdownMenu}>
-            <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={() => {
-                setMapUnitFilter('all');
-                setUnitMenuOpen(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>All units</Text>
-            </TouchableOpacity>
-            {shownUnitChoices.map((u) => (
-              <TouchableOpacity
-                key={u.key}
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setMapUnitFilter(u.key);
-                  setUnitMenuOpen(false);
-                }}
-              >
-                <Text style={styles.dropdownItemText}>{u.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
         {!!transitNotice && <Text accessibilityRole="alert" style={styles.rowSub}>{transitNotice}</Text>}
-        <Text style={styles.scopeDateText}>{formatReportingPeriod(period)}</Text>
 
-        {/* 2x2 KPI Grid */}
         <View style={styles.kpiGrid}>
           <View style={[styles.kpiTile, styles.kpiTileGreen]}>
             <View style={styles.kpiTopRow}>
               <Text style={styles.kpiLabel}>Live units</Text>
               <Ionicons name="bus-outline" size={17} color={Colors.brandGreen} />
             </View>
-            <Text style={styles.kpiNumber}>{liveUnits.filter(unit => locationQuality(unit.fix, telemetryNow) === 'live').length}</Text>
+            <Text style={styles.kpiNumber}>{currentLiveUnits.length - gpsIssueCount}</Text>
           </View>
 
           <View style={styles.kpiTile}>
@@ -552,112 +488,201 @@ export default function SupervisorDashboardScreen() {
 
           <View style={[styles.kpiTile, styles.kpiTileAmber]}>
             <View style={styles.kpiTopRow}>
-              <Text style={styles.kpiLabel}>Route flags</Text>
+              <Text style={styles.kpiLabel}>Pending flags</Text>
               <Ionicons name="flag-outline" size={17} color={Colors.warning} />
             </View>
             <Text style={styles.kpiNumber}>{pendingCount}</Text>
           </View>
         </View>
 
-        {/* View Selector Dropdown */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => {
-            setViewMenuOpen(!viewMenuOpen);
-            setRouteMenuOpen(false);
-            setUnitMenuOpen(false);
-          }}
-          style={styles.viewSelectorBtn}
-        >
-          <Text style={styles.viewSelectorText}>View: {viewLabels[activityView]}</Text>
-          <Ionicons name={viewMenuOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.ink} />
-        </TouchableOpacity>
+        <View style={ops.segmentBar}>
+          {(['map', 'live', 'grades', 'speed', 'cuts'] as const).map(key => (
+            <TouchableOpacity
+              key={key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: activityView === key }}
+              onPress={() => {
+                setActivityView(key);
+                setRouteMenuOpen(false);
+                setUnitMenuOpen(false);
+              }}
+              style={[ops.segmentBtn, activityView === key && ops.segmentBtnActive]}
+            >
+              <Text style={[ops.segmentText, activityView === key && ops.segmentTextActive]}>{viewLabels[key]}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        {viewMenuOpen && (
-          <View style={styles.dropdownMenu}>
-            {(['map', 'live', 'grades', 'speed', 'cuts'] as const).map((key) => (
-              <TouchableOpacity
-                key={key}
-                style={[styles.dropdownItem, activityView === key && { backgroundColor: Colors.paleGreen }]}
-                onPress={() => {
-                  setActivityView(key);
-                  setViewMenuOpen(false);
-                }}
-              >
-                <Text style={[styles.dropdownItemText, activityView === key && { fontWeight: '700' }]}>
-                  {viewLabels[key]}
-                </Text>
-                {activityView === key && <Ionicons name="checkmark" size={18} color={Colors.brandGreen} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {activityView === 'live' && !liveUnits.length && <Text style={styles.rowSub}>No active units.</Text>}
-        {activityView === 'grades' && !scorecards.length && <Text style={styles.rowSub}>No driver records.</Text>}
-        {activityView === 'speed' && !speedEvents.length && <Text style={styles.rowSub}>No speed offenses in this period.</Text>}
-        {activityView === 'cuts' && !allCuts.length && <Text style={styles.rowSub}>No route flags in this period.</Text>}
-        {/* 1) VIEW: LIVE MAP */}
-        {activityView === 'map' && (
-          <View style={{ gap: 12 }}>
-            <View style={styles.mapFrame}>
-              <LeafletMap
-                routes={mapRoutes}
-                terminals={mapTerminals}
-                vehicles={mapVehicles}
-                selectedVehicle={selectedMapVehicle}
-                vehicleSelectionKey={mapUnitFilter === 'all' ? null : mapUnitFilter}
-                vehicleFocusRequestId={vehicleFocusRequestId}
-                selectedRouteId={mapRouteFilter === 'all' ? null : mapRouteFilter}
-                fleetMode
-              />
-            </View>
-
-            <View style={styles.staleBanner}>
-              <Ionicons name="warning-outline" size={18} color={Colors.warning} />
-              <Text style={styles.staleBannerText}>{currentLiveUnits.filter(unit => unit.stale).length} active shifts have stale, weak or unavailable GPS</Text>
-            </View>
-
-            <View style={styles.dividerList}>
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={() => setManageMode('list')}
-                style={styles.listRow}
-              >
-                <View style={styles.routeIconCircle}>
-                  <Ionicons name="git-branch-outline" size={19} color={Colors.brandGreen} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>View routes</Text>
-                  <Text style={styles.rowSub}>Published routes and verified stops</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={() => setActivityView('cuts')}
-                style={styles.listRow}
-              >
-                <View style={[styles.routeIconCircle, { backgroundColor: Colors.warningBg }]}>
-                  <Ionicons name="flag-outline" size={19} color={Colors.warning} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>Review route flags</Text>
-                  <Text style={styles.rowSub}>Pending route compliance queue</Text>
-                </View>
-                <View style={[styles.statusBadge, styles.badgeAmber]}>
-                  <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>
-                    {pendingCount} pending
+        {(activityView === 'speed' || activityView === 'grades') && (
+          <View style={ops.segmentBar}>
+            {(['day', 'week', 'month', 'year'] as const).map((m) => {
+              const active = period.mode === m;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => setPeriod(currentReportingPeriod(m))}
+                  style={[ops.segmentBtn, active && ops.segmentBtnActive]}
+                >
+                  <Text style={[ops.segmentText, active && ops.segmentTextActive]}>
+                    {m.charAt(0).toUpperCase() + m.slice(1)}
                   </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+        {activityView === 'live' && !liveUnits.length && <Text style={ops.emptyState}>No active units.</Text>}
+        {activityView === 'grades' && !scorecards.length && <Text style={ops.emptyState}>No driver records.</Text>}
+        {activityView === 'speed' && !speedEvents.length && <Text style={ops.emptyState}>No speed offenses in this period.</Text>}
+        {activityView === 'map' && (
+          <View style={styles.mapLayout}>
+            <View style={[ops.panel, styles.mapColumn]}>
+              <View style={styles.filterDropdownRow}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Route filter, ${activeRouteLabel}`}
+                  accessibilityState={{ expanded: routeMenuOpen }}
+                  onPress={() => {
+                    setRouteMenuOpen(!routeMenuOpen);
+                    setUnitMenuOpen(false);
+                  }}
+                  style={styles.dropdownPill}
+                >
+                  <Text style={styles.dropdownPillText} numberOfLines={1}>
+                    {activeRouteLabel}
+                  </Text>
+                  <Ionicons name={routeMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.subtleGray} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Unit filter, ${activeUnitLabel}`}
+                  accessibilityState={{ expanded: unitMenuOpen }}
+                  onPress={() => {
+                    setUnitMenuOpen(!unitMenuOpen);
+                    setRouteMenuOpen(false);
+                  }}
+                  style={styles.dropdownPill}
+                >
+                  <Text style={styles.dropdownPillText} numberOfLines={1}>
+                    {activeUnitLabel}
+                  </Text>
+                  <Ionicons name={unitMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.subtleGray} />
+                </TouchableOpacity>
+              </View>
+
+              {routeMenuOpen && (
+                <View style={styles.dropdownMenu}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMapRouteFilter('all');
+                      setRouteMenuOpen(false);
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>All active routes</Text>
+                  </TouchableOpacity>
+                  {routes.map((r) => (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      key={r.id}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setMapRouteFilter(r.id);
+                        setRouteMenuOpen(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{r.name}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-              </TouchableOpacity>
+              )}
+
+              {unitMenuOpen && (
+                <View style={styles.dropdownMenu}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMapUnitFilter('all');
+                      setUnitMenuOpen(false);
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>All units</Text>
+                  </TouchableOpacity>
+                  {shownUnitChoices.map((u) => (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      key={u.key}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setMapUnitFilter(u.key);
+                        setUnitMenuOpen(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{u.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              <View style={styles.mapFrame}>
+                <LeafletMap
+                  routes={mapRoutes}
+                  terminals={mapTerminals}
+                  vehicles={mapVehicles}
+                  selectedVehicle={selectedMapVehicle}
+                  vehicleSelectionKey={mapUnitFilter === 'all' ? null : mapUnitFilter}
+                  vehicleFocusRequestId={vehicleFocusRequestId}
+                  selectedRouteId={mapRouteFilter === 'all' ? null : mapRouteFilter}
+                  fleetMode
+                />
+              </View>
+            </View>
+
+            <View style={styles.mapActions}>
+              {gpsIssueCount > 0 && <View style={styles.staleBanner}>
+                <Ionicons name="warning-outline" size={18} color={Colors.warning} />
+                <Text style={styles.staleBannerText}>{gpsIssueCount} {gpsIssueCount === 1 ? 'active shift has' : 'active shifts have'} stale, weak or unavailable GPS</Text>
+              </View>}
+
+              <View style={ops.panel}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => setManageMode('list')}
+                  style={styles.listRow}
+                >
+                  <View style={styles.routeIconCircle}>
+                    <Ionicons name="git-branch-outline" size={19} color={Colors.action} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>View routes</Text>
+                    <Text style={styles.rowSub}>Published routes and verified stops</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => setActivityView('cuts')}
+                  style={styles.listRow}
+                >
+                  <View style={[styles.routeIconCircle, { backgroundColor: Colors.warningBg }]}>
+                    <Ionicons name="flag-outline" size={19} color={Colors.warning} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>Review route flags</Text>
+                    <Text style={styles.rowSub}>{pendingCount} awaiting review</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
 
-        {/* 2) VIEW: LIVE SPEEDS */}
         {activityView === 'live' && (
           <View style={{ gap: 10 }}>
             <View style={styles.capStrip}>
@@ -665,7 +690,7 @@ export default function SupervisorDashboardScreen() {
                 Operator cap: {ESAKAY_OPERATIONS.operatorSpeedCapKph} km/h
               </Text>
             </View>
-            <View style={styles.dividerList}>
+            <View style={ops.panel}>
               {currentLiveUnits.map((unit) => (
                 <View key={unit.id} style={styles.listRow}>
                   <View style={{ flex: 1 }}>
@@ -707,34 +732,17 @@ export default function SupervisorDashboardScreen() {
           </View>
         )}
 
-        {/* 3) VIEW: DRIVER GRADES */}
         {activityView === 'grades' && (
           <View style={{ gap: 12 }}>
-            <View style={styles.segmentBar}>
-              {(['day', 'week', 'month', 'year'] as const).map((m) => {
-                const active = period.mode === m;
-                return (
-                  <TouchableOpacity
-                    key={m}
-                    onPress={() => setPeriod(currentReportingPeriod(m))}
-                    style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-                  >
-                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                      {m.charAt(0).toUpperCase() + m.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
 
-            <View style={styles.dividerList}>
+            <View style={ops.panel}>
               {scorecards.map((item) => (
                 <View key={item.driverId} style={styles.listRow}>
                   <View style={styles.initialsCircle}>
                     <Text style={styles.initialsText}>{initialsOf(item.name)}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={styles.rowHeading}>
                       <Text style={styles.rowTitle}>{item.name}</Text>
                       <Text style={styles.gradeRatio}>
                         {item.score} <Text style={styles.gradeDenom}>/ 100</Text>
@@ -761,25 +769,8 @@ export default function SupervisorDashboardScreen() {
           </View>
         )}
 
-        {/* 4) VIEW: SPEEDING */}
         {activityView === 'speed' && (
           <View style={{ gap: 12 }}>
-            <View style={styles.segmentBar}>
-              {(['day', 'week', 'month', 'year'] as const).map((m) => {
-                const active = period.mode === m;
-                return (
-                  <TouchableOpacity
-                    key={m}
-                    onPress={() => setPeriod(currentReportingPeriod(m))}
-                    style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-                  >
-                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                      {m.charAt(0).toUpperCase() + m.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
 
             {(speedEvents.map((ev) => ({
                   id: ev.id,
@@ -830,10 +821,9 @@ export default function SupervisorDashboardScreen() {
           </View>
         )}
 
-        {/* 5) VIEW: TRIP CUTS */}
         {activityView === 'cuts' && (
           <View style={{ gap: 12 }}>
-            <View style={styles.segmentBar}>
+            <View style={ops.segmentBar}>
               {(['pending', 'confirmed', 'dismissed'] as const).map((tab) => {
                 const active = cutFilter === tab;
                 const label =
@@ -843,61 +833,49 @@ export default function SupervisorDashboardScreen() {
                 return (
                   <TouchableOpacity
                     key={tab}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
                     onPress={() => setCutFilter(tab)}
-                    style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+                    style={[ops.segmentBtn, active && ops.segmentBtnActive]}
                   >
-                    <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+                    <Text style={[ops.segmentText, active && ops.segmentTextActive]}>{label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <View style={styles.dividerList}>
-              {allCuts
-                .filter((v) =>
-                  cutFilter === 'pending'
-                    ? v.status === 'pending_review' || v.status === 'flagged'
-                    : v.status === cutFilter
-                )
-                .map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    accessibilityRole="button"
-                    onPress={() => setSelectedViolation(item)}
-                    style={styles.listRow}
-                  >
-                    <View style={[styles.routeIconCircle, { backgroundColor: Colors.warningBg }]}>
-                      <Ionicons name="git-branch-outline" size={19} color={Colors.warning} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={styles.rowTitle}>
-                          {item.driverName || driverNames.get(item.driver_id) || 'Driver unavailable'}
-                        </Text>
-                        <View style={[styles.statusBadge, styles.badgeAmber]}>
-                          <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>
-                            {item.status === 'confirmed'
-                              ? 'Confirmed'
-                              : item.status === 'dismissed'
-                                ? 'Dismissed'
-                                : 'Pending review'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.rowSub}>
-                        {item.unitDisplay || unitLabel(item.vehicle_id, item.body_number, item.plate_number)}
+            <View style={ops.panel}>
+              {!visibleCuts.length && <Text style={ops.emptyState}>No {cutFilter} route flags in this period.</Text>}
+              {visibleCuts.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  accessibilityRole="button"
+                  onPress={() => setSelectedViolation(item)}
+                  style={styles.listRow}
+                >
+                  <View style={[styles.routeIconCircle, { backgroundColor: Colors.warningBg }]}>
+                    <Ionicons name="git-branch-outline" size={19} color={Colors.warning} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.rowHeading}>
+                      <Text style={styles.rowTitle}>
+                        {item.driverName || driverNames.get(item.driver_id) || 'Driver unavailable'}
                       </Text>
-                      <Text style={styles.rowSub}>{item.reason}</Text>
+                      <FlagStatus status={item.status} />
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-                  </TouchableOpacity>
-                ))}
+                    <Text style={styles.rowSub}>
+                      {item.unitDisplay || unitLabel(item.vehicle_id, item.body_number, item.plate_number)}
+                    </Text>
+                    <Text style={styles.rowSub}>{item.reason}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         )}
       </ScrollView>
 
-      {/* BOARD 02 RIGHT: REVIEW ROUTE FLAG BOTTOM SHEET */}
       <BottomSheetModal
         visible={Boolean(selectedViolation)}
         onClose={() => setSelectedViolation(null)}
@@ -915,9 +893,7 @@ export default function SupervisorDashboardScreen() {
               <Text style={styles.sectionTitle}>Review route flag</Text>
             </TouchableOpacity>
 
-            <View style={[styles.statusBadge, styles.badgeAmber, { alignSelf: 'flex-start' }]}>
-              <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>Pending review</Text>
-            </View>
+            <FlagStatus status={selectedViolation.status} />
 
             <Text style={styles.pageTitle}>Potential route cut</Text>
 
@@ -960,17 +936,6 @@ export default function SupervisorDashboardScreen() {
               <LeafletMap routes={mapRoutes} terminals={mapTerminals} vehicles={[]} fleetMode />
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 16, height: 3, backgroundColor: Colors.brandGreen }} />
-                <Text style={styles.rowSub}>Assigned route</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 16, height: 3, backgroundColor: Colors.warning }} />
-                <Text style={styles.rowSub}>Recorded path</Text>
-              </View>
-            </View>
-
             <Text style={styles.smallHelper}>
               Confirming adds 1 confirmed route cut (−10 points).
             </Text>
@@ -1002,35 +967,18 @@ export default function SupervisorDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.paper },
-  content: {
-    width: '100%',
-    maxWidth: 640,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 36,
-    gap: 14,
-  },
   pageTitle: {
     color: Colors.ink,
     fontSize: 26,
     fontWeight: '700',
     letterSpacing: -0.4,
   },
-  subtitleText: {
-    fontSize: 15,
-    color: Colors.subtleGray,
-  },
-  filterDropdownRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  filterDropdownRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10 },
   dropdownPill: {
     flex: 1,
     minHeight: 46,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.paper,
@@ -1047,11 +995,12 @@ const styles = StyleSheet.create({
   dropdownMenu: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: Colors.paper,
     overflow: 'hidden',
   },
   dropdownItem: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1065,77 +1014,37 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     fontWeight: '500',
   },
-  scopeDateText: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    fontWeight: '600',
-  },
-  kpiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
+  routeToolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 16, backgroundColor: Colors.paper },
+  routeActionText: { fontWeight: '700', color: Colors.action },
+  rowHeading: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   kpiTile: {
     flexGrow: 1,
-    flexBasis: '46%',
-    minHeight: 82,
-    borderRadius: 12,
-    backgroundColor: Colors.canvas,
+    flexBasis: 136,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: 14,
-    justifyContent: 'space-between',
+    borderRadius: 7,
+    backgroundColor: Colors.paper,
+    gap: 4,
   },
-  kpiTileGreen: {
-    backgroundColor: Colors.paleGreen,
-    borderColor: Colors.brandGreen,
-  },
-  kpiTileAmber: {
-    backgroundColor: Colors.warningBg,
-    borderColor: Colors.warningBorder,
-  },
+  kpiTileGreen: { borderTopColor: Colors.success, borderTopWidth: 3 },
+  kpiTileAmber: { borderTopColor: Colors.warning, borderTopWidth: 3 },
   kpiTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  kpiLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  kpiNumber: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.ink,
-    fontVariant: ['tabular-nums'],
-  },
-  viewSelectorBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 48,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.paper,
-  },
-  viewSelectorText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  mapFrame: {
-    height: 220,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
+  kpiLabel: { flexShrink: 1, fontSize: 13, fontWeight: '600', color: Colors.subtleGray },
+  kpiNumber: { fontSize: 26, fontWeight: '800', color: Colors.ink, fontVariant: ['tabular-nums'] },
+  mapLayout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 12 },
+  mapColumn: { flexBasis: 510, flexGrow: 3, flexShrink: 1, minWidth: 0 },
+  mapActions: { flexBasis: 260, flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 10 },
+  mapFrame: { height: 300, overflow: 'hidden', borderTopWidth: 1, borderColor: Colors.border, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
   mapFrameSmall: {
     height: 170,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
@@ -1147,48 +1056,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.warningBg,
     borderWidth: 1,
     borderColor: Colors.warningBorder,
-    borderRadius: 12,
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
   staleBannerText: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '700',
     color: Colors.warning,
   },
-  dividerList: {
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-  },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
+    gap: 10,
+    padding: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
-  routeIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initialsCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initialsText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: Colors.brandGreen,
-  },
+  routeIconCircle: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.actionTint, alignItems: 'center', justifyContent: 'center' },
+  initialsCircle: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.mutedBackground, alignItems: 'center', justifyContent: 'center' },
+  initialsText: { fontSize: 14, fontWeight: '800', color: Colors.ink },
   rowTitle: {
     fontSize: 16,
     fontWeight: '700',
@@ -1199,37 +1087,7 @@ const styles = StyleSheet.create({
     color: Colors.subtleGray,
     marginTop: 2,
   },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  badgeGreen: {
-    backgroundColor: Colors.paleGreen,
-  },
-  badgeAmber: {
-    backgroundColor: Colors.warningBg,
-    borderWidth: 1,
-    borderColor: Colors.warningBorder,
-  },
-  badgeGray: {
-    backgroundColor: Colors.canvas,
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  badgeGreenText: {
-    color: Colors.brandGreen,
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  badgeAmberText: {
-    color: Colors.warning,
-  },
-  badgeGrayText: {
-    color: Colors.subtleGray,
-  },
+  flagStatus: { alignSelf: 'flex-start', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, fontSize: 12, fontWeight: '700' },
   capStrip: {
     backgroundColor: Colors.canvas,
     borderRadius: 10,
@@ -1252,33 +1110,6 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     fontVariant: ['tabular-nums'],
   },
-  segmentBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.canvas,
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  segmentBtn: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentBtnActive: {
-    backgroundColor: Colors.brandGreen,
-  },
-  segmentText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  segmentTextActive: {
-    color: Colors.white,
-    fontWeight: '700',
-  },
   gradeRatio: {
     fontSize: 17,
     fontWeight: '800',
@@ -1291,7 +1122,7 @@ const styles = StyleSheet.create({
   speedOffenseCard: {
     borderWidth: 1.5,
     borderColor: Colors.primaryRed,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 14,
     gap: 12,
     backgroundColor: Colors.paper,
@@ -1313,127 +1144,34 @@ const styles = StyleSheet.create({
     color: Colors.subtleGray,
   },
   kvValue: {
+    flexShrink: 1,
+    textAlign: 'right',
     fontSize: 14,
     fontWeight: '700',
     color: Colors.ink,
   },
-  topActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  topAddBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  topAddText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.paper,
-  },
-  searchBarInput: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.ink,
-  },
-  restoreOutlineBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.brandGreen,
-  },
-  restoreOutlineText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
+  backNavRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 6 },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '700',
     color: Colors.ink,
   },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  textInput: {
-    minHeight: 50,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    color: Colors.ink,
-    backgroundColor: Colors.paper,
-  },
-  stopNumBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: Colors.paleGreen,
-    borderWidth: 1,
-    borderColor: Colors.brandGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopNumText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: Colors.brandGreen,
-  },
   primaryBtn: {
-    minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: Colors.brandGreen,
+    minHeight: 48,
+    borderRadius: 8,
+    backgroundColor: Colors.action,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
-  },
-  disabledBtn: {
-    backgroundColor: '#D5DBD6',
   },
   primaryBtnText: {
     fontSize: 16,
     fontWeight: '700',
     color: Colors.white,
   },
-  outlineGreenBtn: {
-    minHeight: 50,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.brandGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  outlineGreenText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
   outlineDarkBtn: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: Colors.ink,
     alignItems: 'center',
@@ -1448,24 +1186,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.subtleGray,
     lineHeight: 18,
-  },
-  radioCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.paper,
-  },
-  radioCardSelected: {
-    backgroundColor: Colors.paleGreen,
-    borderColor: Colors.brandGreen,
-    borderWidth: 1.5,
-  },
-  radioCardDisabled: {
-    backgroundColor: Colors.canvas,
-    opacity: 0.75,
   },
 });

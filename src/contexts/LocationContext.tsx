@@ -51,7 +51,7 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
         const permission = await Location.getForegroundPermissionsAsync();
         const enabled = await Location.hasServicesEnabledAsync();
         if (cancelled) return;
-        if (permission.status !== 'granted') { stop(); setErrorMsg('Location permission needed. Use Enable location.'); return; }
+        if (permission.status !== 'granted') { stop(); setErrorMsg('Location access needed.'); return; }
         if (!enabled) { stop(); setErrorMsg('Location services are disabled. Enable device location.'); return; }
         if (subscriber) return;
         setErrorMsg(null);

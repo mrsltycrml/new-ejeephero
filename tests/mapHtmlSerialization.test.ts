@@ -9,8 +9,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 const hooks = registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === 'react-native') return { url: 'data:text/javascript,export const View="div"; export const Platform={OS:"web"}; export const StyleSheet={create:s=>s}', shortCircuit: true };
+    if (specifier === 'react-native') return { url: 'data:text/javascript,export const View="div"; export const Text="span"; export const Platform={OS:"web"}; export const StyleSheet={create:s=>s}', shortCircuit: true };
     if (specifier === 'react-native-webview') return { url: 'data:text/javascript,export const WebView="div"', shortCircuit: true };
+    if (specifier === './MapcnPassengerMap') return { url: 'data:text/javascript,' + encodeURIComponent('export default ({data}) => "Mapcn: " + data.destinationPlace?.name;'), shortCircuit: true };
     if (specifier.startsWith('.') && !/\.[cm]?[jt]sx?$/.test(specifier)) return next(`${specifier}.ts`, context);
     return next(specifier, context);
   },
@@ -21,6 +22,14 @@ const hooks = registerHooks({
 });
 const { default: LeafletMap } = await import('../src/components/LeafletMap.tsx');
 hooks.deregister();
+
+test('the passenger web map defaults to mapcn and keeps Leaflet available offline', () => {
+  const props = { preferMapcn: true, routes: [], terminals: [], vehicles: [], destinationPlace: { name: 'City Hall', latitude: 14.58, longitude: 121.04 } };
+  const online = renderToStaticMarkup(React.createElement(LeafletMap, props));
+  assert.equal(online, 'Mapcn: City Hall');
+  const offline = renderToStaticMarkup(React.createElement(LeafletMap, { ...props, isOffline: true }));
+  assert.match(offline, /title="Leaflet Map"/);
+});
 
 test('serialized map executes safely, frames journeys, preserves camera on telemetry and dispatches stop clicks', () => {
   const a = { latitude: 14.6, longitude: 121 }, b = { latitude: 14.61, longitude: 121.01 };

@@ -124,45 +124,43 @@ export default function RecordsScreen() {
         />
       }
     >
-      <View style={{ gap: 2 }}>
-        <Text style={styles.title}>Records</Text>
-        <Text style={styles.subtitle}>Company Safety Grade</Text>
-      </View>
-
-      {/* 4-Segment Period Control */}
-      <View style={styles.segmentBar}>
-        {(
-          [
-            { key: 'day', label: 'Day' },
-            { key: 'week', label: 'Week' },
-            { key: 'month', label: 'Month' },
-            { key: 'year', label: 'Year' },
-          ] as const
-        ).map((m) => {
-          const active = period.mode === m.key;
-          return (
-            <TouchableOpacity
-              key={m.key}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              onPress={() => setPeriod(currentReportingPeriod(m.key))}
-              style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-            >
-              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{m.label}</Text>
+      <View style={styles.periodPanel}>
+        <View style={styles.masthead}>
+          <Text accessibilityRole="header" style={styles.title}>Safety records</Text>
+          <View style={styles.dateNavRow}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous reporting period" onPress={() => stepPeriod(-1)} style={styles.arrowBtn}>
+              <Ionicons name="chevron-back" size={20} color={Colors.onDark} />
             </TouchableOpacity>
-          );
-        })}
-      </View>
+            <Text style={styles.dateNavText}>{formatReportingPeriod(period)}</Text>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next reporting period" onPress={() => stepPeriod(1)} style={styles.arrowBtn}>
+              <Ionicons name="chevron-forward" size={20} color={Colors.onDark} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.segmentBar}>
+          {(
+            [
+              { key: 'day', label: 'Day' },
+              { key: 'week', label: 'Week' },
+              { key: 'month', label: 'Month' },
+              { key: 'year', label: 'Year' },
+            ] as const
+          ).map((m) => {
+            const active = period.mode === m.key;
+            return (
+              <TouchableOpacity
+                key={m.key}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => setPeriod(currentReportingPeriod(m.key))}
+                style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+              >
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{m.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-      {/* Date Navigator Row */}
-      <View style={styles.dateNavRow}>
-        <TouchableOpacity accessibilityRole="button" onPress={() => stepPeriod(-1)} style={styles.arrowBtn}>
-          <Ionicons name="chevron-back" size={18} color={Colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.dateNavText}>{formatReportingPeriod(period)}</Text>
-        <TouchableOpacity accessibilityRole="button" onPress={() => stepPeriod(1)} style={styles.arrowBtn}>
-          <Ionicons name="chevron-forward" size={18} color={Colors.ink} />
-        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -170,54 +168,47 @@ export default function RecordsScreen() {
           <SkeletonBlock height={140} />
           <SkeletonBlock height={180} />
         </View>
-      ) : loadError ? <Text accessibilityRole="alert">{loadError}</Text> : (
+      ) : loadError ? <Text accessibilityRole="alert" style={styles.error}>{loadError}</Text> : (
         <>
-          {/* Pale-Green Score Box */}
-          <View style={styles.scorePanel}>
-            <Text style={styles.scoreBig}>
-              {score} <Text style={styles.scoreDenom}>/ 100</Text>
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Ionicons
-                name={score === 100 ? 'checkmark-circle' : 'information-circle'}
-                size={16}
-                color={Colors.brandGreen}
-              />
-              <Text style={styles.scoreSubText}>
-                {score === 100 ? 'No deductions in this period' : 'Recorded deductions applied'}
+          <View style={styles.gradePanel}>
+            <View style={styles.scorePanel}>
+              <Text accessibilityRole="header" style={styles.gradeTitle}>Company safety grade</Text>
+              <Text style={styles.scoreBig}>
+                {score}<Text style={styles.scoreDenom}> / 100</Text>
               </Text>
+              <View style={styles.scoreNote}>
+                <Ionicons
+                  name={score === 100 ? 'checkmark-circle' : 'information-circle'}
+                  size={18}
+                  color={score === 100 ? Colors.success : Colors.subtleGray}
+                />
+                <Text style={styles.scoreSubText}>
+                  {score === 100 ? 'No deductions in this period' : 'Recorded deductions applied'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.breakdownList}>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Starting score</Text>
+                <Text style={styles.breakdownVal}>100</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Speed deductions</Text>
+                <Text style={styles.breakdownVal}>{speedDeduction}</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Confirmed route cuts</Text>
+                <Text style={styles.breakdownVal}>{confirmed.length}</Text>
+              </View>
+              <Text style={styles.formulaText}>100 − speed deductions − 10 × confirmed route cuts</Text>
             </View>
           </View>
 
-          {/* Clean Breakdown Rows */}
-          <View style={styles.breakdownList}>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Starting score</Text>
-              <Text style={styles.breakdownVal}>100</Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Speed deductions</Text>
-              <Text style={styles.breakdownVal}>{speedDeduction}</Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Confirmed route cuts</Text>
-              <Text style={styles.breakdownVal}>{confirmed.length}</Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={[styles.breakdownLabel, { fontWeight: '700', color: Colors.ink }]}>Safety grade</Text>
-              <Text style={[styles.breakdownVal, { fontSize: 18 }]}>{score}</Text>
-            </View>
-          </View>
-
-          <Text style={styles.formulaText}>
-            100 − speed deductions − 10 × confirmed route cuts
-          </Text>
-
-          {/* Pending Route Flag Notice */}
-          <View style={styles.pendingBanner}>
-            <Ionicons name="information-circle-outline" size={19} color={Colors.warning} style={{ marginTop: 1 }} />
+          <View style={[styles.pendingBanner, pendingCount > 0 && styles.pending]}>
+            <Ionicons name="information-circle-outline" size={19} color={pendingCount > 0 ? Colors.warning : Colors.subtleGray} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.pendingTitle}>
+              <Text style={[styles.pendingTitle, pendingCount > 0 && { color: Colors.warning }]}>
                 {pendingCount > 0
                   ? `${pendingCount} route flag${pendingCount === 1 ? '' : 's'} awaiting review`
                   : 'No route flags awaiting review'}
@@ -232,130 +223,34 @@ export default function RecordsScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: Colors.paper },
-  content: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 36,
-    gap: 16,
-  },
-  title: { color: Colors.ink, fontSize: 26, fontWeight: '700', letterSpacing: -0.4 },
-  subtitle: { color: Colors.subtleGray, fontSize: 15 },
-  segmentBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.canvas,
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  segmentBtn: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentBtnActive: {
-    backgroundColor: Colors.brandGreen,
-  },
-  segmentText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  segmentTextActive: {
-    color: Colors.white,
-    fontWeight: '700',
-  },
-  dateNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  arrowBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateNavText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  scorePanel: {
-    backgroundColor: Colors.paleGreen,
-    borderRadius: 14,
-    paddingVertical: 22,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  scoreBig: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: Colors.ink,
-    fontVariant: ['tabular-nums'],
-  },
-  scoreDenom: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.subtleGray,
-  },
-  scoreSubText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.brandGreen,
-  },
-  breakdownList: {
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  breakdownLabel: {
-    fontSize: 15,
-    color: Colors.subtleGray,
-  },
-  breakdownVal: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.ink,
-    fontVariant: ['tabular-nums'],
-  },
-  formulaText: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-  },
-  pendingBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-  },
-  pendingTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.warning,
-  },
-  pendingSub: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    marginTop: 2,
-  },
+  page: { flex: 1, backgroundColor: Colors.canvas },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 14 },
+  periodPanel: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  masthead: { backgroundColor: Colors.midnight, padding: 20, gap: 10 },
+  title: { color: Colors.onDark, fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
+  dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  arrowBtn: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.onDark, borderRadius: 6 },
+  dateNavText: { flex: 1, textAlign: 'center', fontSize: 16, color: Colors.onDark, fontWeight: '600' },
+  segmentBar: { flexDirection: 'row', paddingHorizontal: 6 },
+  segmentBtn: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  segmentBtnActive: { borderBottomColor: Colors.action },
+  segmentText: { fontSize: 14, fontWeight: '600', color: Colors.subtleGray },
+  segmentTextActive: { color: Colors.action, fontWeight: '700' },
+  gradePanel: { borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.paper },
+  scorePanel: { padding: 18, gap: 6 },
+  gradeTitle: { fontSize: 18, fontWeight: '700', color: Colors.ink },
+  scoreBig: { fontSize: 38, fontWeight: '800', color: Colors.ink, fontVariant: ['tabular-nums'] },
+  scoreDenom: { fontSize: 20, fontWeight: '500', color: Colors.subtleGray },
+  scoreNote: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  scoreSubText: { flexShrink: 1, color: Colors.ink, fontSize: 14 },
+  breakdownList: { paddingHorizontal: 18, borderTopWidth: 1, borderColor: Colors.border },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderColor: Colors.border },
+  breakdownLabel: { flex: 1, fontSize: 14, color: Colors.subtleGray },
+  breakdownVal: { fontSize: 16, fontWeight: '700', color: Colors.ink, fontVariant: ['tabular-nums'] },
+  formulaText: { fontSize: 13, lineHeight: 19, paddingVertical: 12, color: Colors.subtleGray },
+  pendingBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 8 },
+  pending: { backgroundColor: Colors.warningBg, borderColor: Colors.warningBorder },
+  pendingTitle: { fontSize: 14, fontWeight: '700', color: Colors.ink },
+  pendingSub: { fontSize: 13, lineHeight: 19, color: Colors.subtleGray, marginTop: 2 },
+  error: { backgroundColor: Colors.dangerBg, color: Colors.primaryRed, padding: 14, borderRadius: 8 },
 });

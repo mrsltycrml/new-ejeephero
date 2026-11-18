@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { acceptFix, fromDeviceLocation, locationQuality, positionPayload, telemetryFix } from '../src/services/locationQuality.ts';
+import { acceptFix, fromDeviceLocation, locationQuality, positionPayload, telemetryFix, vehicleTelemetryReadout } from '../src/services/locationQuality.ts';
 import { pickLatestFreshPositions } from '../src/utils/operationsSummary.ts';
 
 const now = Date.parse('2026-11-18T08:00:00Z');
 const fix = { latitude: 14.6, longitude: 121, accuracy: 5, timestamp: now, speed: 0, heading: null };
+test('the vehicle readout shows measured zero and withholds speed from weak or expired GPS', () => {
+  const position = { ...fix, recorded_at: new Date(now - 2000).toISOString() };
+  assert.deepEqual(vehicleTelemetryReadout(position, now), { gps: 'GPS live · measured 2s ago · ±5 m', speed: 0 });
+  assert.equal(vehicleTelemetryReadout({ ...position, speed: null }, now).speed, null);
+  assert.equal(vehicleTelemetryReadout({ ...position, speed: 16, accuracy: 60 }, now).speed, null);
+  assert.deepEqual(vehicleTelemetryReadout({ ...position, speed: 16 }, now + 30000), { gps: 'Current vehicle GPS unavailable', speed: null });
+});
 test('quality distinguishes invalid, future, stale, weak and stationary fixes as wallclock advances', () => {
   assert.equal(locationQuality(null, now), 'unavailable');
   for (const extra of [{ latitude: 91 }, { longitude: NaN }, { timestamp: NaN }]) assert.equal(locationQuality({ ...fix, ...extra }, now), 'invalid');

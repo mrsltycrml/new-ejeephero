@@ -1,15 +1,18 @@
 import { loadAdminOperations } from '../services/adminOperationsService';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenSkeleton } from '../components/AppUI';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
+import { AuthAction, AuthLink, AuthNotice, AuthPage } from '../screens/auth/AuthUI';
 import ESakayLogo from '../components/ESakayLogo';
 import AdminHeaderPopover, { type AdminPanel } from '../components/AdminHeaderPopover';
+import RouteWarningBanner from '../components/RouteWarningBanner';
+import { RouteWarningsProvider, useRouteWarnings } from '../contexts/RouteWarningsContext';
 import ServiceAccountMenu from '../components/ServiceAccountMenu';
 import { supabase } from '../lib/supabase';
 
@@ -46,127 +49,78 @@ import ProfileScreen from '../screens/shared/ProfileScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const commonScreenOptions = {
-  headerTitleAlign: 'left' as const,
-  headerStatusBarHeight: Platform.OS === 'web' ? 0 : undefined,
-  tabBarActiveTintColor: Colors.brandGreen,
-  tabBarInactiveTintColor: Colors.tabInactive,
-  tabBarStyle: {
-    backgroundColor: Colors.paper,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: 6,
-    paddingBottom: 8,
-    height: 64,
-    elevation: 0,
-  },
-  tabBarItemStyle: {
-    paddingVertical: 2,
-    height: 50,
-  },
-  tabBarLabelStyle: {
-    fontSize: 12,
-    lineHeight: 15,
-    fontWeight: '600' as const,
-    marginTop: 2,
-    paddingBottom: 2,
-  },
-  tabBarIconStyle: { marginTop: 0 },
-  headerStyle: {
-    backgroundColor: Colors.paper,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerShadowVisible: false,
-  headerTintColor: Colors.ink,
-  headerTitleStyle: {
-    fontWeight: '700' as const,
-    fontSize: 18,
-    color: Colors.ink,
-  },
-};
+function useTabOptions(): BottomTabNavigationOptions {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const rail = Platform.OS === 'web' && width >= 1100;
+  const bottom = Platform.OS === 'web' ? 6 : Math.max(8, insets.bottom);
+  return {
+    headerTitleAlign: 'left',
+    headerStatusBarHeight: Platform.OS === 'web' ? 0 : undefined,
+    headerStyle: { backgroundColor: Colors.midnight },
+    headerShadowVisible: false,
+    headerTintColor: Colors.onDark,
+    tabBarPosition: rail ? 'left' : 'bottom',
+    tabBarLabelPosition: rail ? 'beside-icon' : 'below-icon',
+    tabBarActiveTintColor: rail ? Colors.midnight : Colors.action,
+    tabBarInactiveTintColor: rail ? Colors.onDarkMuted : Colors.subtleGray,
+    tabBarActiveBackgroundColor: rail ? Colors.signal : Colors.actionTint,
+    tabBarStyle: rail ? styles.rail : [styles.bottomBar, { height: 56 + bottom, paddingBottom: bottom }],
+    tabBarItemStyle: rail ? styles.railItem : styles.bottomItem,
+    tabBarLabelStyle: rail ? styles.railLabel : styles.bottomLabel,
+    tabBarIconStyle: rail ? undefined : styles.bottomIcon,
+    tabBarAllowFontScaling: true,
+  };
+}
 
-function ServiceHeaderActions({
-  onAccount,
-  onAlerts,
-  alertsLabel = 'Open driver alerts',
-  open,
-}: {
-  onAccount: () => void;
-  onAlerts?: () => void;
-  alertsLabel?: string;
-  open: boolean;
+const styles = StyleSheet.create({
+  rail: { width: 160, minWidth: 160, maxWidth: 160, paddingTop: 20, backgroundColor: Colors.midnight, borderRightWidth: 0, elevation: 0 },
+  railItem: { minHeight: 52, borderRadius: 8, marginVertical: 3 },
+  railLabel: { fontSize: 14, fontWeight: '700' },
+  bottomBar: { backgroundColor: Colors.paper, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 4, paddingHorizontal: 4, elevation: 0 },
+  bottomItem: { marginHorizontal: 2, borderRadius: 8, overflow: 'hidden' },
+  bottomIcon: { height: 24, flexGrow: 0, flexShrink: 0 },
+  bottomLabel: { fontSize: 12, lineHeight: 16, minHeight: 16, flexShrink: 0, fontWeight: '700' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 12 },
+  headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  headerButtonActive: { backgroundColor: Colors.signal },
+  count: { position: 'absolute', right: 0, top: 1, borderRadius: 9, minWidth: 18, minHeight: 18, paddingHorizontal: 3, backgroundColor: Colors.primaryRed, alignItems: 'center', justifyContent: 'center' },
+  countText: { fontSize: 10, fontWeight: '800', color: Colors.white },
+});
+
+function HeaderButton({ label, icon, expanded, onPress, count = 0 }: {
+  label: string; icon: 'notifications-outline' | 'person-outline'; expanded?: boolean; onPress: () => void; count?: number;
 }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 16 }}>
-      {onAlerts && (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={alertsLabel}
-          onPress={onAlerts}
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: Colors.paper,
-            borderWidth: 1,
-            borderColor: Colors.border,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="notifications-outline" size={19} color={Colors.ink} />
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Open account menu"
-        accessibilityState={{ expanded: open }}
-        onPress={onAccount}
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: 19,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: open ? Colors.paleGreen : Colors.paper,
-          borderWidth: 1,
-          borderColor: open ? Colors.brandGreen : Colors.border,
-        }}
-      >
-        <Ionicons name="person-outline" size={19} color={open ? Colors.brandGreen : Colors.ink} />
-      </TouchableOpacity>
-    </View>
-  );
+  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ expanded }} onPress={onPress}
+    style={[styles.headerButton, expanded && styles.headerButtonActive]}>
+    <Ionicons name={icon} size={23} color={expanded ? Colors.midnight : Colors.onDark} />
+    {count > 0 && <View style={styles.count}><Text style={styles.countText}>{count > 99 ? '99+' : count}</Text></View>}
+  </TouchableOpacity>;
 }
 
 const PassengerTabs = ({ navigation: stackNavigation }: any) => {
-  const insets = useSafeAreaInsets();
+  const tabOptions = useTabOptions();
   const [accountOpen, setAccountOpen] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
-  const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
-  const tabHeight = Platform.OS === 'web' ? 64 : 56 + tabBottom;
   const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
     <View style={{ flex: 1, backgroundColor: Colors.paper }}>
       <Tab.Navigator
         safeAreaInsets={webSafeInsets}
-        screenOptions={({ navigation, route }) => ({
-          ...commonScreenOptions,
-          tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight },
+        screenOptions={({ navigation }) => ({
+          ...tabOptions,
           headerTitle: () => (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}>
-              <ESakayLogo compact color={route.name === 'Map' ? Colors.ink : Colors.brandGreen} />
+              <ESakayLogo compact roleLabel="Passenger" color={Colors.onDark} />
             </TouchableOpacity>
           ),
           headerRight: () => (
-            <ServiceHeaderActions
-              open={accountOpen}
-              onAccount={() => {
-                setNoticesOpen(false);
-                setAccountOpen((value) => !value);
-              }}
-            />
+            <View style={styles.headerActions}>
+              <HeaderButton label="Boarding notices" icon="notifications-outline" expanded={noticesOpen}
+                onPress={() => { setAccountOpen(false); setNoticesOpen(value => !value); }} />
+              <HeaderButton label="Open account menu" icon="person-outline" expanded={accountOpen}
+                onPress={() => { setNoticesOpen(false); setAccountOpen(value => !value); }} />
+            </View>
           ),
         })}
       >
@@ -219,28 +173,24 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
 };
 
 const DriverTabs = ({ navigation: stackNavigation }: any) => {
-  const insets = useSafeAreaInsets();
+  const tabOptions = useTabOptions();
   const [accountOpen, setAccountOpen] = useState(false);
-  const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
-  const tabHeight = Platform.OS === 'web' ? 64 : 56 + tabBottom;
   const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
     <View style={{ flex: 1, backgroundColor: Colors.paper }}>
       <Tab.Navigator
         safeAreaInsets={webSafeInsets}
         screenOptions={({ navigation }) => ({
-          ...commonScreenOptions,
-          tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight },
+          ...tabOptions,
           headerTitle: () => (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}>
-              <ESakayLogo compact roleLabel="Driver" roleSeparator="|" />
+              <ESakayLogo compact roleLabel="Driver" color={Colors.onDark} />
             </TouchableOpacity>
           ),
           headerRight: () => (
-            <ServiceHeaderActions
-              open={accountOpen}
-              onAccount={() => setAccountOpen((value) => !value)}
-            />
+            <View style={styles.headerActions}>
+              <HeaderButton label="Open account menu" icon="person-outline" expanded={accountOpen} onPress={() => setAccountOpen(value => !value)} />
+            </View>
           ),
         })}
       >
@@ -270,15 +220,17 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
         />
       </Tab.Navigator>
       <ServiceAccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} onProfile={() => stackNavigation.navigate('DriverProfile')} />
+      {!accountOpen && <RouteWarningBanner onOpen={() => stackNavigation.navigate('DriverTabs', { screen: 'Alerts' })} />}
     </View>
   );
 };
 
 const stackScreenOptions = {
-  headerStyle: { backgroundColor: Colors.paper },
-  headerTintColor: Colors.ink,
+  headerStyle: { backgroundColor: Colors.midnight },
+  headerTintColor: Colors.onDark,
+  statusBarStyle: 'light' as const,
   headerShadowVisible: false,
-  headerTitleStyle: { fontWeight: '700' as const, fontSize: 18, color: Colors.ink },
+  headerTitleStyle: { fontWeight: '700' as const, fontSize: 18, color: Colors.onDark },
 };
 
 const PassengerStack = () => (
@@ -286,19 +238,21 @@ const PassengerStack = () => (
     <Stack.Navigator screenOptions={stackScreenOptions}>
       <Stack.Screen name="PassengerTabs" component={PassengerTabs} options={{ headerShown: false }} />
       <Stack.Screen name="PassengerProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
-      <Stack.Screen name="PassengerDirectory" component={DirectoryScreen} options={{ title: 'Routes & trip planner' }} />
-      <Stack.Screen name="PassengerAbout" component={AboutScreen} options={{ title: 'About ejeephero' }} />
+      <Stack.Screen name="PassengerDirectory" component={DirectoryScreen} options={{ title: 'Route directory' }} />
+      <Stack.Screen name="PassengerAbout" component={AboutScreen} options={{ title: 'About eSAKAY' }} />
       <Stack.Screen name="PassengerWeather" component={WeatherScreen} options={{ title: 'Makati weather' }} />
-      <Stack.Screen name="PassengerAssistant" component={HeroBotScreen} options={{ title: 'ejeepherobot' }} />
+      <Stack.Screen name="PassengerAssistant" component={HeroBotScreen} options={{ title: 'Commuter assistant' }} />
     </Stack.Navigator>
   </PassengerJourneyProvider>
 );
 
 const DriverStack = () => (
-  <Stack.Navigator screenOptions={stackScreenOptions}>
-    <Stack.Screen name="DriverTabs" component={DriverTabs} options={{ headerShown: false }} />
-    <Stack.Screen name="DriverProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
-  </Stack.Navigator>
+  <RouteWarningsProvider driverOnly>
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen name="DriverTabs" component={DriverTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="DriverProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
+    </Stack.Navigator>
+  </RouteWarningsProvider>
 );
 
 function AdminHeaderActions({
@@ -312,70 +266,17 @@ function AdminHeaderActions({
   alertCount: number;
   activePanel: AdminPanel;
 }) {
-  const { width } = useWindowDimensions();
-  const compact = width < 520;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 8 : 10, marginRight: 16 }}>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel={`Violation alerts${alertCount ? `, ${alertCount} recent` : ''}`}
-        accessibilityState={{ expanded: activePanel === 'alerts' }}
-        onPress={onAlerts}
-        style={{
-          width: 38,
-          height: 38,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 19,
-          backgroundColor: activePanel === 'alerts' ? Colors.paleGreen : Colors.paper,
-          borderWidth: 1,
-          borderColor: activePanel === 'alerts' ? Colors.brandGreen : Colors.border,
-        }}
-      >
-        <Ionicons name="notifications-outline" size={18} color={activePanel === 'alerts' ? Colors.brandGreen : Colors.ink} />
-        {alertCount > 0 && (
-          <View
-            style={{
-              position: 'absolute',
-              right: -2,
-              top: -2,
-              minWidth: 17,
-              height: 17,
-              borderRadius: 9,
-              paddingHorizontal: 3,
-              backgroundColor: Colors.primaryRed,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>{alertCount > 99 ? '99+' : alertCount}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Open supervisor profile"
-        accessibilityState={{ expanded: activePanel === 'profile' }}
-        onPress={onProfile}
-        style={{
-          width: 38,
-          height: 38,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 19,
-          backgroundColor: activePanel === 'profile' ? Colors.paleGreen : Colors.paper,
-          borderWidth: 1,
-          borderColor: activePanel === 'profile' ? Colors.brandGreen : Colors.border,
-        }}
-      >
-        <Ionicons name="person-outline" size={18} color={activePanel === 'profile' ? Colors.brandGreen : Colors.ink} />
-      </TouchableOpacity>
-    </View>
-  );
+  return <View style={styles.headerActions}>
+    <HeaderButton label={`Violation alerts${alertCount ? `, ${alertCount} recent` : ''}`} icon="notifications-outline"
+      expanded={activePanel === 'alerts'} count={alertCount} onPress={onAlerts} />
+    <HeaderButton label="Open supervisor profile" icon="person-outline" expanded={activePanel === 'profile'} onPress={onProfile} />
+  </View>;
 }
 
 const AdminTabs = ({ navigation: stackNavigation }: any) => {
-  const insets = useSafeAreaInsets();
+  const tabOptions = useTabOptions();
+  const { warnings } = useRouteWarnings();
+  const recentRouteWarnings = warnings.filter(warning => Date.now() - Date.parse(warning.created_at) <= 86400000).length;
   const [alertCount, setAlertCount] = useState(0);
   const [notice, setNotice] = useState('');
   const [activePanel, setActivePanel] = useState<AdminPanel>(null);
@@ -417,19 +318,16 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
     const timer = setTimeout(() => setNotice(''), 6500);
     return () => clearTimeout(timer);
   }, [notice]);
-  const tabBottom = Platform.OS === 'web' ? 8 : Math.max(10, insets.bottom);
-  const tabHeight = Platform.OS === 'web' ? 64 : 56 + tabBottom;
   const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
     <View style={{ flex: 1, backgroundColor: Colors.paper }}>
       <Tab.Navigator
         safeAreaInsets={webSafeInsets}
         screenOptions={({ navigation }) => ({
-          ...commonScreenOptions,
-          tabBarStyle: { ...commonScreenOptions.tabBarStyle, paddingBottom: tabBottom, height: tabHeight },
+          ...tabOptions,
           headerRight: () => (
             <AdminHeaderActions
-              alertCount={alertCount}
+              alertCount={alertCount + recentRouteWarnings}
               activePanel={activePanel}
               onAlerts={() => setActivePanel((open) => (open === 'alerts' ? null : 'alerts'))}
               onProfile={() => setActivePanel((open) => (open === 'profile' ? null : 'profile'))}
@@ -437,7 +335,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
           ),
           headerTitle: () => (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to Fleet" onPress={() => navigation.navigate('Fleet')}>
-              <ESakayLogo compact roleLabel="Supervisor" roleSeparator="/" />
+              <ESakayLogo compact roleLabel="Supervisor" color={Colors.onDark} />
             </TouchableOpacity>
           ),
         })}
@@ -503,52 +401,33 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
           <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', flex: 1 }}>{notice}</Text>
         </TouchableOpacity>
       )}
+      {!activePanel && <RouteWarningBanner onOpen={() => setActivePanel('alerts')} />}
       <AdminHeaderPopover panel={activePanel} onClose={() => setActivePanel(null)} onManageProfile={() => stackNavigation.navigate('AdminProfile')} />
     </View>
   );
 };
 
 const AdminStack = () => (
-  <Stack.Navigator screenOptions={stackScreenOptions}>
-    <Stack.Screen name="AdminTabs" component={AdminTabs} options={{ headerShown: false }} />
-    <Stack.Screen name="AdminProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
-  </Stack.Navigator>
+  <RouteWarningsProvider>
+    <Stack.Navigator screenOptions={stackScreenOptions}>
+      <Stack.Screen name="AdminTabs" component={AdminTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
+    </Stack.Navigator>
+  </RouteWarningsProvider>
 );
 
 export const AppNavigator = () => {
   const { user, role, status, isAdmin, loading, authError, refreshProfile, signOut } = useAuth();
 
-  if (authError)
+  if (authError) {
     return (
-      <View style={{ flex: 1, backgroundColor: Colors.paper, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <View style={{ width: '100%', maxWidth: 480, gap: 16 }}>
-          <Text accessibilityRole="header" style={{ color: Colors.ink, fontSize: 24, fontWeight: '700' }}>
-            Check your account
-          </Text>
-          <Text accessibilityRole="alert" style={{ color: Colors.ink, fontSize: 16, lineHeight: 24 }}>
-            {authError}
-          </Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => {
-              void refreshProfile();
-            }}
-            style={{ minHeight: 50, padding: 14, borderRadius: 12, backgroundColor: Colors.brandGreen, alignItems: 'center' }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Retry</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => {
-              void signOut();
-            }}
-            style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center' }}
-          >
-            <Text style={{ color: Colors.brandGreen, fontWeight: '700', fontSize: 16 }}>Return to sign in</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <AuthPage title="Check your account">
+        <AuthNotice message={authError} error />
+        <AuthAction label="Retry" onPress={() => { void refreshProfile(); }} />
+        <AuthLink label="Return to sign in" onPress={() => { void signOut(); }} />
+      </AuthPage>
     );
+  }
 
   if (loading) {
     return <ScreenSkeleton preset="dashboard" />;

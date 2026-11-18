@@ -13,12 +13,13 @@ import LeafletMap from '../../components/LeafletMap';
 import { realRows } from '../../utils/realData';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRouteWarnings } from '../../contexts/RouteWarningsContext';
 import { Colors } from '../../constants/theme';
 import { offlineTransit, type RouteData, type TerminalData } from '../../services/offlineTransitService';
 
 type AlertItem = {
   id: string;
-  category: 'announcement' | 'speed' | 'violation';
+  category: 'announcement' | 'speed' | 'violation' | 'deviation';
   title: string;
   body: string;
   timestamp: string;
@@ -30,6 +31,7 @@ type AlertItem = {
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
+  const { warnings, error: warningError } = useRouteWarnings();
   const [items, setItems] = useState<AlertItem[]>([]);
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -109,9 +111,9 @@ export default function NotificationsScreen() {
           id: `vio-${v.id}`,
           category: 'violation',
           title: 'Potential route cut',
-          body: `${v.body_number || 'Unit unavailable'} · ${v.status === 'confirmed' ? 'Confirmed' : 'Awaiting review'}`,
+          body: `${v.body_number || 'Unit unavailable'} · ${statusLabel}`,
           timestamp: v.created_at,
-          severity: v.status === 'confirmed' ? 'danger' : 'warning',
+          severity: v.status === 'confirmed' ? 'danger' : v.status === 'dismissed' ? 'info' : 'warning',
           unitLabel: [v.body_number, v.plate_number].filter(Boolean).join(' · ') || 'Unit unavailable',
           routeLabel: 'Route unavailable',
           statusLabel,
@@ -152,8 +154,13 @@ export default function NotificationsScreen() {
   }
 
   const todayStr = new Date().toDateString();
-  const todayItems = items.filter((item) => new Date(item.timestamp).toDateString() === todayStr);
-  const olderItems = items.filter((item) => new Date(item.timestamp).toDateString() !== todayStr);
+  const visibleItems = [...items, ...warnings.map((warning): AlertItem => ({
+    id: `warning-${warning.id}`, category: 'deviation', title: 'Possible off-route movement',
+    body: `${Math.round(warning.distance_meters)} m from the assigned line (±${Math.round(warning.accuracy_meters)} m GPS). Logged for supervisor review.`,
+    timestamp: warning.captured_at, severity: 'warning', unitLabel: warning.unit_label, routeLabel: warning.route_name,
+  }))].sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+  const todayItems = visibleItems.filter((item) => new Date(item.timestamp).toDateString() === todayStr);
+  const olderItems = visibleItems.filter((item) => new Date(item.timestamp).toDateString() !== todayStr);
 
   const renderRow = (item: AlertItem) => {
     const iconName =
@@ -162,18 +169,12 @@ export default function NotificationsScreen() {
         : item.category === 'speed'
           ? 'warning-outline'
           : 'git-branch-outline';
-    const circleStyle =
-      item.severity === 'danger'
-        ? styles.circleDanger
-        : item.severity === 'warning'
-          ? styles.circleWarning
-          : styles.circleInfo;
     const iconColor =
       item.severity === 'danger'
         ? Colors.primaryRed
         : item.severity === 'warning'
           ? Colors.warning
-          : Colors.brandGreen;
+          : Colors.action;
     const timeText = new Date(item.timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
@@ -187,14 +188,13 @@ export default function NotificationsScreen() {
         onPress={() => setSelectedFlag(item)}
         style={styles.row}
       >
-        <View style={[styles.iconCircle, circleStyle]}>
-          <Ionicons name={iconName} size={19} color={iconColor} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <View style={styles.rowTop}>
-            <Text style={styles.rowTitle}>{item.title}</Text>
-            <Text style={styles.rowTime}>{timeText}</Text>
-          </View>
+        <Ionicons name={iconName} size={20} color={iconColor} />
+        <View style={styles.message}>
+          <Text style={styles.rowTime}>
+            {new Date(item.timestamp).toDateString() !== todayStr && `${new Date(item.timestamp).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} · `}
+            {timeText}
+          </Text>
+          <Text style={styles.rowTitle}>{item.title}</Text>
           <Text style={styles.rowBody}>{item.body}</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
@@ -210,28 +210,23 @@ export default function NotificationsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.headerBlock}>
-          <Text style={styles.title}>Alerts</Text>
-        {!!loadError && <Text accessibilityRole="alert">{loadError}</Text>}
-        {!loadError && !items.length && <Text>No alerts.</Text>}
-          <Text style={styles.subtitle}>Updates for your shifts.</Text>
+          <Text accessibilityRole="header" style={styles.title}>Shift alerts</Text>
         </View>
 
-        {todayItems.length > 0 && (
-          <>
-            <View style={styles.groupBand}>
-              <Text style={styles.groupBandText}>Today</Text>
-            </View>
-            <View style={styles.listSection}>{todayItems.map(renderRow)}</View>
-          </>
-        )}
+        {!!loadError && <Text accessibilityRole="alert" style={styles.error}>{loadError}</Text>}
+        {!!warningError && <Text accessibilityRole="alert" style={styles.error}>{warningError}</Text>}
+        {!loadError && !warningError && !visibleItems.length && <Text style={styles.empty}>No alerts.</Text>}
 
-        {olderItems.length > 0 && (
-          <>
-            <View style={styles.groupBand}>
-              <Text style={styles.groupBandText}>Earlier</Text>
+        {[{ label: 'Today', rows: todayItems }, { label: 'Earlier', rows: olderItems }].map(({ label, rows }) =>
+          rows.length > 0 && (
+            <View key={label} style={styles.listSection}>
+              <View style={styles.groupBand}>
+                <Text accessibilityRole="header" style={styles.groupBandText}>{label}</Text>
+                <Text style={styles.groupCount}>{rows.length}</Text>
+              </View>
+              {rows.map(renderRow)}
             </View>
-            <View style={styles.listSection}>{olderItems.map(renderRow)}</View>
-          </>
+          )
         )}
       </ScrollView>
 
@@ -247,7 +242,7 @@ export default function NotificationsScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => setSelectedFlag(null)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 }}
             >
               <Ionicons name="chevron-back" size={20} color={Colors.ink} />
               <Text style={styles.sheetHeaderLabel}>
@@ -255,15 +250,16 @@ export default function NotificationsScreen() {
               </Text>
             </TouchableOpacity>
 
+            <Text accessibilityRole="header" style={styles.detailHeading}>{selectedFlag.title}</Text>
             {selectedFlag.category === 'violation' && (
-              <View style={styles.amberStatusPill}>
-                <Text style={styles.amberStatusText}>
-                  {selectedFlag.statusLabel || 'Awaiting supervisor review'}
-                </Text>
-              </View>
+              <Text style={[
+                styles.statusText,
+                selectedFlag.severity === 'danger' && { color: Colors.primaryRed, backgroundColor: Colors.dangerBg },
+                selectedFlag.severity === 'warning' && { color: Colors.warning, backgroundColor: Colors.warningBg },
+              ]}>
+                {selectedFlag.statusLabel || 'Awaiting supervisor review'}
+              </Text>
             )}
-
-            <Text style={styles.detailHeading}>{selectedFlag.title}</Text>
 
             <View style={styles.kvGroup}>
               <View style={styles.kvRow}>
@@ -290,21 +286,12 @@ export default function NotificationsScreen() {
 
             {selectedFlag.category === 'violation' ? (
               <>
+                <Text style={styles.kvLabel}>Route reference map</Text>
                 <View style={styles.mapBox}>
                   <LeafletMap routes={mapRoutes} terminals={mapTerminals} vehicles={[]} fleetMode />
                 </View>
-                <View style={styles.legendRow}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendLine, { backgroundColor: Colors.brandGreen }]} />
-                    <Text style={styles.legendText}>Assigned route</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendLine, { backgroundColor: Colors.warning }]} />
-                    <Text style={styles.legendText}>Recorded path</Text>
-                  </View>
-                </View>
                 <Text style={styles.readOnlyNote}>
-                  A route deviation was detected. Your supervisor will review this flag.
+                  This end-of-shift check looks for missed stops. See the status above.
                 </Text>
               </>
             ) : (
@@ -318,84 +305,27 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.paper },
-  content: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingBottom: 36 },
-  headerBlock: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
-    gap: 2,
-  },
-  title: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, color: Colors.ink },
-  subtitle: { fontSize: 15, color: Colors.subtleGray, lineHeight: 21 },
-  groupBand: {
-    backgroundColor: Colors.canvas,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  groupBandText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.subtleGray,
-  },
-  listSection: {
-    backgroundColor: Colors.paper,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  circleWarning: {
-    backgroundColor: Colors.warningBg,
-  },
-  circleDanger: {
-    backgroundColor: Colors.dangerBg,
-  },
-  circleInfo: {
-    backgroundColor: Colors.paleGreen,
-  },
-  rowTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  rowTitle: { fontSize: 15, fontWeight: '700', color: Colors.ink },
-  rowTime: { fontSize: 13, color: Colors.subtleGray },
-  rowBody: { fontSize: 13, color: Colors.subtleGray, marginTop: 2 },
+  container: { flex: 1, backgroundColor: Colors.canvas },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 14 },
+  headerBlock: { backgroundColor: Colors.midnight, borderRadius: 10, padding: 20 },
+  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.6, color: Colors.onDark },
+  groupBand: { paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  groupBandText: { fontSize: 18, fontWeight: '700', color: Colors.ink },
+  groupCount: { fontSize: 14, color: Colors.subtleGray, fontVariant: ['tabular-nums'] },
+  listSection: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderTopWidth: 1, borderColor: Colors.border },
+  message: { flex: 1, minWidth: 0, gap: 4 },
+  rowTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },
+  rowTime: { fontSize: 13, color: Colors.subtleGray, fontVariant: ['tabular-nums'] },
+  rowBody: { fontSize: 14, lineHeight: 20, color: Colors.subtleGray },
+  empty: { padding: 18, backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 8, color: Colors.ink },
+  error: { padding: 14, color: Colors.primaryRed, backgroundColor: Colors.dangerBg, borderRadius: 8 },
   sheetHeaderLabel: {
     fontSize: 17,
     fontWeight: '700',
     color: Colors.ink,
   },
-  amberStatusPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.warningBg,
-    borderWidth: 1,
-    borderColor: Colors.warningBorder,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  amberStatusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.warning,
-  },
+  statusText: { alignSelf: 'flex-start', color: Colors.ink, backgroundColor: Colors.canvas, fontWeight: '700', fontSize: 14, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 },
   detailHeading: {
     fontSize: 22,
     fontWeight: '700',
@@ -418,6 +348,9 @@ const styles = StyleSheet.create({
     color: Colors.subtleGray,
   },
   kvValue: {
+    flexShrink: 1,
+    marginLeft: 12,
+    textAlign: 'right',
     fontSize: 14,
     fontWeight: '700',
     color: Colors.ink,
@@ -428,26 +361,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    gap: 18,
-    alignItems: 'center',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendLine: {
-    width: 16,
-    height: 3,
-    borderRadius: 2,
-  },
-  legendText: {
-    fontSize: 12,
-    color: Colors.subtleGray,
-    fontWeight: '600',
   },
   readOnlyNote: {
     fontSize: 14,

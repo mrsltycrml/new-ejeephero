@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { passengerStyles as s } from '../../components/PassengerUI';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,11 +12,13 @@ type Message = { role: 'user' | 'assistant'; content: string };
 export default function HeroBotScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const chat = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const SUGGESTIONS = [
     'Where do I board at MRT Buendia?',
-    'Operating hours',
-    'Student discount',
-    'Route 1 stops',
+    'Where can I check operating hours?',
+    'How do I check the student fare?',
+    'How do I find stops on a route?',
     'How does Emergency SOS work?',
   ];
   const [messages, setMessages] = useState<Message[]>([
@@ -36,6 +39,7 @@ export default function HeroBotScreen() {
     if (typeof textToSend !== 'string') {
       setInput('');
     }
+    setShowSuggestions(false);
     setLoading(true);
 
     try {
@@ -51,7 +55,7 @@ export default function HeroBotScreen() {
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: 'ejeepherobot is unavailable right now. Please try again shortly.' },
+        { role: 'assistant', content: 'The commuter assistant is unavailable. Please try again shortly.' },
       ]);
     } finally {
       setLoading(false);
@@ -59,217 +63,64 @@ export default function HeroBotScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <View style={styles.helperStrip}>
-        <Text style={styles.helperStripText}>Commuter assistant · Ask about routes, stops and using ejeephero.</Text>
-      </View>
-
-      <ScrollView
-        style={styles.chatArea}
-        contentContainerStyle={{ padding: 20, paddingBottom: 26, width: '100%', maxWidth: 680, alignSelf: 'center' }}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {messages.map((msg, i) => (
-          <View
-            key={i}
-            style={[
-              styles.bubbleContainer,
-              msg.role === 'user' ? styles.userBubbleContainer : styles.botBubbleContainer,
-            ]}
-          >
-            {msg.role === 'assistant' && (
-              <View style={styles.botIcon}>
-                <Ionicons name="chatbubble-outline" size={16} color={Colors.brandGreen} />
-              </View>
-            )}
-            <View style={[styles.bubble, msg.role === 'user' ? styles.userBubble : styles.botBubble]}>
-              <Text style={msg.role === 'user' ? styles.userText : styles.botText}>{msg.content}</Text>
+    <KeyboardAvoidingView style={s.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <ScrollView ref={chat} style={{ flex: 1 }} contentContainerStyle={[s.content, styles.column]}
+        keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets
+        onContentSizeChange={() => { if (messages.length > 1 && !showSuggestions) chat.current?.scrollToEnd({ animated: false }); }}>
+        {messages.map((msg, index) => {
+          const outgoing = msg.role === 'user';
+          return (
+            <View key={index} style={[styles.bubble, outgoing ? styles.outgoing : styles.incoming]}>
+              <Text style={[s.label, outgoing ? styles.light : styles.sender]}>{outgoing ? 'You' : 'Commuter assistant'}</Text>
+              <Text selectable style={[s.body, outgoing && styles.light]}>{msg.content}</Text>
             </View>
-          </View>
-        ))}
-        {loading && (
-          <View style={styles.loadingBubble}>
-            <ActivityIndicator size="small" color={Colors.brandGreen} />
-            <Text style={styles.loadingText}>Thinking…</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Suggestion Chips */}
-      <View style={styles.suggestionsWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.suggestionsContainer}
-        >
-          {SUGGESTIONS.map((suggestion, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.suggestionChip}
-              onPress={() => sendMessage(suggestion)}
-              disabled={loading}
-              accessibilityRole="button"
-            >
-              <Text style={styles.suggestionText}>{suggestion}</Text>
+          );
+        })}
+        {loading && <View style={styles.status}>
+          <ActivityIndicator size="small" color={Colors.action} />
+          <Text accessibilityLiveRegion="polite" style={s.muted}>Waiting for a reply…</Text>
+        </View>}
+        {showSuggestions && <View style={s.section}>
+          <Text accessibilityRole="header" style={s.sectionTitle}>Suggested questions</Text>
+          {SUGGESTIONS.map(question => (
+            <TouchableOpacity key={question} accessibilityRole="button" onPress={() => void sendMessage(question)} disabled={loading} style={styles.question}>
+              <Text style={[s.link, { flex: 1 }]}>{question}</Text>
+              <Ionicons aria-hidden name="arrow-forward" size={18} color={Colors.action} />
             </TouchableOpacity>
           ))}
-        </ScrollView>
-      </View>
+        </View>}
+      </ScrollView>
 
-      <View style={[styles.inputContainer, { paddingBottom: Math.max(12, insets.bottom + 8) }]}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Ask ejeepherobot..."
-          placeholderTextColor={Colors.subtleGray}
-          onSubmitEditing={() => sendMessage()}
-          returnKeyType="send"
-          accessibilityLabel="Message ejeepherobot"
-          maxLength={2000}
-        />
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-          style={[styles.sendButton, (loading || !input.trim()) && { opacity: 0.45 }]}
-          onPress={() => sendMessage()}
-          disabled={loading || !input.trim()}
-        >
-          <Ionicons name="arrow-up" size={20} color={Colors.white} />
-        </TouchableOpacity>
+      <View style={[styles.composer, { paddingBottom: Math.max(12, insets.bottom + 8) }]}>
+        <View style={styles.controls}>
+          {messages.length > 1 && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Suggested questions"
+            accessibilityState={{ expanded: showSuggestions, disabled: loading }} disabled={loading} style={styles.iconButton}
+            onPress={() => { setShowSuggestions(!showSuggestions); if (!showSuggestions) requestAnimationFrame(() => chat.current?.scrollToEnd({ animated: false })); }}>
+            <Ionicons aria-hidden name="help-circle-outline" size={24} color={Colors.action} />
+          </TouchableOpacity>}
+          <TextInput style={[s.input, { flex: 1, minWidth: 0 }]} value={input} onChangeText={setInput} placeholder="Ask a question" placeholderTextColor={Colors.subtleGray}
+            onSubmitEditing={() => void sendMessage()} returnKeyType="send" accessibilityLabel="Message the commuter assistant" maxLength={2000} />
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send message" accessibilityState={{ disabled: loading || !input.trim() }}
+            style={[styles.iconButton, styles.send, (loading || !input.trim()) && { opacity: 0.5 }]} onPress={() => void sendMessage()} disabled={loading || !input.trim()}>
+            <Ionicons aria-hidden name="arrow-up" size={22} color={Colors.white} />
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.paper },
-  helperStrip: {
-    backgroundColor: Colors.canvas,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  helperStripText: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    fontWeight: '500',
-  },
-  chatArea: { flex: 1 },
-  bubbleContainer: {
-    flexDirection: 'row',
-    marginBottom: 14,
-    alignItems: 'flex-start',
-    maxWidth: '100%',
-    minWidth: 0,
-  },
-  userBubbleContainer: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
-  botBubbleContainer: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
-  botIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Colors.paleGreen,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    marginTop: 2,
-  },
-  bubble: {
-    minWidth: 0,
-    flexShrink: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  userBubble: {
-    backgroundColor: Colors.paleGreen,
-    borderWidth: 1,
-    borderColor: Colors.brandGreen,
-  },
-  botBubble: {
-    backgroundColor: Colors.canvas,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  userText: { color: Colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '500' },
-  botText: { color: Colors.ink, fontSize: 15, lineHeight: 21 },
-  loadingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.canvas,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginLeft: 38,
-    gap: 8,
-  },
-  loadingText: { fontSize: 14, color: Colors.subtleGray },
-  inputContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    backgroundColor: Colors.paper,
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    gap: 10,
-  },
-  input: {
-    flex: 1,
-    minHeight: 48,
-    backgroundColor: Colors.paper,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: Colors.ink,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  sendButton: {
-    backgroundColor: Colors.brandGreen,
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  suggestionsWrapper: {
-    backgroundColor: Colors.paper,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-  },
-  suggestionsContainer: {
-    paddingHorizontal: 20,
-    gap: 8,
-    flexDirection: 'row',
-  },
-  suggestionChip: {
-    minHeight: 38,
-    backgroundColor: Colors.canvas,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  suggestionText: {
-    color: Colors.ink,
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  column: { maxWidth: 640, gap: 12 },
+  bubble: { gap: 6, padding: 14, maxWidth: '94%', borderRadius: 10 },
+  incoming: { alignSelf: 'flex-start', backgroundColor: Colors.paper, borderLeftWidth: 3, borderColor: Colors.action },
+  outgoing: { alignSelf: 'flex-end', backgroundColor: Colors.midnight },
+  sender: { color: Colors.action },
+  light: { color: Colors.onDark },
+  status: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  question: { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 48, paddingVertical: 8, borderTopWidth: 1, borderColor: Colors.border },
+  composer: { backgroundColor: Colors.paper, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12 },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', maxWidth: 640, paddingHorizontal: 16, alignSelf: 'center' },
+  iconButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  send: { backgroundColor: Colors.action, borderRadius: 8 },
 });

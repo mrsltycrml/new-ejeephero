@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useRouteWarnings } from '../contexts/RouteWarningsContext';
 import { realRows } from '../utils/realData';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/theme';
@@ -13,12 +14,18 @@ type AlertRow = { id: string; title: string; detail: string; time: string; kind:
 
 export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: { panel: AdminPanel; onClose: () => void; onManageProfile: () => void }) {
   const { user, fullName, status, signOut } = useAuth();
+  const { warnings, error: warningError } = useRouteWarnings();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const displayedAlerts = [...alerts, ...warnings.map((warning): AlertRow => ({
+    id: `warning-${warning.id}`, kind: 'route', title: `Possible off-route · ${warning.unit_label}`,
+    detail: `${warning.route_name} · ${Math.round(warning.distance_meters)} m from line (±${Math.round(warning.accuracy_meters)} m GPS)`,
+    time: warning.captured_at,
+  }))].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 10);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);
@@ -86,11 +93,12 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
         {confirmLogout ? <View style={styles.confirmBox}><Text style={styles.confirmTitle}>Log out of your account?</Text><View style={styles.confirmRow}><TouchableOpacity accessibilityRole="button" onPress={logout} style={styles.confirmDanger}><Text style={styles.confirmDangerText}>Confirm log out</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(false)} style={styles.confirmCancel}><Text style={styles.menuText}>Cancel</Text></TouchableOpacity></View></View> : <TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(true)} style={styles.menuItem}><Ionicons name="log-out-outline" size={18} color={Colors.ink} /><Text style={styles.menuText}>Log out</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>}
       </> : <>
         <Text style={styles.panelSub}>GPS speed and route records appear as they arrive.</Text>
-        {loading && alerts.length === 0 ? <View style={{ gap: 8, paddingVertical: 8 }}><SkeletonBlock height={48} /><SkeletonBlock height={48} /><SkeletonBlock height={48} /></View> : null}
+        {loading && displayedAlerts.length === 0 ? <View style={{ gap: 8, paddingVertical: 8 }}><SkeletonBlock height={48} /><SkeletonBlock height={48} /><SkeletonBlock height={48} /></View> : null}
         {!!error && <TouchableOpacity onPress={() => { void loadAlerts(); }}><Text accessibilityRole="alert" style={styles.error}>{error} Tap to retry.</Text></TouchableOpacity>}
-        {!loading && !error && alerts.length === 0 ? <View style={styles.emptyBox}><Ionicons name="checkmark-circle-outline" size={27} color={Colors.subtleGray} /><Text style={styles.empty}>No recorded violations</Text></View> : null}
-        {alerts.length > 0 && <ScrollView style={styles.alertList} nestedScrollEnabled>
-          {alerts.map((item) => <View key={item.id} style={styles.alertRow}>
+        {!!warningError && <Text style={styles.error}>{warningError}</Text>}
+        {!loading && !error && !warningError && displayedAlerts.length === 0 ? <View style={styles.emptyBox}><Ionicons name="checkmark-circle-outline" size={27} color={Colors.subtleGray} /><Text style={styles.empty}>No recorded alerts</Text></View> : null}
+        {displayedAlerts.length > 0 && <ScrollView style={styles.alertList} nestedScrollEnabled>
+          {displayedAlerts.map((item) => <View key={item.id} style={styles.alertRow}>
             <View style={styles.alertIcon}><Ionicons name={item.kind === 'speed' ? 'speedometer-outline' : 'alert-circle-outline'} size={17} color={Colors.primaryRed} /></View>
             <View style={{ flex: 1 }}><Text style={styles.alertName}>{item.title}</Text><Text style={styles.alertDetail}>{item.detail}</Text><Text style={styles.alertTime}>{new Date(item.time).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PHT</Text></View>
           </View>)}
@@ -102,10 +110,10 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
 
 const styles = StyleSheet.create({
   scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 30, backgroundColor: 'rgba(14, 27, 31, 0.08)' },
-  panel: { position: 'absolute', top: 66, right: 12, zIndex: 40, overflow: 'hidden', borderRadius: 8, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.paper, padding: 18, shadowColor: '#102027', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.16, shadowRadius: 26, elevation: 12 },
+  panel: { position: 'absolute', top: 66, right: 12, zIndex: 40, overflow: 'hidden', borderRadius: 12, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.paper, padding: 18, shadowColor: '#102027', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.16, shadowRadius: 26, elevation: 12 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
-  panelTitle: { color: Colors.ink, fontSize: 18, fontWeight: '600', letterSpacing: -0.3 },
-  closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: Colors.sand },
+  panelTitle: { color: Colors.ink, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
+  closeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: Colors.sand },
   panelSub: { color: Colors.subtleGray, fontSize: 12, lineHeight: 18, marginBottom: 12 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 14 },
   avatar: { width: 42, height: 42, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.sand },
@@ -126,7 +134,7 @@ const styles = StyleSheet.create({
   alertList: { maxHeight: 320 },
   alertRow: { flexDirection: 'row', gap: 10, paddingVertical: 11, borderTopWidth: 1, borderTopColor: Colors.border },
   alertIcon: { width: 32, height: 32, borderRadius: 6, backgroundColor: Colors.sand, alignItems: 'center', justifyContent: 'center' },
-  alertName: { color: Colors.ink, fontSize: 12, fontWeight: '600' },
+  alertName: { color: Colors.ink, fontSize: 14, fontWeight: '700' },
   alertDetail: { color: Colors.subtleGray, fontSize: 12, lineHeight: 16, marginTop: 2 },
   alertTime: { color: Colors.subtleGray, fontSize: 12, marginTop: 3 },
   emptyBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: 25, gap: 8 },

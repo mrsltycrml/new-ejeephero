@@ -32,6 +32,7 @@ const fixtures: Record<string, string> = {
   '/lib/supabase': 'export const supabase=globalThis.__monitorDb;',
   '/services/offlineTransitService': 'export const offlineTransit={getTransitData:async()=>({routes:[],terminals:[],status:"ready"})};',
   '/components/LeafletMap': 'export default "Map";',
+  '/components/RouteLineEditor': 'export default "RouteLineEditor";',
   '/components/AppUI': 'export const BottomSheetModal="Sheet",ScreenSkeleton="Skeleton",triggerHaptic=()=>{};',
   '/passenger/DirectoryScreen': 'export default "Directory";',
 };

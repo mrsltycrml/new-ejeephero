@@ -30,7 +30,7 @@ export function PassengerSelect({
         style={[
           passengerStyles.input,
           { flexDirection: 'row', alignItems: 'center', gap: 10 },
-          open && { borderColor: Colors.brandGreen, backgroundColor: Colors.paper },
+          open && { borderColor: Colors.action, backgroundColor: Colors.paper },
           disabled && { opacity: 0.6 },
         ]}
       >
@@ -51,7 +51,7 @@ export function PassengerSelect({
             maxHeight: 240,
             borderWidth: 1,
             borderColor: Colors.border,
-            borderRadius: 12,
+            borderRadius: 10,
             backgroundColor: Colors.paper,
           }}
           nestedScrollEnabled
@@ -73,7 +73,7 @@ export function PassengerSelect({
                   paddingHorizontal: 14,
                   paddingVertical: 13,
                   minHeight: 48,
-                  backgroundColor: isSelected ? Colors.paleGreen : Colors.paper,
+                  backgroundColor: isSelected ? Colors.actionTint : Colors.paper,
                   opacity: o.disabled ? 0.55 : 1,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -90,7 +90,7 @@ export function PassengerSelect({
                 >
                   {o.label}
                 </Text>
-                {isSelected && <Ionicons name="checkmark-circle" color={Colors.brandGreen} size={20} />}
+                {isSelected && <Ionicons name="checkmark-circle" color={Colors.action} size={20} />}
               </TouchableOpacity>
             );
           })}
@@ -101,37 +101,37 @@ export function PassengerSelect({
 }
 
 export const passengerStyles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.paper },
-  content: { width: '100%', maxWidth: 960, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 36, gap: 16 },
+  screen: { flex: 1, backgroundColor: Colors.canvas },
+  content: { width: '100%', maxWidth: 920, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40, gap: 16 },
   heroBanner: {
     backgroundColor: Colors.paper,
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 16,
     gap: 10,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: Colors.brandGreen },
-  title: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, color: Colors.ink },
-  heroTitle: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, color: Colors.ink },
+  eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: Colors.action },
+  title: { fontSize: 32, fontWeight: '800', letterSpacing: -0.95, color: Colors.ink },
+  heroTitle: { fontSize: 32, fontWeight: '800', letterSpacing: -0.95, color: Colors.ink },
   subtitle: { fontSize: 15, lineHeight: 21, color: Colors.subtleGray, marginTop: 2 },
   heroSubtitle: { fontSize: 15, lineHeight: 21, color: Colors.subtleGray, marginTop: 2 },
   section: {
     backgroundColor: Colors.paper,
-    padding: 16,
+    padding: 18,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
     gap: 12,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.2, color: Colors.ink },
+  sectionTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.45, color: Colors.ink },
   body: { fontSize: 16, lineHeight: 22, color: Colors.ink },
-  muted: { fontSize: 13, lineHeight: 19, color: Colors.subtleGray },
+  muted: { fontSize: 14, lineHeight: 20, color: Colors.subtleGray },
   label: { fontSize: 14, fontWeight: '600', color: Colors.ink },
   input: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 13,
     minHeight: 50,
@@ -142,25 +142,25 @@ export const passengerStyles = StyleSheet.create({
   },
   button: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 18,
     paddingVertical: 13,
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.brandGreen,
+    backgroundColor: Colors.action,
   },
   buttonMint: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 18,
     paddingVertical: 13,
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.brandGreen,
+    backgroundColor: Colors.action,
   },
   buttonText: { fontSize: 16, fontWeight: '700', color: Colors.white },
   secondary: { backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border },
@@ -171,7 +171,7 @@ export const passengerStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: Colors.actionTint,
   },
   pillDark: {
     flexDirection: 'row',
@@ -180,9 +180,9 @@ export const passengerStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: Colors.actionTint,
   },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' },
   divider: { height: 1, backgroundColor: Colors.border },
-  link: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
+  link: { fontSize: 14, fontWeight: '700', color: Colors.action },
 });

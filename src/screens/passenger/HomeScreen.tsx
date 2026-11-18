@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, Linking, Platform, Vibration, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, Keyboard, Linking, Platform, Vibration, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap, { type LeafletMapRef } from '../../components/LeafletMap';
 import PassengerStopGuide from '../../components/PassengerStopGuide';
@@ -11,28 +11,38 @@ import { useNetwork } from '../../contexts/NetworkContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { type TerminalData, type VehicleData } from '../../services/offlineTransitService';
-import { loadLoadingZones } from '../../services/passengerDataService';
+import { loadLoadingZones, loadPassengerFareData } from '../../services/passengerDataService';
+import { quotePassengerFare, validFareMatrix, verifiedRideDistance } from '../../services/passengerFare';
+import { STOP_SEARCH_METERS, passengerPlanRide } from '../../services/passengerTrip';
 import { distanceMeters, evaluateBoardingLocation, type LoadingZone } from '../../services/passengerSafety';
 import { getWalkingDirections, type WalkingRoute } from '../../services/walkingDirections';
 import { searchPassengerPlaces } from '../../services/placeSearchService';
 import { type PassengerPlace } from '../../services/passengerPlaces';
-import { locationDescription, locationQuality } from '../../services/locationQuality';
+import { locationDescription, locationQuality, vehicleTelemetryReadout } from '../../services/locationQuality';
 import { rideLeg, selectJourneyStop } from '../../services/routeMap';
 import { Colors } from '../../constants/theme';
+import { manilaDateKey } from '../../utils/reportingPeriod';
 
 export default function PassengerHomeScreen({ route, navigation }: any) {
   const { fix, quality, errorMsg, foreground, enableLocation } = useLocation();
   const { isConnected } = useNetwork();
   const { user, getAccessToken } = useAuth();
-  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, endRide, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
+  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, endRide, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setRideStops, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const map = useRef<LeafletMapRef>(null);
+  const destinationInput = useRef<React.ElementRef<typeof TextInput>>(null);
+  const wide = useWindowDimensions().width >= 860;
+  const pendingPlace = useRef<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
 
   const stops = transit.terminals;
   const routes = transit.routes;
   const [inspectedStop, setInspectedStop] = useState<TerminalData | null>(null);
   const [query, setQuery] = useState(place?.name || destination?.name || '');
   const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    if (!searchOpen) setQuery(place?.name || destination?.name || '');
+  }, [searchOpen, place?.name, destination?.name]);
   const [boardingOpen, setBoardingOpen] = useState(false);
   const [places, setPlaces] = useState<PassengerPlace[]>([]);
   const [searching, setSearching] = useState(false);
@@ -52,8 +62,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   useEffect(() => {
     walkingRequest.current++;
     setWalkingBusy(false); setWalkingError(''); setDestinationWalks({});
-    return () => { walkingRequest.current++; searchVersion.current++; };
+    return () => { walkingRequest.current++; };
   }, [user?.id, selectedRouteId, boardingStop?.id, alightingStop?.id, place?.id, transit.syncedAt]);
+  useEffect(() => () => { searchVersion.current++; }, [user?.id]);
 
   useEffect(() => {
     if (route?.params?.showStopGuide) {
@@ -115,7 +126,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const stopBadgeCode = activeStop ? 'VERIFIED STOP' : 'NO STOP SELECTED';
   const routeName = (id?: string) => routes.find(item => item.id === id)?.name || 'Route unavailable';
 
-  const routeStops = stops.filter(t => !selectedRouteId || t.route_id === selectedRouteId).sort((a, b) => a.sequence_order - b.sequence_order);
+  const routeStops = useMemo(() => stops.filter(t => !selectedRouteId || t.route_id === selectedRouteId)
+    .sort((a, b) => a.sequence_order - b.sequence_order), [stops, selectedRouteId]);
   const results = routeStops.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
   const allModeVehicles = isConnected ? vehicles.filter(vehicle => !vehicle.is_sample && ['live', 'weak'].includes(locationQuality({ ...vehicle, timestamp: Date.parse(vehicle.recorded_at || '') }, now))) : [];
   const displayed = selectedRouteId
@@ -124,17 +136,54 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const currentSelected = selected
     ? displayed.find((v) => v.vehicle_id === selected.vehicle_id) || null
     : null;
+  const tracked = unit || selected;
+  const trackedPosition = tracked ? allModeVehicles.find(vehicle => vehicle.vehicle_id === tracked.vehicle_id) || null : null;
+  const telemetry = vehicleTelemetryReadout(trackedPosition, now);
+  const trackingCard = tracked && <View style={[s.section, { marginHorizontal: 16, marginTop: 12 }]}>
+    <Text style={s.sectionTitle}>{tracked.body_number || tracked.plate_number || 'Selected e-jeep'}</Text>
+    <Text style={s.label}>{telemetry.speed == null ? 'Speed unavailable' : `${Math.round(telemetry.speed)} km/h`}</Text>
+    <Text style={s.muted}>{telemetry.gps}</Text>
+  </View>;
   const locationFresh = foreground && !errorMsg && quality === 'live';
+  const origin = locationFresh ? fix : null;
+  const trip = useMemo(() => place && transit.status === 'ready'
+    ? passengerPlanRide(origin, place, routes, stops, { selectedRouteId, boardingStop, alightingStop }) : null,
+  [origin, place, routes, stops, selectedRouteId, boardingStop, alightingStop, transit.status]);
+  useEffect(() => {
+    if (!place || pendingPlace.current !== place.id || !trip || unit || !origin || locationQuality(origin) !== 'live') return;
+    pendingPlace.current = null;
+    setRideStops(trip.boarding, trip.alighting);
+  }, [trip, origin, place, unit, setRideStops]);
+  const hasTrip = Boolean(trip);
+  const [tripFare, setTripFare] = useState<{ catalog: typeof transit; owner: string | undefined; data: Awaited<ReturnType<typeof loadPassengerFareData>> | null } | null>(null);
+  useEffect(() => {
+    if (!hasTrip) return;
+    let cancelled = false;
+    const owner = user?.id;
+    void loadPassengerFareData().then(
+      data => { if (!cancelled) setTripFare({ catalog: transit, owner, data }); },
+      () => { if (!cancelled) setTripFare({ catalog: transit, owner, data: null }); },
+    );
+    return () => { cancelled = true; };
+  }, [hasTrip, transit, user?.id]);
+  const fareRead = tripFare && tripFare.catalog === transit && tripFare.owner === user?.id ? tripFare : null;
+  const fareDate = manilaDateKey(new Date(now));
+  const rideKm = trip && fareRead?.data ? verifiedRideDistance(trip.boarding.id, trip.alighting.id, trip.route.id, fareRead.data.segments) : null;
+  const matrix = trip && fareRead?.data?.matrices.find(value => validFareMatrix(value, trip.route.id, fareDate));
+  const fareQuote = trip && rideKm != null ? quotePassengerFare(rideKm, 'regular', trip.route, matrix, fareDate) : null;
+  const tripApplied = trip && trip.boarding.id === boardingStop?.id && trip.alighting.id === alightingStop?.id;
 
   const chooseDestination = (stop: TerminalData) => {
     walkingRequest.current++; setWalkingBusy(false); setWalkingError('');
     triggerHaptic('light');
     setInspectedStop(stop);
+    setManualOpen(true);
     setSearchOpen(false);
     setSelected(null);
   };
 
   const searchPlaces = async () => {
+    if (query.trim().length < 3 || searching) return;
     const version = ++searchVersion.current;
     setSearching(true);
     setSearchError('');
@@ -154,12 +203,27 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
 
   const choosePlace = (value: PassengerPlace) => {
     searchVersion.current++;
+    destinationInput.current?.blur();
+    Keyboard.dismiss();
+    pendingPlace.current = value.id;
     triggerHaptic('light');
     setPlace(value);
+    setSelectedRouteId(null);
     setDestination(null);
     setQuery(value.name);
+    setInspectedStop(null);
+    setManualOpen(false);
+    setSearching(false);
+    setSearched(false);
+    setSearchError('');
+    setPlaces([]);
     setSearchOpen(false);
     setSelected(null);
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  };
+  const chooseStopAsDestination = (stop: TerminalData) => {
+    choosePlace({ id: `stop:${stop.id}`, name: stop.name, address: '', latitude: stop.latitude, longitude: stop.longitude });
+    setInspectedStop(stop);
   };
 
   const selectVehicle = (vehicle: VehicleData) => {
@@ -182,8 +246,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const selectedRoute = routes.find(r => r.id === selectedRouteId);
   const selection = { selectedRouteId, boardingStop, alightingStop };
   const canChooseStop = (role: 'boarding' | 'alighting') => activeStop && selectJourneyStop(selection, activeStop, role, routes, stops) !== selection;
-  const destinationCandidates = place ? routeStops.filter(stop => selectJourneyStop(selection, stop, 'alighting', routes, stops) !== selection)
-    .map(stop => ({ stop, distance: distanceMeters(stop, place) })).filter(item => item.distance <= 2000)
+  const destinationCandidates = place && transit.status === 'ready' ? routeStops.filter(stop => selectJourneyStop(selection, stop, 'alighting', routes, stops) !== selection)
+    .map(stop => ({ stop, distance: distanceMeters(stop, place) })).filter(item => item.distance <= STOP_SEARCH_METERS)
     .sort((a, b) => a.distance - b.distance).slice(0, 3) : [];
   const requestWalk = async (stop: TerminalData, toPlace = false) => {
     const request = ++walkingRequest.current;
@@ -212,39 +276,97 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const transitNotice = transit.status === 'ready'
     ? (routes.length ? `Routes read ${transit.syncedAt ? new Date(transit.syncedAt).toLocaleString() : 'at an unknown time'}.` : 'No published active routes.')
     : transit.syncedAt ? `Cached routes from ${new Date(transit.syncedAt).toLocaleString()}; refresh unavailable.` : transit.error || 'Route data unavailable.';
-  const journeyControls = <View style={{ padding: 16, gap: 10 }}>
-    <Text style={s.muted}>{transitNotice}</Text>
-    <Text style={s.sectionTitle}>Your journey</Text>
-    <PassengerSelect label="Route" value={selectedRouteId || ''} options={[{ value: '', label: 'All published routes' }, ...routes.map(r => ({ value: r.id, label: r.name }))]}
-      onSelect={id => { setSelectedRouteId(id || null); setInspectedStop(null); setSelected(null); }} />
-    {!(selectedRoute ? selectedRoute.coordinates.length > 1 : routes.some(r => r.coordinates.length > 1)) && <Text style={s.muted}>Route path unavailable.</Text>}
-    {!routeStops.length && <Text style={s.muted}>Verified stop locations unavailable.</Text>}
-    <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!routeStops.length}
-      options={routeStops.filter(stop => !alightingStop || stop.sequence_order < alightingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
-      onSelect={id => setBoardingStop(routeStops.find(stop => stop.id === id) || null)} />
-    <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!routeStops.length}
-      options={routeStops.filter(stop => !boardingStop || stop.sequence_order > boardingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
-      onSelect={id => setDestination(routeStops.find(stop => stop.id === id) || null)} />
-    <Text style={s.muted}>Destination place: {place?.name || 'Not selected'}</Text>
-    {boardingStop && alightingStop && !rideLeg(selectedRoute, boardingStop, alightingStop).length && <Text style={s.muted}>Ride leg unavailable: verified geometry must connect these stops in route order.</Text>}
-    {!!selectedRoute?.coordinates.length && <Text style={s.muted}>Arrows follow published geometry order. Green highlights the selected ride leg.</Text>}
-    {!!activeStop && <View style={{ gap: 8 }}>
-      <Text style={s.label}>{activeStop.name} · {routeName(activeStop.route_id)}</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        <TouchableOpacity accessibilityRole="button" disabled={!canChooseStop('boarding')} accessibilityState={{ disabled: !canChooseStop('boarding') }} onPress={() => setBoardingStop(activeStop)} style={[s.input, !canChooseStop('boarding') && { opacity: 0.5 }]}><Text>Board here</Text></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" disabled={!canChooseStop('alighting')} accessibilityState={{ disabled: !canChooseStop('alighting') }} onPress={() => setDestination(activeStop)} style={[s.input, !canChooseStop('alighting') && { opacity: 0.5 }]}><Text>Alight here</Text></TouchableOpacity>
+  const hasPath = selectedRoute ? selectedRoute.coordinates.length > 1 : routes.some(item => item.coordinates.length > 1);
+  const walkingFeedback = <>
+    {walkingBusy && <Text accessibilityRole="alert" style={s.muted}>Finding a walking path…</Text>}
+    {!!walkingError && <Text accessibilityRole="alert" style={s.muted}>{walkingError}</Text>}
+    {walk && <WalkingDirectionsPanel {...walk} />}
+  </>;
+  const rideStatus = transit.status !== 'ready' || !routeStops.length || !hasPath
+    ? 'Verified stops and route paths are unavailable for this trip.'
+    : boardingStop || alightingStop ? 'Choose a boarding stop and a later alighting stop on the same verified route.'
+    : !origin ? 'A current, accurate location is needed to find your boarding stop.'
+    : 'No direct ride has verified stops within 2 km of both ends.';
+  const result = place && !unit && <View style={styles.result}>
+    <Text accessibilityRole="header" style={styles.resultHeading}>Suggested ride</Text>
+    <Text accessibilityLiveRegion="polite" style={s.muted}>{trip?.route.name || rideStatus}</Text>
+    <View style={styles.itinerary}>
+      <View style={styles.itineraryRow}>
+        <Ionicons name="radio-button-on" size={19} color={Colors.brandGreen} />
+        <View style={styles.itineraryText}>
+          <Text style={s.muted}>Board at</Text><Text style={styles.rowTitle}>{trip?.boarding.name || 'Unavailable'}</Text>
+          {trip?.boardingProximity != null && <Text style={s.muted}>{Math.round(trip.boardingProximity)} m from you in a straight line</Text>}
+        </View>
       </View>
-      <Text style={s.muted}>Choose stops on the same route, with boarding before alighting. A stop marker does not verify a loading boundary.</Text>
+      <View style={styles.itineraryRow}>
+        <Ionicons name="location-outline" size={20} color={Colors.ink} />
+        <View style={styles.itineraryText}>
+          <Text style={s.muted}>{!trip && destinationCandidates.length ? 'Possible alighting stop' : 'Alight at'}</Text>
+          <Text style={styles.rowTitle}>{trip?.alighting.name || destinationCandidates[0]?.stop.name || 'Unavailable'}</Text>
+          {!trip && destinationCandidates.length > 0 && <Text style={s.muted}>Near your destination. A connecting ride is unconfirmed.</Text>}
+          {trip && <Text style={s.muted}>{Math.round(trip.alightingProximity)} m from your destination in a straight line</Text>}
+        </View>
+      </View>
+    </View>
+    <View style={styles.fareLine}><Text style={s.label}>Regular fare</Text>
+      <Text style={s.label}>{fareQuote ? `₱${fareQuote.amount.toFixed(2)}` : trip && !fareRead ? 'Checking…' : 'Unavailable'}</Text>
+    </View>
+    {trip && (tripApplied ? <>
+      <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} style={s.button} onPress={() => void requestWalk(trip.boarding)}>
+        <Ionicons name="walk-outline" size={19} color={Colors.white} /><Text style={s.buttonText}>Walk to boarding stop</Text>
+      </TouchableOpacity>
+      {walkingFeedback}
+      <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => navigation.navigate('Fares', { showSelectedStops: Date.now() })}>
+        <Text style={s.label}>Fare and discounts</Text><Ionicons name="chevron-forward" size={18} color={Colors.ink} />
+      </TouchableOpacity>
+    </> : <TouchableOpacity accessibilityRole="button" style={s.button} onPress={() => {
+      if (locationQuality(fix) === 'live') setRideStops(trip.boarding, trip.alighting);
+    }}><Text style={s.buttonText}>Use these stops</Text></TouchableOpacity>)}
+  </View>;
+  const locationControl = <TouchableOpacity accessibilityRole="button"
+    accessibilityLabel={locationFresh ? 'Center on my location' : 'Enable location'}
+    accessibilityHint={errorMsg || locationDescription(fix, now)}
+    onPress={() => locationFresh && fix ? map.current?.centerOn(fix.latitude, fix.longitude) : void enableLocation()}
+    style={styles.locationRow}>
+    <Ionicons name="locate-outline" size={21} color={Colors.action} />
+    <View style={styles.itineraryText}><Text style={s.label}>Your location</Text>
+      <Text style={s.muted}>{errorMsg || locationDescription(fix, now)}</Text></View>
+    <Text style={styles.locationAction}>{locationFresh ? 'Center' : 'Enable location'}</Text>
+  </TouchableOpacity>;
+  const journeyControls = <View style={styles.details}>
+    <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: manualOpen }} style={styles.actionRow}
+      onPress={() => setManualOpen(open => !open)}>
+      <Text style={s.label}>Choose stops manually</Text>
+      <Ionicons name={manualOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.ink} />
+    </TouchableOpacity>
+    {manualOpen && <View style={styles.manual}>
+      <Text style={s.muted}>{transitNotice}</Text>
+      <PassengerSelect label="Route" value={selectedRouteId || ''} options={[{ value: '', label: 'All published routes' }, ...routes.map(r => ({ value: r.id, label: r.name }))]}
+        onSelect={id => { pendingPlace.current = null; setSelectedRouteId(id || null); setInspectedStop(null); setSelected(null); }} />
+      {!hasPath && <Text style={s.muted}>Route path unavailable.</Text>}
+      {!routeStops.length && <Text style={s.muted}>Verified stop locations unavailable.</Text>}
+      <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!routeStops.length}
+        options={routeStops.filter(stop => !alightingStop || stop.sequence_order < alightingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
+        onSelect={id => setBoardingStop(routeStops.find(stop => stop.id === id) || null)} />
+      <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!routeStops.length}
+        options={routeStops.filter(stop => !boardingStop || stop.sequence_order > boardingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
+        onSelect={id => setDestination(routeStops.find(stop => stop.id === id) || null)} />
+      <Text style={s.muted}>Destination place: {place?.name || 'Not selected'}</Text>
+      {boardingStop && alightingStop && !rideLeg(selectedRoute, boardingStop, alightingStop).length && <Text style={s.muted}>Ride leg unavailable: verified geometry must connect these stops in route order.</Text>}
+      {!!selectedRoute?.coordinates.length && <Text style={s.muted}>Arrows follow published geometry order. Green highlights the selected ride leg.</Text>}
+      {!!activeStop && <View style={{ gap: 8 }}>
+        <Text style={s.label}>{activeStop.name} · {routeName(activeStop.route_id)}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <TouchableOpacity accessibilityRole="button" disabled={!canChooseStop('boarding')} accessibilityState={{ disabled: !canChooseStop('boarding') }} onPress={() => setBoardingStop(activeStop)} style={[s.input, !canChooseStop('boarding') && { opacity: 0.5 }]}><Text>Board here</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" disabled={!canChooseStop('alighting')} accessibilityState={{ disabled: !canChooseStop('alighting') }} onPress={() => setDestination(activeStop)} style={[s.input, !canChooseStop('alighting') && { opacity: 0.5 }]}><Text>Alight here</Text></TouchableOpacity>
+        </View>
+        <Text style={s.muted}>Choose stops on the same route, with boarding before alighting. A stop marker does not verify a loading boundary.</Text>
     </View>}
     {(boardingStop || alightingStop) && <TouchableOpacity accessibilityRole="button" onPress={() => { setBoardingStop(null); setDestination(null); }}><Text style={s.muted}>Clear boarding and alighting stops</Text></TouchableOpacity>}
-    <Text style={s.muted}>{errorMsg || locationDescription(fix, now)}</Text>
-    <Text style={s.muted}>GPS updates while the app is open.</Text>
-    <TouchableOpacity accessibilityRole="button" onPress={() => void enableLocation()} style={s.input}><Text>Enable location</Text></TouchableOpacity>
-    {locationFresh && fix && <TouchableOpacity accessibilityRole="button" onPress={() => map.current?.centerOn(fix.latitude, fix.longitude)} style={s.input}><Text>Center on my location</Text></TouchableOpacity>}
-    {place && <View style={s.section}>
+    </View>}
+    {place && !trip && destinationCandidates.length > 0 && <View style={s.section}>
       <Text style={s.sectionTitle}>Stops near {place.name}</Text>
       <Text style={s.muted}>Nearby distances are straight-line proximity. Check a walking path before choosing where to alight.</Text>
-      {!destinationCandidates.length && <Text style={s.muted}>No compatible verified stops within 2 km are available.</Text>}
       {destinationCandidates.map(({ stop, distance }) => <View key={stop.id} style={{ gap: 8 }}>
         <Text style={s.label}>{stop.name}</Text>
         <Text style={s.muted}>{Math.round(distance)} m in a straight line · {destinationWalks[stop.id] ? 'Walking path available' : 'Walking availability unconfirmed'}</Text>
@@ -257,158 +379,125 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
       </View>)}
     </View>}
     {alightingStop && place && <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} onPress={() => void requestWalk(alightingStop, true)} style={[s.button, s.secondary]}><Text style={s.label}>Walk from alighting stop to destination</Text></TouchableOpacity>}
-    {walkingBusy && <Text accessibilityRole="alert" style={s.muted}>Finding a real walking path…</Text>}
-    {!!walkingError && <Text accessibilityRole="alert" style={s.muted}>{walkingError}</Text>}
-    {walk && <WalkingDirectionsPanel {...walk} />}
+    {(!tripApplied || unit) && walkingFeedback}
     <PassengerStopGuide boarding={boarding} landmarks={routeStops} selectedStop={activeStop} onSelectStop={chooseDestination}
       onWalk={stop => void requestWalk(stop)} walkingBusy={walkingBusy} onRefresh={refreshZones} loading={zonesLoading}
       loadError={zonesError || transit.status !== 'ready'} openRequest={route?.params?.showStopGuide} />
   </View>;
-  const journeyMapProps = { routes, terminals: routeStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes, selectedTerminal: activeStop, onSelectTerminal: chooseDestination, vehicleSelectionKey: selected?.id ?? null };
+  const journeyMapProps = { preferMapcn: true, routes, terminals: routeStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes, selectedTerminal: activeStop, onSelectTerminal: chooseDestination, vehicleSelectionKey: selected?.id ?? null };
 
-  // 1) DESTINATION SEARCH VIEW (Board 01 right)
-  if (searchOpen) {
-    return (
-      <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={styles.sheetScreen}>
-        <View style={styles.subHeader}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Back to map"
-            onPress={() => setSearchOpen(false)}
-            style={styles.backBtn}
-          >
-            <Ionicons name="chevron-back" size={24} color={Colors.ink} />
-          </TouchableOpacity>
-          <Text style={styles.subHeaderTitle}>Find a destination</Text>
-        </View>
+  const tripPlanner = <View style={styles.planner}>
+    <View style={styles.plannerHeading}>
+      <Text accessibilityRole="header" style={styles.plannerTitle}>Plan your ride</Text>
+      <Ionicons name="navigate" size={31} color={Colors.midnight} accessible={false} />
+    </View>
+    <View style={styles.plannerBody}>
+    {locationControl}
+    <Text style={s.label}>Destination</Text>
+    <View style={[styles.searchInputWrap, searchOpen && styles.searchInputActive]}>
+      <Ionicons name="search-outline" size={21} color={Colors.action} />
+      <TextInput
+        ref={destinationInput}
+        accessibilityLabel="Search destination"
+        value={query}
+        selectTextOnFocus
+        onFocus={() => setSearchOpen(true)}
+        onChangeText={(value) => {
+          searchVersion.current++;
+          setQuery(value);
+          setPlaces([]);
+          setSearched(false);
+          setSearching(false);
+          setSearchError('');
+        }}
+        onSubmitEditing={searchPlaces}
+        returnKeyType="search"
+        enterKeyHint="search"
+        placeholder="Where are you going?"
+        placeholderTextColor={Colors.subtleGray}
+        style={styles.searchInputText}
+      />
+    </View>
 
-        <View style={styles.searchInputWrap}>
-          <Ionicons name="search-outline" size={20} color={Colors.subtleGray} />
-          <TextInput
-            accessibilityLabel="Search destination"
-            value={query}
-            autoFocus
-            onChangeText={(value) => {
-              searchVersion.current++;
-              setQuery(value);
-              setPlaces([]);
-              setSearched(false);
-              setSearching(false);
-              setSearchError('');
-            }}
-            onSubmitEditing={searchPlaces}
-            returnKeyType="search"
-            enterKeyHint="search"
-            placeholder="MRT Buendia, Circuit Makati, or street..."
-            placeholderTextColor={Colors.subtleGray}
-            style={styles.searchInputText}
-          />
-          {query.length > 0 && (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              onPress={() => {
-                searchVersion.current++;
-                setSearching(false);
-                setSearchError('');
-                setQuery('');
-                setPlaces([]);
-                setSearched(false);
-              }}
-              style={{ padding: 4 }}
-            >
-              <Ionicons name="close-circle" size={18} color={Colors.subtleGray} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {query.trim().length >= 3 && (
-          <TouchableOpacity
-            accessibilityRole="button"
-            disabled={searching}
-            onPress={searchPlaces}
-            style={[s.button, { minHeight: 46 }]}
-          >
-            <Ionicons name="search" size={18} color={Colors.white} />
-            <Text style={s.buttonText}>{searching ? 'Searching places…' : `Search "${query.trim()}"`}</Text>
-          </TouchableOpacity>
-        )}
-
-        {!!searchError && <Text accessibilityRole="alert" style={s.body}>{searchError}</Text>}
-
-        {/* Places section */}
-        <View style={styles.listGroup}>
-          <Text style={styles.groupHeading}>Places</Text>
-          {places.length > 0 ? (
-            places.map((value) => (
-              <TouchableOpacity
-                key={value.id}
-                accessibilityRole="button"
-                onPress={() => choosePlace(value)}
-                style={styles.dividerRow}
-              >
-                <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>{value.name}</Text>
-                  <Text style={styles.rowSubtitle}>{value.address}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-              </TouchableOpacity>
-            ))
-          ) : (
-            results.slice(0, 2).map((stop) => (
-              <TouchableOpacity
-                key={`place-${stop.id}`}
-                accessibilityRole="button"
-                onPress={() => chooseDestination(stop)}
-                style={styles.dividerRow}
-              >
-                <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>{stop.name}</Text>
-                  <Text style={styles.rowSubtitle}>{routeName(stop.route_id)}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-              </TouchableOpacity>
-            ))
-          )}
-          {searched && !places.length && !searching && (
-            <Text style={[s.muted, { paddingVertical: 8 }]}>No places found. Add a street or city name and search again.</Text>
-          )}
-        </View>
-
-        {/* Route stops section */}
-        <View style={styles.listGroup}>
-          <Text style={styles.groupHeading}>Route stops</Text>
-          {!routeStops.length && <Text style={s.muted}>No verified stop locations for this selection.</Text>}
-          {(query ? results : routeStops).map((stop) => {
-            const num = Number.isFinite(stop.sequence_order) ? String(stop.sequence_order) : '—';
-            return (
-              <TouchableOpacity
-                key={stop.id}
-                accessibilityRole="button"
-                onPress={() => chooseDestination(stop)}
-                style={styles.dividerRow}
-              >
-                <View style={styles.stopNumBox}>
-                  <Text style={styles.stopNumText}>{num}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>{stop.name}</Text>
-                  <Text style={styles.rowSubtitle}>{routeName(stop.route_id)}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}>
-          <Text style={s.muted}>Place search: OpenStreetMap / Photon · Metro Manila</Text>
+    {searchOpen && <>
+      {query.length > 0 && query.trim().length < 3 && <Text style={s.muted}>Enter at least 3 characters to search places.</Text>}
+      <View style={styles.searchActions}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Search"
+          disabled={searching || query.trim().length < 3}
+          accessibilityState={{ disabled: searching || query.trim().length < 3, busy: searching }}
+          onPress={searchPlaces}
+          style={[s.button, { flex: 1 }, (query.trim().length < 3 || searching) && { opacity: 0.55 }]}
+        >
+          <Ionicons name="search" size={18} color={Colors.white} />
+          <Text style={s.buttonText}>{searching ? 'Searching…' : 'Search'}</Text>
         </TouchableOpacity>
-      </FormScrollView>
-    );
-  }
+        <TouchableOpacity accessibilityRole="button" style={styles.cancelButton} onPress={() => {
+          searchVersion.current++;
+          destinationInput.current?.blur(); Keyboard.dismiss();
+          setQuery(place?.name || destination?.name || ''); setPlaces([]); setSearchError('');
+          setSearched(false); setSearching(false); setSearchOpen(false);
+        }}><Text style={s.label}>Cancel</Text></TouchableOpacity>
+      </View>
+
+      {!!searchError && <Text accessibilityRole="alert" style={s.body}>{searchError}</Text>}
+
+      {searched && <View style={styles.listGroup}>
+        <Text accessibilityRole="header" style={styles.groupHeading}>Matching places</Text>
+        {places.length > 0 && (
+          places.map((value) => (
+            <TouchableOpacity
+              key={value.id}
+              accessibilityRole="button"
+              onPress={() => choosePlace(value)}
+              style={styles.dividerRow}
+            >
+              <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>{value.name}</Text>
+                <Text style={styles.rowSubtitle}>{value.address}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+            </TouchableOpacity>
+          ))
+        )}
+        {searched && !places.length && !searching && (
+          <Text style={[s.muted, { paddingVertical: 8 }]}>No places found. Add a street or city name and search again.</Text>
+        )}
+      </View>}
+
+      {results.length > 0 && <View style={styles.listGroup}>
+        <Text style={styles.groupHeading}>Route stops</Text>
+        {results.map((stop) => {
+          const num = Number.isFinite(stop.sequence_order) ? String(stop.sequence_order) : '—';
+          return (
+            <TouchableOpacity
+              key={stop.id}
+              accessibilityRole="button"
+              onPress={() => chooseStopAsDestination(stop)}
+              style={styles.dividerRow}
+            >
+              <View style={styles.stopNumBox}>
+                <Text style={styles.stopNumText}>{num}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>{stop.name}</Text>
+                <Text style={styles.rowSubtitle}>{routeName(stop.route_id)}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>}
+
+      <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}>
+        <Text style={s.muted}>Metro Manila place search · OpenStreetMap / Photon</Text>
+      </TouchableOpacity>
+    </>}
+    {!searchOpen && (result || <Text style={s.muted}>Find your boarding stop, alighting stop and fare.</Text>)}
+    </View>
+  </View>;
 
   // 2) WHERE TO BOARD VIEW (Board 02 left)
   if (boardingOpen) {
@@ -447,6 +536,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           </View>
         </View>
 
+        {trackingCard}
+        {locationControl}
+        {result}
         {journeyControls}
         <View style={[styles.boardingStatusRow, isProhibited && styles.boardingStatusDanger]}>
           <Ionicons
@@ -533,6 +625,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           />
         </View>
 
+        {trackingCard}
+        {locationControl}
         {journeyControls}
         <View style={styles.bottomSheetSurface}>
           <View style={styles.sheetHandle} />
@@ -593,180 +687,68 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     );
   }
 
-  // 4) DEFAULT MAP COCKPIT VIEW (Board 01 middle)
   return (
-    <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={{ flexGrow: 1, backgroundColor: Colors.paper }}>
-      {/* Top Search & Mode Control */}
-      <View style={styles.topControls}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Where are you going? Search destination"
-          onPress={() => setSearchOpen(true)}
-          style={styles.searchTrigger}
-        >
-          <Ionicons name="search-outline" size={20} color={Colors.subtleGray} />
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.searchTriggerText,
-              (place || destination) && { color: Colors.ink, fontWeight: '600' },
-            ]}
-          >
-            {place?.name || destination?.name || 'Where are you going?'}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={s.muted}>{vehicleError || (!displayed.length ? 'No current vehicle locations available.' : 'Select a unit on the map.')}</Text>
-      </View>
-
-      {/* Street Map */}
-      <View style={styles.mapContainer}>
-        <LeafletMap
-          ref={map}
-          destinationPlace={place}
-          hideOccupancy
-          {...journeyMapProps}
-          vehicles={displayed}
-          userLocation={locationFresh ? fix : null}
-          selectedVehicle={currentSelected}
-          isOffline={!isConnected}
-          onSelectVehicle={selectVehicle}
-        />
-        <View style={styles.updatedPill}>
-          <View style={styles.liveDot} />
-          <Text style={styles.updatedPillText}>
-            {!isConnected ? 'Offline' : currentSelected?.recorded_at ? `GPS measured ${new Date(currentSelected.recorded_at).toLocaleTimeString()}` : 'No unit selected'}
-          </Text>
+    <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={styles.home}>
+      <View style={[styles.layout, wide && styles.wideLayout]}>
+        <View style={wide && styles.plannerColumn}>{tripPlanner}</View>
+        <View style={[styles.mapColumn, wide && styles.wideMapColumn]}>
+          <View style={[styles.mapContainer, wide && styles.wideMap]}>
+            <LeafletMap ref={map} destinationPlace={place} hideOccupancy {...journeyMapProps}
+              vehicles={displayed} userLocation={locationFresh ? fix : null}
+              selectedVehicle={currentSelected} isOffline={!isConnected} onSelectVehicle={selectVehicle} />
+          </View>
+          <View style={styles.mapCaption}>
+            <Ionicons name="bus-outline" size={18} color={Colors.subtleGray} />
+            <Text style={[s.muted, { flex: 1 }]}>{vehicleError || (!displayed.length ? 'No current vehicle locations available.' : 'Tap an e-jeep to see its speed and GPS reading.')}</Text>
+          </View>
+          {trackingCard}
         </View>
       </View>
-
-      {journeyControls}
-      {/* Bottom Sheet Card */}
-      <View style={styles.bottomSheetSurface}>
-        <View style={styles.sheetHandle} />
-        <Text style={styles.nearbyLabel}>Selected stop</Text>
-
-        <View style={styles.stopHeroRow}>
-          <View style={styles.stopBadgePill}>
-            <Text style={styles.stopBadgeText}>{stopBadgeCode}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.stopHeroName}>{activeStop?.name || 'Choose a verified stop'}</Text>
-            <Text style={styles.rowSubtitle}>Select a stop, then choose Board here or Alight here</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => setSearchOpen(true)}
-          style={styles.dividerRow}
-        >
-          <View style={styles.unitIconCircle}>
-            <Ionicons name="bus-outline" size={19} color={Colors.brandGreen} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>{routeName(selectedRouteId || undefined)}</Text>
-            <Text style={styles.rowSubtitle}>{alightingStop?.name || 'Alighting stop not selected'}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+      <View style={styles.tools}>
+        <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => setBoardingOpen(true)}>
+          <Ionicons name="shield-checkmark-outline" size={20} color={Colors.action} />
+          <Text style={[s.label, { flex: 1 }]}>Where to board safely</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.ink} />
         </TouchableOpacity>
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => setBoardingOpen(true)}
-          style={[s.button, { marginTop: 4 }]}
-        >
-          <Text style={s.buttonText}>Where to board</Text>
-        </TouchableOpacity>
+        {journeyControls}
       </View>
     </FormScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  topControls: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 12,
-    gap: 10,
-    backgroundColor: Colors.paper,
-  },
-  searchTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    minHeight: 50,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.paper,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  searchTriggerText: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.subtleGray,
-  },
-  segmentWrap: {
-    flexDirection: 'row',
-    backgroundColor: Colors.canvas,
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  segmentBtn: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: 9,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  segmentBtnActive: {
-    backgroundColor: Colors.paleGreen,
-  },
-  segmentText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.subtleGray,
-  },
-  segmentTextActive: {
-    color: Colors.brandGreen,
-    fontWeight: '700',
-  },
+  home: { flexGrow: 1, backgroundColor: Colors.canvas, paddingBottom: 28 },
+  layout: { width: '100%', maxWidth: 1200, alignSelf: 'center', backgroundColor: Colors.paper },
+  wideLayout: { width: '96%', flexDirection: 'row', alignItems: 'stretch', marginTop: 16, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, overflow: 'hidden' },
+  plannerColumn: { width: '40%', maxWidth: 442 },
+  planner: { backgroundColor: Colors.paper },
+  plannerHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: Colors.signal, paddingHorizontal: 22, paddingVertical: 17 },
+  plannerBody: { paddingHorizontal: 22, paddingTop: 8, paddingBottom: 20, gap: 10 },
+  plannerTitle: { flexShrink: 1, fontSize: 33, fontWeight: '800', letterSpacing: -1, color: Colors.midnight },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingVertical: 10, borderBottomWidth: 1, borderColor: Colors.border },
+  locationAction: { fontSize: 14, fontWeight: '700', color: Colors.action },
+  searchActions: { flexDirection: 'row', gap: 10 },
+  cancelButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 10 },
+  result: { gap: 8, marginTop: 4, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 14 },
+  resultHeading: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: Colors.midnight },
+  itinerary: { gap: 12, paddingVertical: 4 },
+  itineraryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  itineraryText: { flex: 1, gap: 2 },
+  fareLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.actionTint, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12 },
+  mapColumn: { backgroundColor: Colors.paper },
+  wideMapColumn: { flex: 1, minWidth: 0, borderLeftWidth: 1, borderColor: Colors.border },
+  wideMap: { minHeight: 360, flex: 1 },
+  mapCaption: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  tools: { width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8 },
+  details: { gap: 8 },
+  manual: { gap: 10, paddingBottom: 8 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 48, borderBottomWidth: 1, borderColor: Colors.border },
   mapContainer: {
     height: 290,
     position: 'relative',
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: Colors.border,
-  },
-  updatedPill: {
-    position: 'absolute',
-    left: 16,
-    bottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.paper,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.brandGreen,
-  },
-  updatedPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.ink,
   },
   bottomSheetSurface: {
     flex: 1,
@@ -789,16 +771,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 4,
   },
-  nearbyLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.subtleGray,
-  },
-  stopHeroRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
   stopBadgePill: {
     backgroundColor: Colors.paleGreen,
     paddingHorizontal: 10,
@@ -810,11 +782,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: Colors.brandGreen,
-  },
-  stopHeroName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.ink,
   },
   dividerRow: {
     flexDirection: 'row',
@@ -872,8 +839,8 @@ const styles = StyleSheet.create({
     gap: 10,
     minHeight: 50,
     paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.canvas,
+    borderRadius: 9,
+    backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -883,6 +850,7 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     paddingVertical: 10,
   },
+  searchInputActive: { borderColor: Colors.action, backgroundColor: Colors.actionTint },
   listGroup: {
     marginTop: 4,
   },

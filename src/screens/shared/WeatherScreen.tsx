@@ -99,66 +99,88 @@ export default function WeatherScreen() {
   if (!weather?.weather?.[0] || !weather?.main) {
     return (
       <View style={styles.center}>
-        <Text>{t('weather.couldNotLoad')}</Text>
+        <Ionicons name="cloud-offline-outline" size={32} color={Colors.subtleGray} />
+        <Text accessibilityRole="alert" style={styles.detailValue}>{t('weather.couldNotLoad')}</Text>
       </View>
     );
   }
 
   const advisory = getWeatherAdvisory(weather);
-  const advisoryColors: Record<string, { bg: string; border: string; text: string }> = {
-    safe: { bg: '#EDF5F0', border: '#A9C9B4', text: '#285C3A' },
-    caution: { bg: '#FBF4E5', border: '#D8C38F', text: '#745B1D' },
-    danger: { bg: '#F8ECEE', border: '#D8AEB4', text: '#812D38' },
+  const advisoryColors = {
+    safe: { background: Colors.successBg, ink: Colors.success },
+    caution: { background: Colors.warningBg, ink: Colors.warning },
+    danger: { background: Colors.dangerBg, ink: Colors.primaryRed },
   };
-  const ac = advisory ? advisoryColors[advisory.severity] : advisoryColors.safe;
+  const tone = advisory && advisoryColors[advisory.severity];
+  const condition = weather.weather[0];
+  const icon = condition.id < 300 ? 'thunderstorm-outline' : condition.id < 600 ? 'rainy-outline'
+    : condition.id === 800 ? 'sunny-outline' : 'cloud-outline';
 
-  const weatherIcon = weather.weather[0].main.toLowerCase().includes('rain') ? 'rainy' : weather.weather[0].main.toLowerCase().includes('cloud') ? 'cloudy' : 'partly-sunny';
-  return <ScrollView style={styles.page} contentContainerStyle={styles.container}>
-    <View style={styles.mainCard}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.eyebrow}>Makati Transit Weather</Text>
-          <Text style={styles.title}>{new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}</Text>
+  return (
+    <ScrollView style={styles.page} contentContainerStyle={styles.container}>
+      <View style={styles.masthead}>
+        <View style={styles.locationRow}>
+          <View style={{ flex: 1 }}>
+            <Text accessibilityRole="header" style={styles.title}>Makati City</Text>
+            <Text style={styles.date}>
+              {new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}
+            </Text>
+          </View>
+          <Ionicons name={icon} size={38} color={Colors.onDark} />
         </View>
-        <View style={styles.weatherIcon}><Ionicons name={weatherIcon} size={36} color={Colors.brandMintLight} /></View>
+        <View style={styles.observation}>
+          <Text style={styles.temp}>{Math.round(weather.main.temp)}°C</Text>
+          <Text style={styles.condition}>{condition.description}</Text>
+        </View>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12, marginTop: 8 }}>
-        <Text style={styles.temp}>{Math.round(weather.main.temp)}°C</Text>
-        <Text style={styles.condition}>{weather.weather[0].description}</Text>
+
+      {advisory && tone && (
+        <View style={[styles.advisoryCard, { backgroundColor: tone.background, borderLeftColor: tone.ink }]}>
+          <Ionicons name={advisory.severity === 'safe' ? 'checkmark-circle' : 'alert-circle'} size={22} color={tone.ink} />
+          <View style={{ flex: 1 }}>
+            <Text accessibilityRole="header" style={[styles.advisoryTitle, { color: tone.ink }]}>
+              {advisory.severity === 'danger' ? t('weather.travelAdvisory') : advisory.severity === 'caution' ? t('weather.caution') : t('weather.travelConditions')}
+            </Text>
+            <Text style={styles.advisoryText}>{advisory.message}</Text>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.measurements}>
+        {[
+          { label: 'Feels like', value: reading(weather.main.feels_like, '°C', true) },
+          { label: t('weather.windSpeed'), value: reading(weather.wind?.speed, ' m/s') },
+          { label: t('weather.humidity'), value: reading(weather.main.humidity, '%') },
+          { label: t('weather.pressure'), value: reading(weather.main.pressure, ' hPa') },
+          { label: t('weather.sunrise'), value: sunLabel(weather.sys?.sunrise) },
+          { label: t('weather.sunset'), value: sunLabel(weather.sys?.sunset) },
+        ].map(({ label, value }) => (
+          <View key={label} style={styles.readingRow}>
+            <Text style={styles.detailLabel}>{label}</Text>
+            <Text style={styles.detailValue}>{value}</Text>
+          </View>
+        ))}
       </View>
-    </View>
-    {advisory && <View style={[styles.advisoryCard, { backgroundColor: ac.bg, borderColor: ac.border }]}><Ionicons name={advisory.severity === 'safe' ? 'checkmark-circle' : 'alert-circle'} size={22} color={ac.text} /><View style={{ flex: 1 }}><Text style={[styles.advisoryTitle, { color: ac.text }]}>{advisory.severity === 'danger' ? t('weather.travelAdvisory') : advisory.severity === 'caution' ? t('weather.caution') : t('weather.travelConditions')}</Text><Text style={[styles.advisoryText, { color: ac.text }]}>{advisory.message}</Text></View></View>}
-    <View style={styles.detailsGrid}>
-      {[
-        { icon: 'water' as const, label: 'Humidity', value: reading(weather.main.humidity, '%') },
-        { icon: 'speedometer' as const, label: 'Wind speed', value: reading(weather.wind?.speed, ' m/s') },
-        { icon: 'thermometer' as const, label: 'Feels like', value: reading(weather.main.feels_like, '°C', true) },
-        { icon: 'compass' as const, label: 'Pressure', value: reading(weather.main.pressure, ' hPa') },
-        { icon: 'sunny' as const, label: 'Sunrise', value: sunLabel(weather.sys?.sunrise) },
-        { icon: 'moon' as const, label: 'Sunset', value: sunLabel(weather.sys?.sunset) },
-      ].map((item) => <View key={item.label} style={styles.detailCard}><View style={styles.detailIcon}><Ionicons name={item.icon} size={17} color={Colors.brandMintLight} /></View><Text style={styles.detailLabel}>{item.label}</Text><Text style={styles.detailValue}>{item.value}</Text></View>)}
-    </View>
-  </ScrollView>;
+    </ScrollView>
+  );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.canvas },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16, gap: 10, backgroundColor: Colors.canvas },
   page: { flex: 1, backgroundColor: Colors.canvas },
-  container: { width: '100%', maxWidth: 960, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 16 },
-  header: { marginBottom: 2 },
-  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', color: Colors.brandMintLight, marginBottom: 4 },
-  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: Colors.white },
-  subtitle: { fontSize: 14, color: Colors.subtleGray, marginTop: 4 },
-  mainCard: { backgroundColor: Colors.ink, borderRadius: 22, padding: 24, borderWidth: 1, borderColor: Colors.brandSurfaceDark, gap: 6 },
-  weatherIcon: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: Colors.brandSurfaceDark, borderWidth: 1, borderColor: '#1E463E' },
-  temp: { fontSize: 52, fontWeight: '900', color: Colors.brandMintLight, fontVariant: ['tabular-nums'] },
-  condition: { fontSize: 16, color: '#A7F3D0', fontWeight: '700', textTransform: 'capitalize' },
-  advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderWidth: 1, borderRadius: 16, padding: 16 },
-  advisoryTitle: { fontSize: 14, fontWeight: '800' },
-  advisoryText: { fontSize: 13, lineHeight: 19, marginTop: 3 },
-  detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  detailCard: { flexGrow: 1, flexBasis: 145, backgroundColor: Colors.paper, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 6 },
-  detailIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  detailLabel: { fontSize: 12, color: Colors.subtleGray, fontWeight: '700' },
-  detailValue: { fontSize: 20, color: Colors.ink, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  container: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 14 },
+  masthead: { backgroundColor: Colors.midnight, borderRadius: 10, padding: 20, gap: 20 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  title: { color: Colors.onDark, fontSize: 22, fontWeight: '700' },
+  date: { color: Colors.onDark, fontSize: 14, marginTop: 3 },
+  observation: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 14, rowGap: 4 },
+  temp: { fontVariant: ['tabular-nums'], fontSize: 44, color: Colors.onDark, fontWeight: '800', letterSpacing: -1.2 },
+  condition: { fontSize: 18, fontWeight: '600', color: Colors.onDark, textTransform: 'capitalize' },
+  advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 16, borderRadius: 8, borderLeftWidth: 4 },
+  advisoryTitle: { fontSize: 14, fontWeight: '700' },
+  advisoryText: { color: Colors.ink, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  measurements: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, backgroundColor: Colors.paper, overflow: 'hidden' },
+  readingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
+  detailLabel: { flexShrink: 1, fontSize: 14, color: Colors.subtleGray },
+  detailValue: { fontSize: 16, color: Colors.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });

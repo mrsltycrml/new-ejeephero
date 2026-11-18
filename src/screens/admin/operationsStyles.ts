@@ -1,0 +1,63 @@
+import { StyleSheet } from 'react-native';
+import { Colors } from '../../constants/theme';
+
+export const operationsStyles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: Colors.canvas },
+  content: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 1024,
+    padding: 16,
+    paddingBottom: 32,
+    gap: 12,
+  },
+  masthead: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    backgroundColor: Colors.midnight,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.signal,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  mastheadTitle: {
+    color: Colors.onDark,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+  },
+  mastheadMeta: { color: Colors.onDarkMuted, fontSize: 14, fontWeight: '600' },
+  panel: {
+    backgroundColor: Colors.paper,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+  },
+  toolbar: { gap: 8, padding: 12 },
+  segmentBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  segmentBtn: {
+    flexGrow: 1,
+    minHeight: 44,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 5,
+    backgroundColor: Colors.mutedBackground,
+  },
+  segmentBtnActive: { backgroundColor: Colors.action },
+  segmentText: { color: Colors.ink, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  segmentTextActive: { color: Colors.onDark, fontWeight: '700' },
+  emptyState: { padding: 16, color: Colors.subtleGray, fontSize: 14 },
+  errorBanner: {
+    padding: 12,
+    borderRadius: 8,
+    color: Colors.primaryRed,
+    backgroundColor: Colors.dangerBg,
+    fontSize: 14,
+  },
+});

@@ -50,3 +50,10 @@ export function locationDescription(fix: MeasuredFix | null, now = Date.now()): 
   if (!fix || quality === 'invalid' || quality === 'future') return `GPS ${quality}`;
   return `GPS ${quality} · measured ${Math.max(0, Math.floor((now - fix.timestamp) / 1000))}s ago · ${fix.accuracy == null ? 'accuracy unknown' : `±${Math.round(fix.accuracy)} m`}`;
 }
+
+export function vehicleTelemetryReadout(position: (Point & { recorded_at?: string; speed: number | null; accuracy?: number | null }) | null, now = Date.now()) {
+  const fix = position && telemetryFix({ ...position, captured_at: position.recorded_at });
+  const quality = locationQuality(fix, now);
+  if (quality !== 'live' && quality !== 'weak') return { gps: 'Current vehicle GPS unavailable', speed: null };
+  return { gps: locationDescription(fix, now), speed: quality === 'live' ? fix?.speed ?? null : null };
+}

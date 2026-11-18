@@ -49,12 +49,12 @@ export default function WeatherBanner() {
 
   return (
     <View style={styles.banner}>
-      <Ionicons name="warning-outline" size={19} color="#745B1D" style={{ marginRight: 8 }} />
-      <Text style={styles.text}>
-        {t('weather.weatherAdvisoryBanner', { condition: weather.condition, temp: Math.round(weather.temp) })}
+      <Ionicons name="warning-outline" size={21} color={Colors.warning} />
+      <Text accessibilityLiveRegion="polite" style={styles.text}>
+        {t('weather.weatherAdvisoryBanner', { desc: weather.condition, temp: Math.round(weather.temp) })}
       </Text>
-      <TouchableOpacity onPress={() => setVisible(false)} style={styles.dismissBtn}>
-        <Text style={styles.dismiss}>{t('common.dismiss')}</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.dismiss')} onPress={() => setVisible(false)} style={styles.dismissBtn}>
+        <Ionicons name="close" size={20} color={Colors.ink} />
       </TouchableOpacity>
     </View>
   );
@@ -62,32 +62,10 @@ export default function WeatherBanner() {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: '#FBF4E5',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D8C38F',
-    marginHorizontal: 12,
-    marginTop: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingVertical: 4, paddingLeft: 14, paddingRight: 4,
+    marginHorizontal: 12, marginTop: 12, backgroundColor: Colors.warningBg,
+    borderLeftWidth: 4, borderLeftColor: Colors.warning, borderRadius: 6,
   },
-  text: {
-    color: '#5E4D27',
-    fontWeight: '700',
-    fontSize: 13,
-    flex: 1,
-    lineHeight: 18,
-  },
-  dismissBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  dismiss: {
-    color: '#745B1D',
-    fontWeight: 'bold',
-    fontSize: 13,
-  }
+  text: { flex: 1, color: Colors.ink, fontWeight: '600', fontSize: 14, lineHeight: 20 },
+  dismissBtn: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 });

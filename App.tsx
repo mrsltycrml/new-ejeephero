@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import './src/lib/webAlertPolyfill';
 import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider } from '@clerk/clerk-expo';
@@ -11,6 +11,12 @@ import { NetworkProvider } from './src/contexts/NetworkContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { initializeLanguage } from './src/locales/i18n';
 import { clerkPublishableKey, clerkTokenCache, isClerkConfigured } from './src/lib/clerk';
+import { Colors } from './src/constants/theme';
+
+const navigationTheme = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, primary: Colors.action, background: Colors.canvas, card: Colors.paper, text: Colors.ink, border: Colors.border, notification: Colors.primaryRed },
+};
 
 export default function App() {
   useEffect(() => {
@@ -23,7 +29,7 @@ export default function App() {
         <NetworkProvider>
           <AuthProvider>
             <LocationProvider>
-              <NavigationContainer>
+              <NavigationContainer theme={navigationTheme}>
                 <AppNavigator />
               </NavigationContainer>
             </LocationProvider>

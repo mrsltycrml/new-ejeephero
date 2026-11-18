@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { BottomSheetModal, ScreenSkeleton, triggerHaptic } from '../../components/AppUI';
+import { operationsStyles as ops } from './operationsStyles';
 import AdminRegistryManager from '../../components/AdminRegistryManager';
 import { Colors } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
@@ -128,7 +129,6 @@ type UnifiedDriverRow = {
 // 1. DRIVERS TAB (Board 03 left & middle, Board 08 left)
 // ─────────────────────────────────────────────────────────────────────────────
 export function AdminDriversScreen() {
-  const { user } = useAuth();
   const { data, loading, refreshing, error, refresh } = useOperationsData();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'approved' | 'pending' | 'hidden'>('all');
@@ -224,15 +224,12 @@ export function AdminDriversScreen() {
   return (
     <>
       <ScrollView
-        style={styles.page}
-        contentContainerStyle={styles.content}
+        style={ops.page}
+        contentContainerStyle={ops.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       >
-        <View style={styles.topActionRow}>
-          <View>
-            <Text style={styles.title}>Drivers</Text>
-            <Text style={styles.subtitle}>Supervisor</Text>
-          </View>
+        <View style={ops.masthead}>
+          <Text accessibilityRole="header" style={ops.mastheadTitle}>Drivers</Text>
           <TouchableOpacity
             accessibilityRole="button"
             onPress={() => {
@@ -242,90 +239,95 @@ export function AdminDriversScreen() {
             }}
             style={styles.topAddBtn}
           >
-            <Ionicons name="add" size={18} color={Colors.brandGreen} />
-            <Text style={styles.topAddText}>Add</Text>
+            <Ionicons name="people-outline" size={18} color={Colors.onDark} />
+            <Text style={styles.topAddText}>Driver roster</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={Colors.subtleGray} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search drivers"
-            placeholderTextColor={Colors.subtleGray}
-            style={styles.searchInput}
-          />
-        </View>
+        <View style={ops.panel}>
+          <View style={ops.toolbar}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search-outline" size={18} color={Colors.subtleGray} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                accessibilityLabel="Search drivers"
+                placeholder="Search drivers"
+                placeholderTextColor={Colors.subtleGray}
+                style={styles.searchInput}
+              />
+            </View>
 
-        <View style={styles.segmentBar}>
-          {(
-            [
-              { key: 'all', label: 'All' },
-              { key: 'approved', label: 'Approved' },
-              { key: 'pending', label: 'Pending' },
-              { key: 'hidden', label: 'Hidden' },
-            ] as const
-          ).map((tab) => {
-            const active = filter === tab.key;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                accessibilityRole="button"
-                onPress={() => setFilter(tab.key)}
-                style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-              >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{tab.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+            <View style={ops.segmentBar}>
+              {(
+                [
+                  { key: 'all', label: 'All' },
+                  { key: 'approved', label: 'Approved' },
+                  { key: 'pending', label: 'Pending' },
+                  { key: 'hidden', label: 'Hidden' },
+                ] as const
+              ).map((tab) => {
+                const active = filter === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => setFilter(tab.key)}
+                    style={[ops.segmentBtn, active && ops.segmentBtnActive]}
+                  >
+                    <Text style={[ops.segmentText, active && ops.segmentTextActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
-        {!!error && <Text style={styles.errorBanner}>{error}</Text>}
+          {!!error && <Text accessibilityRole="alert" style={ops.errorBanner}>{error}</Text>}
 
-        <View style={styles.dividerList}>
+          {!error && !filteredDrivers.length && <Text style={ops.emptyState}>{query || filter !== 'all' ? 'No drivers match these filters.' : 'No driver accounts.'}</Text>}
           {filteredDrivers.map((d) => (
-            <TouchableOpacity
-              key={d.id}
-              accessibilityRole="button"
-              onPress={() => {
-                if (d.status === 'pending') {
-                  setReviewingDriver(d);
-                } else {
-                  setEditName(d.name);
-                  setEditEmail(d.email);
-                  setEditingDriver(d);
-                }
-              }}
-              style={styles.listRow}
-            >
-              <View style={styles.initialsCircle}>
-                <Text style={styles.initialsText}>{initialsOf(d.name)}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{d.name}</Text>
-                {d.status === 'approved' && (
-                  <Text style={styles.rowSub}>
-                    Approved{d.unitCode ? ` · ${d.unitCode}` : ' · Off duty'}
-                  </Text>
-                )}
-                {d.status === 'pending' && (
-                  <View style={[styles.statusBadge, styles.badgeAmber, { alignSelf: 'flex-start', marginTop: 4 }]}>
-                    <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>Pending approval</Text>
-                  </View>
-                )}
-                {d.status === 'hidden' && <Text style={styles.rowSub}>Hidden · inactive</Text>}
-              </View>
+            <View key={d.id} style={styles.listRow}>
+              <TouchableOpacity
+                style={styles.recordButton}
+                accessibilityRole="button"
+                onPress={() => {
+                  if (d.status === 'pending') {
+                    setReviewingDriver(d);
+                  } else {
+                    setEditName(d.name);
+                    setEditEmail(d.email);
+                    setEditingDriver(d);
+                  }
+                }}
+              >
+                <View style={styles.initialsCircle}>
+                  <Text style={styles.initialsText}>{initialsOf(d.name)}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{d.name}</Text>
+                  <Text style={styles.rowSub}>{d.email}</Text>
+                  {d.status === 'approved' && (
+                    <Text style={styles.rowSub}>
+                      Approved · {d.onShift ? 'On shift' : 'Off duty'}{d.unitCode ? ` · ${d.unitCode}` : ''}
+                    </Text>
+                  )}
+                  {d.status === 'pending' && (
+                    <View style={[styles.statusBadge, styles.badgeAmber, { alignSelf: 'flex-start', marginTop: 4 }]}>
+                      <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>Pending approval</Text>
+                    </View>
+                  )}
+                  {d.status === 'hidden' && <Text style={styles.rowSub}>Hidden · inactive</Text>}
+                  {!['approved', 'pending', 'hidden'].includes(d.status) && <Text style={styles.rowSub}>{d.status}</Text>}
+                </View>
 
-              {d.status === 'pending' ? (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  onPress={() => setReviewingDriver(d)}
-                  style={styles.reviewGreenBtn}
-                >
-                  <Text style={styles.reviewGreenText}>Review</Text>
-                </TouchableOpacity>
-              ) : d.status === 'hidden' ? (
+                {d.status === 'pending' ? (
+                  <View style={styles.reviewBtn}><Text style={styles.reviewText}>Review</Text></View>
+                ) : d.status !== 'hidden' && (
+                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+                )}
+              </TouchableOpacity>
+              {d.status === 'hidden' && (
                 <TouchableOpacity
                   accessibilityRole="button"
                   onPress={() => {
@@ -335,10 +337,8 @@ export function AdminDriversScreen() {
                 >
                   <Text style={styles.restoreOutlineText}>Restore</Text>
                 </TouchableOpacity>
-              ) : (
-                <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
               )}
-            </TouchableOpacity>
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -388,7 +388,7 @@ export function AdminDriversScreen() {
               </View>
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Registered</Text>
-                <Text style={styles.kvValue}>{reviewingDriver.registeredLabel || '17 Nov 2026'}</Text>
+                <Text style={styles.kvValue}>{reviewingDriver.registeredLabel || 'Unavailable'}</Text>
               </View>
             </View>
 
@@ -445,14 +445,15 @@ export function AdminDriversScreen() {
 
             <View style={styles.topActionRow}>
               <Text style={styles.title}>Edit driver</Text>
-              <View style={[styles.statusBadge, styles.badgeGreen]}>
-                <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>{editingDriver.status}</Text>
+              <View style={[styles.statusBadge, editingDriver.status === 'approved' ? styles.badgeGreen : styles.badgeGray]}>
+                <Text style={[styles.statusBadgeText, editingDriver.status === 'approved' ? styles.badgeGreenText : styles.badgeGrayText]}>{editingDriver.status}</Text>
               </View>
             </View>
 
             <View style={{ gap: 6 }}>
               <Text style={styles.fieldLabel}>Full name</Text>
               <TextInput
+                accessibilityLabel="Full name"
                 value={editName}
                 onChangeText={setEditName}
                 style={styles.textInput}
@@ -463,6 +464,7 @@ export function AdminDriversScreen() {
             <View style={{ gap: 6 }}>
               <Text style={styles.fieldLabel}>Email</Text>
               <TextInput
+                accessibilityLabel="Email"
                 value={editEmail}
                 editable={false}
                 style={styles.textInput}
@@ -652,17 +654,14 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
   if (loading) return <ScreenSkeleton preset="list" />;
 
   return (
-    <View style={styles.page}>
+    <View style={ops.page}>
       <ScrollView
-        style={styles.page}
-        contentContainerStyle={[styles.content, { paddingBottom: 170 }]}
+        style={ops.page}
+        contentContainerStyle={ops.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       >
-        <View style={styles.topActionRow}>
-          <View>
-            <Text style={styles.title}>Units</Text>
-            <Text style={styles.subtitle}>Supervisor</Text>
-          </View>
+        <View style={ops.masthead}>
+          <Text accessibilityRole="header" style={ops.mastheadTitle}>Units</Text>
           <TouchableOpacity
             accessibilityRole="button"
             onPress={() => {
@@ -673,110 +672,114 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
             }}
             style={styles.topAddBtn}
           >
-            <Ionicons name="add" size={18} color={Colors.brandGreen} />
-            <Text style={styles.topAddText}>Add</Text>
+            <Ionicons name="add" size={18} color={Colors.onDark} />
+            <Text style={styles.topAddText}>Add unit</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={Colors.subtleGray} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Body or plate number"
-            placeholderTextColor={Colors.subtleGray}
-            style={styles.searchInput}
-          />
-        </View>
+        <View style={ops.panel}>
+          <View style={ops.toolbar}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search-outline" size={18} color={Colors.subtleGray} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                accessibilityLabel="Search units"
+                placeholder="Search body, plate or driver"
+                placeholderTextColor={Colors.subtleGray}
+                style={styles.searchInput}
+              />
+            </View>
 
-        <View style={styles.segmentBar}>
-          {(
-            [
-              { key: 'all', label: 'All' },
-              { key: 'on_shift', label: 'On shift' },
-              { key: 'inactive', label: 'Inactive' },
-            ] as const
-          ).map((tab) => {
-            const active = filter === tab.key;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                accessibilityRole="button"
-                onPress={() => setFilter(tab.key)}
-                style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-              >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{tab.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+            <View style={ops.segmentBar}>
+              {(
+                [
+                  { key: 'all', label: 'All' },
+                  { key: 'on_shift', label: 'On shift' },
+                  { key: 'inactive', label: 'Inactive' },
+                ] as const
+              ).map((tab) => {
+                const active = filter === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => setFilter(tab.key)}
+                    style={[ops.segmentBtn, active && ops.segmentBtnActive]}
+                  >
+                    <Text style={[ops.segmentText, active && ops.segmentTextActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
-        {!!error && <Text style={styles.errorBanner}>{error}</Text>}
-        {!!registryError && <Text accessibilityRole="alert" style={styles.errorBanner}>{registryError}</Text>}
+          {!!error && <Text accessibilityRole="alert" style={ops.errorBanner}>{error}</Text>}
+          {!!registryError && <Text accessibilityRole="alert" style={ops.errorBanner}>{registryError}</Text>}
 
-        <View style={styles.dividerList}>
+          {!error && !registryError && !filteredUnits.length && <Text style={ops.emptyState}>{query || filter !== 'all' ? 'No units match these filters.' : 'No fleet units.'}</Text>}
           {filteredUnits.map((u) => {
             const isSelected = selectedUnit?.key === u.key;
             return (
-              <TouchableOpacity
-                key={u.key}
-                accessibilityRole="button"
-                onPress={() => setSelectedUnitKey(u.key)}
-                style={[
-                  styles.listRow,
-                  u.state === 'stale' && { backgroundColor: '#FFFBEB' },
-                  isSelected && { backgroundColor: Colors.paleGreen },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.initialsCircle,
-                    u.state === 'stale' && { backgroundColor: Colors.warningBg },
-                    u.state === 'inactive' && { backgroundColor: Colors.canvas },
-                  ]}
+              <View key={u.key} style={[styles.listRow, isSelected && styles.selectedUnit]}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  onPress={() => setSelectedUnitKey(u.key)}
+                  style={styles.recordButton}
                 >
-                  <Ionicons
-                    name="bus-outline"
-                    size={20}
-                    color={
-                      u.state === 'stale'
-                        ? Colors.warning
-                        : u.state === 'inactive'
-                          ? Colors.subtleGray
-                          : Colors.brandGreen
-                    }
-                  />
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={styles.rowTitle}>{u.body || 'Body unavailable'}</Text>
-                    {u.state === 'on_shift' && (
-                      <View style={[styles.statusBadge, styles.badgeGreen]}>
-                        <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>On shift</Text>
-                      </View>
-                    )}
-                    {u.state === 'stale' && (
-                      <View style={[styles.statusBadge, styles.badgeAmber]}>
-                        <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>
-                          GPS stale · shift active
-                        </Text>
-                      </View>
-                    )}
-                    {u.state === 'inactive' && (
-                      <View style={[styles.statusBadge, styles.badgeGray]}>
-                        <Text style={[styles.statusBadgeText, styles.badgeGrayText]}>Off shift</Text>
-                      </View>
-                    )}
+                  <View
+                    style={[
+                      styles.initialsCircle,
+                      u.state === 'stale' && { backgroundColor: Colors.warningBg },
+                      u.state === 'inactive' && { backgroundColor: Colors.canvas },
+                    ]}
+                  >
+                    <Ionicons
+                      name="bus-outline"
+                      size={20}
+                      color={
+                        u.state === 'stale'
+                          ? Colors.warning
+                          : u.state === 'inactive'
+                            ? Colors.subtleGray
+                            : Colors.brandGreen
+                      }
+                    />
                   </View>
-                  <Text style={styles.rowSub}>
-                    Plate {u.plate || 'unavailable'}
-                    {u.state !== 'inactive' ? ` · ${u.driverName}` : ' · Historical records kept'}
-                  </Text>
-                  {!!u.registryDeletedAt && <Text style={styles.rowSub}>Inactive in registry · historical records kept</Text>}
-                </View>
 
-                {u.registryDeletedAt ? (
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.recordHeading}>
+                      <Text style={styles.rowTitle}>{u.body || 'Body unavailable'}</Text>
+                      {u.state === 'on_shift' && (
+                        <View style={[styles.statusBadge, styles.badgeGreen]}>
+                          <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>On shift</Text>
+                        </View>
+                      )}
+                      {u.state === 'stale' && (
+                        <View style={[styles.statusBadge, styles.badgeAmber]}>
+                          <Text style={[styles.statusBadgeText, styles.badgeAmberText]}>
+                            GPS stale · shift active
+                          </Text>
+                        </View>
+                      )}
+                      {u.state === 'inactive' && (
+                        <View style={[styles.statusBadge, styles.badgeGray]}>
+                          <Text style={[styles.statusBadgeText, styles.badgeGrayText]}>Off shift</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.rowSub}>
+                      Plate {u.plate || 'unavailable'}
+                      {u.state !== 'inactive' ? ` · ${u.driverName}` : ' · Historical records kept'}
+                    </Text>
+                    {!!u.registryDeletedAt && <Text style={styles.rowSub}>Inactive in registry · historical records kept</Text>}
+                  </View>
+
+                  <Ionicons name={isSelected ? 'checkmark-circle' : 'ellipse-outline'} size={19} color={isSelected ? Colors.action : Colors.subtleGray} />
+                </TouchableOpacity>
+                {!!u.registryDeletedAt && (
                   <TouchableOpacity
                     accessibilityRole="button"
                     onPress={() => {
@@ -786,10 +789,8 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
                   >
                     <Text style={styles.restoreOutlineText}>Restore</Text>
                   </TouchableOpacity>
-                ) : (
-                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
                 )}
-              </TouchableOpacity>
+              </View>
             );
           })}
         </View>
@@ -798,8 +799,11 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
       {/* BOTTOM SELECTED UNIT ACTION DOCK (Board 03 right) */}
       {selectedUnit && (
         <View style={styles.bottomActionDock}>
-          <Text style={styles.dockSelectedLabel}>Selected: {selectedUnit.body}</Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={styles.dockHeading}>
+            <Ionicons name="bus-outline" size={18} color={Colors.ink} />
+            <Text style={styles.dockSelectedLabel}>Selected unit · {selectedUnit.body}</Text>
+          </View>
+          <View style={styles.dockActions}>
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() =>
@@ -809,9 +813,9 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
                   trackRequestId: Date.now(),
                 })
               }
-              style={[styles.outlineGreenBtn, { flex: 1 }]}
+              style={[styles.primaryBtn, styles.dockButton]}
             >
-              <Text style={styles.outlineGreenText}>Track on map</Text>
+              <Text style={styles.primaryBtnText}>Track on map</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -823,21 +827,20 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
                 setFormCapacity('');
                 setEditModalUnit(selectedUnit);
               }}
-              style={[styles.outlineGreenBtn, { flex: 1 }]}
+              style={[styles.outlineBtn, styles.dockButton, !selectedUnit.registryId && styles.disabledOutlineBtn]}
             >
-              <Text style={styles.outlineGreenText}>Edit unit</Text>
+              <Text style={[styles.outlineText, !selectedUnit.registryId && { color: Colors.subtleGray }]}>Edit unit</Text>
             </TouchableOpacity>
+            {!!selectedUnit.activeShiftId && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => setForceEndModalUnit(selectedUnit)}
+                style={[styles.outlineRedBtn, styles.dockButton]}
+              >
+                <Text style={styles.outlineRedText}>Force-end shift</Text>
+              </TouchableOpacity>
+            )}
           </View>
-
-          {!!selectedUnit.activeShiftId && (
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => setForceEndModalUnit(selectedUnit)}
-              style={styles.outlineRedBtn}
-            >
-              <Text style={styles.outlineRedText}>Force-end shift</Text>
-            </TouchableOpacity>
-          )}
         </View>
       )}
 
@@ -905,7 +908,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
             <View style={styles.staleBanner}>
               <Ionicons name="information-circle-outline" size={18} color={Colors.warning} />
               <Text style={styles.staleBannerText}>
-                GPS is stale. The unit will be removed from live passenger and fleet maps.
+                Ending this shift removes the unit from live passenger and fleet maps.
               </Text>
             </View>
 
@@ -960,8 +963,8 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         <View style={styles.topActionRow}>
           <Text style={styles.title}>{editModalUnit ? 'Edit unit' : 'Add unit'}</Text>
           {editModalUnit && (
-            <View style={[styles.statusBadge, styles.badgeGreen]}>
-              <Text style={[styles.statusBadgeText, styles.badgeGreenText]}>
+            <View style={[styles.statusBadge, editModalUnit.registryDeletedAt ? styles.badgeGray : styles.badgeGreen]}>
+              <Text style={[styles.statusBadgeText, editModalUnit.registryDeletedAt ? styles.badgeGrayText : styles.badgeGreenText]}>
                 {editModalUnit.registryDeletedAt ? 'Inactive in registry' : 'Active in registry'}
               </Text>
             </View>
@@ -971,6 +974,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         <View style={{ gap: 6 }}>
           <Text style={styles.fieldLabel}>Body number</Text>
           <TextInput
+            accessibilityLabel="Body number"
             value={formBody}
             onChangeText={setFormBody}
             placeholder="Body number"
@@ -983,7 +987,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
           <TextInput
             value={formPlate}
             onChangeText={setFormPlate}
-            placeholder="JKL 3456"
+            accessibilityLabel="Plate number"
             style={styles.textInput}
           />
         </View>
@@ -994,7 +998,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
             value={formCapacity}
             onChangeText={setFormCapacity}
             keyboardType="number-pad"
-            placeholder="22"
+            accessibilityLabel="Seat capacity"
             style={styles.textInput}
           />
         </View>
@@ -1100,96 +1104,92 @@ export function AdminReportsScreen() {
 
   return (
     <>
-      <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-        <View style={{ gap: 2 }}>
-          <Text style={styles.title}>Reports</Text>
-          <Text style={styles.subtitle}>Fleet report</Text>
-          {!!error && <Text accessibilityRole="alert">{error}</Text>}
-        </View>
-
-        <View style={styles.segmentBar}>
-          {(
-            [
-              { key: 'day', label: 'Day' },
-              { key: 'week', label: 'Week' },
-              { key: 'month', label: 'Month' },
-              { key: 'year', label: 'Year' },
-            ] as const
-          ).map((m) => {
-            const active = period.mode === m.key;
-            return (
-              <TouchableOpacity
-                key={m.key}
-                accessibilityRole="button"
-                onPress={() => setPeriod(currentReportingPeriod(m.key))}
-                style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-              >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{m.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <View style={{ gap: 6 }}>
-          <Text style={styles.fieldLabel}>Report date</Text>
-          <View style={styles.selectorRowCard}>
-            <TouchableOpacity onPress={() => stepPeriod(-1)} style={{ padding: 4 }}>
-              <Ionicons name="chevron-back" size={18} color={Colors.ink} />
-            </TouchableOpacity>
-            <Text style={styles.selectorRowText}>{formatReportingPeriod(period)}</Text>
-            <TouchableOpacity onPress={() => stepPeriod(1)} style={{ padding: 4 }}>
-              <Ionicons name="chevron-forward" size={18} color={Colors.ink} />
-            </TouchableOpacity>
+      <ScrollView style={ops.page} contentContainerStyle={ops.content}>
+        <View style={ops.masthead}>
+          <View>
+            <Text accessibilityRole="header" style={ops.mastheadTitle}>Fleet reports</Text>
+            <Text style={ops.mastheadMeta}>All recorded routes</Text>
           </View>
+          <TouchableOpacity
+            accessibilityRole="button"
+            disabled={loading || !!error}
+            accessibilityState={{ disabled: loading || !!error }}
+            onPress={() => setPreviewOpen(true)}
+            style={[styles.topAddBtn, (loading || !!error) && styles.disabledAction]}
+          >
+            <Ionicons name="document-text-outline" size={18} color={Colors.onDark} />
+            <Text style={styles.topAddText}>Export PDF</Text>
+          </TouchableOpacity>
         </View>
-
-        <View style={{ gap: 6 }}>
-          <Text style={styles.fieldLabel}>Route</Text>
-          <View style={styles.selectorRowCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.selectorRowText}>All routes</Text>
-              <Text style={styles.rowSub}>Recorded operations for the selected period</Text>
+        {!!error && <Text accessibilityRole="alert" style={ops.errorBanner}>{error}</Text>}
+        <View style={styles.reportLayout}>
+          <View style={[ops.panel, styles.reportControls]}>
+            <Text accessibilityRole="header" style={styles.panelTitle}>Reporting period</Text>
+            <View style={ops.segmentBar}>
+              {(
+                [
+                  { key: 'day', label: 'Day' },
+                  { key: 'week', label: 'Week' },
+                  { key: 'month', label: 'Month' },
+                  { key: 'year', label: 'Year' },
+                ] as const
+              ).map((m) => {
+                const active = period.mode === m.key;
+                return (
+                  <TouchableOpacity
+                    key={m.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => setPeriod(currentReportingPeriod(m.key))}
+                    style={[ops.segmentBtn, active && ops.segmentBtnActive]}
+                  >
+                    <Text style={[ops.segmentText, active && ops.segmentTextActive]}>{m.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            <Ionicons name="chevron-down" size={18} color={Colors.subtleGray} />
+
+            <View style={styles.selectorRowCard}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous reporting period" onPress={() => stepPeriod(-1)} style={styles.stepButton}>
+                <Ionicons name="chevron-back" size={18} color={Colors.action} />
+              </TouchableOpacity>
+              <Text style={styles.selectorRowText}>{formatReportingPeriod(period)}</Text>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next reporting period" onPress={() => stepPeriod(1)} style={styles.stepButton}>
+                <Ionicons name="chevron-forward" size={18} color={Colors.action} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={[ops.panel, styles.reportSummary]}>
+            <Text accessibilityRole="header" style={styles.panelTitle}>Report summary</Text>
+            <View style={styles.kvGroup}>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Shifts started</Text>
+                <Text style={styles.kvValue}>{loading || error ? 'Unavailable' : shiftsCount}</Text>
+              </View>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Speed offenses</Text>
+                <Text style={styles.kvValue}>{loading || error || data.speedEvents === null ? 'Unavailable' : speedCount}</Text>
+              </View>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Route flags</Text>
+                <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : routeFlagsCount}</Text>
+              </View>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Confirmed cuts</Text>
+                <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : confirmedCutsCount}</Text>
+              </View>
+              <View style={styles.kvRow}>
+                <Text style={styles.kvLabel}>Awaiting review</Text>
+                <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : data.tripViolations.filter(item => ['pending_review', 'flagged'].includes(item.status) && periodContains(item.created_at, period)).length}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.smallHelper}>
+              Includes driver safety grades, speed offenses, and route flag status for the selected period.
+            </Text>
           </View>
         </View>
-
-        <Text style={[styles.fieldLabel, { marginTop: 4 }]}>Report summary</Text>
-        <View style={styles.kvGroup}>
-          <View style={styles.kvRow}>
-            <Text style={styles.kvLabel}>Shifts started</Text>
-            <Text style={styles.kvValue}>{loading || error ? 'Unavailable' : shiftsCount}</Text>
-          </View>
-          <View style={styles.kvRow}>
-            <Text style={styles.kvLabel}>Speed offenses</Text>
-            <Text style={styles.kvValue}>{loading || error || data.speedEvents === null ? 'Unavailable' : speedCount}</Text>
-          </View>
-          <View style={styles.kvRow}>
-            <Text style={styles.kvLabel}>Route flags</Text>
-            <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : routeFlagsCount}</Text>
-          </View>
-          <View style={styles.kvRow}>
-            <Text style={styles.kvLabel}>Confirmed cuts</Text>
-            <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : confirmedCutsCount}</Text>
-          </View>
-          <View style={styles.kvRow}>
-            <Text style={styles.kvLabel}>Awaiting review</Text>
-            <Text style={styles.kvValue}>{loading || error || data.tripViolations === null ? 'Unavailable' : data.tripViolations.filter(item => ['pending_review', 'flagged'].includes(item.status) && periodContains(item.created_at, period)).length}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.smallHelper}>
-          Includes driver safety grades, speed offenses, and route flag status for the selected period.
-        </Text>
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          disabled={loading || !!error}
-          onPress={() => setPreviewOpen(true)}
-          style={styles.primaryBtn}
-        >
-          <Text style={styles.primaryBtnText}>Export PDF</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* BOARD 04 RIGHT: PDF PREVIEW SHEET */}
@@ -1212,7 +1212,7 @@ export function AdminReportsScreen() {
 
         <View style={styles.pdfSheetCard}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.brandGreen }}>ejeephero</Text>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.ink }}>eSAKAY</Text>
             <Text style={styles.rowSub}>{period.key}</Text>
           </View>
           <Text style={[styles.rowTitle, { fontSize: 18 }]}>Fleet report</Text>
@@ -1260,113 +1260,37 @@ export function AdminReportsScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: Colors.paper },
-  content: {
-    width: '100%',
-    maxWidth: 640,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 36,
-    gap: 14,
-  },
-  topActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  topActionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: {
     fontSize: 26,
     fontWeight: '700',
     color: Colors.ink,
     letterSpacing: -0.4,
   },
-  subtitle: {
-    fontSize: 14,
-    color: Colors.subtleGray,
-  },
-  topAddBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  topAddText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
-  searchBar: {
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.paper,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
+  topAddBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: Colors.onDarkMuted, backgroundColor: Colors.action },
+  recordButton: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, minHeight: 60, paddingVertical: 10, gap: 10 },
+  recordHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  selectedUnit: { backgroundColor: Colors.actionTint, borderLeftWidth: 3, borderLeftColor: Colors.action },
+  dockHeading: { flexDirection: 'row', alignItems: 'center', flexGrow: 1, gap: 6 },
+  dockActions: { flexDirection: 'row', flexWrap: 'wrap', flexGrow: 1, flexShrink: 1, gap: 6 },
+  dockButton: { flexGrow: 1, minHeight: 44, paddingHorizontal: 8, paddingVertical: 6 },
+  reportLayout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 12 },
+  reportControls: { flexGrow: 1, flexShrink: 1, flexBasis: 300, padding: 14, gap: 14 },
+  reportSummary: { flexGrow: 2, flexShrink: 1, flexBasis: 360, padding: 14, gap: 10 },
+  panelTitle: { fontSize: 18, fontWeight: '700', color: Colors.ink },
+  stepButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  disabledAction: { opacity: 0.6 },
+  topAddText: { fontSize: 14, fontWeight: '700', color: Colors.onDark },
+  searchBar: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: Colors.paper, borderRadius: 6, borderWidth: 1, borderColor: Colors.border },
   searchInput: {
     flex: 1,
     fontSize: 15,
     color: Colors.ink,
     paddingVertical: 10,
   },
-  segmentBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.canvas,
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  segmentBtn: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentBtnActive: {
-    backgroundColor: Colors.brandGreen,
-  },
-  segmentText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  segmentTextActive: {
-    color: Colors.white,
-    fontWeight: '700',
-  },
-  dividerList: {
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-  },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  initialsCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initialsText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: Colors.brandGreen,
-  },
+  listRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 6, borderTopWidth: 1, borderColor: Colors.border },
+  initialsCircle: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.mutedBackground, alignItems: 'center', justifyContent: 'center' },
+  initialsText: { fontSize: 14, fontWeight: '800', color: Colors.midnight },
   rowTitle: {
     fontSize: 16,
     fontWeight: '700',
@@ -1380,7 +1304,7 @@ const styles = StyleSheet.create({
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 5,
   },
   badgeGreen: {
     backgroundColor: Colors.paleGreen,
@@ -1406,30 +1330,16 @@ const styles = StyleSheet.create({
   badgeGrayText: {
     color: Colors.subtleGray,
   },
-  reviewGreenBtn: {
-    backgroundColor: Colors.brandGreen,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  reviewGreenText: {
+  reviewBtn: { backgroundColor: Colors.action, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 5 },
+  reviewText: {
     fontSize: 13,
     fontWeight: '700',
     color: Colors.white,
   },
-  restoreOutlineBtn: {
-    borderWidth: 1,
-    borderColor: Colors.brandGreen,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  restoreOutlineText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
+  restoreOutlineBtn: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: Colors.action, paddingHorizontal: 10, borderRadius: 6 },
+  restoreOutlineText: { fontSize: 13, fontWeight: '700', color: Colors.action },
   backNavRow: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -1444,6 +1354,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   kvRow: {
+    gap: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1456,6 +1367,8 @@ const styles = StyleSheet.create({
     color: Colors.subtleGray,
   },
   kvValue: {
+    flexShrink: 1,
+    textAlign: 'right',
     fontSize: 14,
     fontWeight: '700',
     color: Colors.ink,
@@ -1467,7 +1380,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.border,
     paddingHorizontal: 14,
@@ -1477,8 +1390,8 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: Colors.brandGreen,
+    borderRadius: 8,
+    backgroundColor: Colors.action,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1489,14 +1402,14 @@ const styles = StyleSheet.create({
   },
   solidRedBtn: {
     minHeight: 52,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: Colors.primaryRed,
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineRedBtn: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: Colors.primaryRed,
     backgroundColor: Colors.paper,
@@ -1512,23 +1425,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.primaryRed,
   },
-  outlineGreenBtn: {
+  outlineBtn: {
     minHeight: 46,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: Colors.brandGreen,
+    borderColor: Colors.action,
     backgroundColor: Colors.paper,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  outlineGreenText: {
+  outlineText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.brandGreen,
+    color: Colors.action,
   },
   outlineDarkBtn: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: Colors.ink,
     backgroundColor: Colors.paper,
@@ -1546,23 +1459,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   bottomActionDock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.paper,
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 14,
-    gap: 8,
+    width: '100%', maxWidth: 992, alignSelf: 'center',
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
+    gap: 8, paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: Colors.paper, borderTopWidth: 2, borderTopColor: Colors.action,
   },
-  dockSelectedLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
+  dockSelectedLabel: { color: Colors.ink, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   staleBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1570,7 +1472,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.warningBg,
     borderWidth: 1,
     borderColor: Colors.warningBorder,
-    borderRadius: 12,
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -1580,36 +1482,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.warning,
   },
-  selectorRowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 50,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.paper,
-  },
-  selectorRowText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
+  selectorRowCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: Colors.border, borderRadius: 6 },
+  selectorRowText: { flex: 1, textAlign: 'center', color: Colors.ink, fontSize: 15, fontWeight: '700' },
   pdfSheetCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     backgroundColor: Colors.paper,
     gap: 8,
-  },
-  errorBanner: {
-    padding: 12,
-    borderRadius: 12,
-    color: Colors.primaryRed,
-    backgroundColor: Colors.dangerBg,
-    fontSize: 13,
   },
 });

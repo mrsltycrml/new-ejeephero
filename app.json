@@ -32,8 +32,8 @@
       "favicon": "./assets/esakay-app-icon.png",
       "name": "eSAKAY",
       "shortName": "eSAKAY",
-      "themeColor": "#FFFFFF",
-      "backgroundColor": "#F5F4F1"
+      "themeColor": "#13263F",
+      "backgroundColor": "#F5F4EF"
     },
     "plugins": [
       [

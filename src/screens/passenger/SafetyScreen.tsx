@@ -11,6 +11,8 @@ import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { loadEmergencyContacts, saveEmergencyContact, removeEmergencyContact, type EmergencyContact } from '../../services/emergencyService';
 import { Colors } from '../../constants/theme';
 
+const DEFAULT_MESSAGE = 'EMERGENCY! I need help. Please check on me.';
+
 export default function SafetyScreen() {
   const { user, getAccessToken } = useAuth();
   const { unit } = usePassengerJourney();
@@ -20,7 +22,7 @@ export default function SafetyScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [editing, setEditing] = useState(false);
-  const [preset, setPreset] = useState('EMERGENCY! I need help. Please check on me.');
+  const [preset, setPreset] = useState(DEFAULT_MESSAGE);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
 
@@ -109,19 +111,27 @@ export default function SafetyScreen() {
   };
 
   return (
-    <FormScrollView style={s.screen} contentContainerStyle={styles.container}>
-      <View style={{ gap: 2 }}>
-        <Text style={s.title}>Safety</Text>
-        <Text style={s.subtitle}>Keep trusted people within reach.</Text>
+    <FormScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}>
+      <View style={[s.heroBanner, styles.masthead]}>
+        <Text accessibilityRole="header" style={[s.heroTitle, styles.light]}>Safety</Text>
+        <Text style={[s.heroSubtitle, styles.light]}>Send your location and ride details to trusted contacts. You have five seconds to cancel.</Text>
+        <SOSButton activeVehicleId={unit?.vehicle_id} activeVehicleBody={unit?.body_number} activeVehiclePlate={unit?.plate_number || undefined} />
+        <View style={styles.ride}>
+          <Ionicons aria-hidden name="bus-outline" size={20} color={Colors.onDark} />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.label, styles.light]}>{unit ? `Linked unit ${unit.body_number}` : 'No unit linked'}</Text>
+            {unit && <Text style={[s.muted, styles.light]}>Plate {unit.plate_number || 'unavailable'}</Text>}
+          </View>
+        </View>
       </View>
 
-      {/* Trusted Contacts Section */}
-      <View style={{ gap: 4 }}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeading}>Trusted contacts</Text>
-          <Text style={styles.countText}>{contacts.length} of 5</Text>
-        </View>
+      <View style={s.section}><EmergencyHotlines /></View>
 
+      <View style={s.section}>
+        <View style={styles.sectionHeader}>
+          <Text accessibilityRole="header" style={[s.sectionTitle, { flex: 1 }]}>Trusted contacts</Text>
+          {!loading && <Text style={s.muted}>{contacts.length} of 5</Text>}
+        </View>
         {loading && (
           <View style={{ gap: 10, paddingVertical: 6 }}>
             <SkeletonBlock height={56} />
@@ -130,28 +140,22 @@ export default function SafetyScreen() {
         )}
 
         {!loading && !contacts.length && (
-          <View style={styles.emptyBox}>
-            <Text style={s.label}>No trusted contacts added yet</Text>
-            <Text style={s.muted}>Add up to 5 trusted contacts to receive your SOS location and ride details.</Text>
-          </View>
+          <Text style={s.muted}>Add up to five people who can receive your SOS location and ride details.</Text>
         )}
 
-        <View style={styles.contactList}>
+        <View style={{ gap: 2 }}>
           {contacts.map((c) => (
             <Pressable
               key={c.phone_number}
               onLongPress={() => openContactActions(c)}
+              accessible={false}
               delayLongPress={350}
               style={styles.contactRow}
             >
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>
-                  {(c.contact_name || 'C').charAt(0).toUpperCase()}
-                </Text>
-              </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.contactName}>{c.contact_name}</Text>
-                <Text style={styles.contactPhone}>{c.phone_number}</Text>
+                <Text style={s.label}>{c.contact_name}</Text>
+                <Text style={s.muted}>{c.phone_number}</Text>
+                {c.localOnly && <Text style={s.muted}>Saved on this device</Text>}
               </View>
               <TouchableOpacity
                 accessibilityRole="button"
@@ -159,7 +163,7 @@ export default function SafetyScreen() {
                 onPress={() => startEdit(c)}
                 style={styles.iconBtn}
               >
-                <Ionicons name="pencil-outline" size={19} color={Colors.brandGreen} />
+                <Ionicons name="pencil-outline" size={19} color={Colors.action} />
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
@@ -173,7 +177,7 @@ export default function SafetyScreen() {
           ))}
         </View>
 
-        {feedback !== '' && <Text accessibilityRole="alert" style={[s.muted, { color: Colors.brandGreen, fontWeight: '600' }]}>{feedback}</Text>}
+        {feedback !== '' && <Text accessibilityRole="alert" style={s.body}>{feedback}</Text>}
 
         {formOpen ? (
           <View style={styles.formBox}>
@@ -184,7 +188,7 @@ export default function SafetyScreen() {
               value={name}
               onChangeText={setName}
               maxLength={80}
-              placeholder="Ana Santos"
+              placeholder="Contact name"
               placeholderTextColor={Colors.subtleGray}
             />
             <Text style={s.label}>Mobile number</Text>
@@ -228,176 +232,36 @@ export default function SafetyScreen() {
             </View>
           </View>
         ) : (
-          contacts.length < 5 && (
+          user && !loading && contacts.length < 5 && (
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => {
                 setEditing(false);
                 setName('');
                 setPhone('');
+                setPreset(DEFAULT_MESSAGE);
                 setFormOpen(true);
                 setFeedback('');
               }}
-              style={styles.addContactBtn}
+              style={[s.button, s.secondary]}
             >
-              <Ionicons name="add" size={20} color={Colors.brandGreen} />
-              <Text style={styles.addContactText}>Add contact</Text>
+              <Ionicons name="add" size={20} color={Colors.action} />
+              <Text style={s.link}>Add contact</Text>
             </TouchableOpacity>
           )
         )}
       </View>
 
-      {/* Linked Unit Row */}
-      <View style={styles.linkedRideRow}>
-        <View style={styles.busIconBox}>
-          <Ionicons name="bus-outline" size={20} color={Colors.brandGreen} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.contactName}>
-            {unit ? `Linked unit ${unit.body_number}` : 'No unit linked'}
-          </Text>
-          <Text style={styles.contactPhone}>
-            Plate {unit?.plate_number || 'Unavailable'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Emergency SOS Button */}
-      <SOSButton
-        activeVehicleId={unit?.vehicle_id}
-        activeVehicleBody={unit?.body_number}
-        activeVehiclePlate={unit?.plate_number || undefined}
-      />
-
-      <View style={{ gap: 6 }}>
-        <Text style={styles.helperCenter}>
-          Starts a 5-second countdown. You can cancel before it ends.
-        </Text>
-        <Text style={styles.helperCenter}>
-          Your location and linked unit details help identify your ride.
-        </Text>
-      </View>
-
-      <View style={[s.section, { marginTop: 8 }]}>
-        <EmergencyHotlines />
-      </View>
     </FormScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 36,
-    gap: 16,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  sectionHeading: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  countText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.subtleGray,
-  },
-  emptyBox: {
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-    gap: 4,
-  },
-  contactList: {
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  avatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
-  contactName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  contactPhone: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    marginTop: 2,
-  },
-  iconBtn: {
-    padding: 8,
-  },
-  addContactBtn: {
-    minHeight: 50,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.brandGreen,
-    backgroundColor: Colors.paper,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 8,
-  },
-  addContactText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
-  formBox: {
-    gap: 10,
-    paddingTop: 12,
-  },
-  linkedRideRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  busIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helperCenter: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+  masthead: { gap: 12, backgroundColor: Colors.midnight, borderColor: Colors.midnight },
+  light: { color: Colors.onDark },
+  ride: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, borderBottomWidth: 1, borderColor: Colors.border },
+  iconBtn: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  formBox: { gap: 10, paddingTop: 8 },
 });

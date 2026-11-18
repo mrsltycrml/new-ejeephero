@@ -33,7 +33,7 @@ The public [Sakay GTFS repository](https://github.com/sakayph/gtfs/blob/master/R
 | Stop photographs | A real photograph, source attribution and confirmation that it depicts the correct waiting area and direction |
 | Live vehicle position | A fresh device measurement with its original timestamp and reported accuracy; speed and heading may be unknown |
 
-Supervisor route authoring must persist through an authorized backend before a success message is shown. The current route directory is read-only where that backend is unavailable.
+An approved supervisor can publish a verified line for an existing route under **Fleet → View routes → Set verified route line**. The editor takes a single GeoJSON LineString for the route's travel direction and an HTTPS source. The database verifies the supervisor role and validates the geometry before reporting success.
 
 An ordinary pedestrian route may have unconfirmed accessibility, which must be stated. It must never be offered as a step-free option without explicit accessibility evidence.
 
@@ -84,12 +84,22 @@ The 30-second freshness limit and 30-metre navigation threshold are validation g
 
 The GPS and sample-filter changes include `20261118010000_exclude_sample_fleet_units.sql` and `20261118020000_measured_gps_quality.sql`. Apply reviewed migrations through the normal release process before relying on the new telemetry fields. Keep legacy capture time and accuracy unknown; never backfill either from receipt time or assumed values.
 
+Apply `20261118040000_live_route_deviations.sql` after the measured GPS migration. It adds the verified route coordinates, supervisor publishing RPC and private route warning feed. Collect actual routes and test with an approved driver shift before relying on alerts. The server uses a 75 m corridor, with at least three consecutive accurate positions outside it after accounting for reported uncertainty, spanning at least 12 seconds. Poor GPS, implausible movement and coverage gaps cannot establish the alert. The driver and supervisor receive in-app alerts. A possible deviation is separate from the end-of-shift missed-stop violation and carries no automatic penalty.
+
 Publish the verified reference records and refresh the shared route/stop catalog in the app. Confirm that an empty successful response clears old records, while a failed response is identified as unavailable or dated cached data. Adding a row alone does not make a route or stop verified.
 
 The local preview at `http://localhost:8091` uses the application's existing sign-in flow and connected data. There is no generated test login. A successful local preview or web export is not a deployment of database migrations, routing functions, or the public application.
 
-The existing live application is [ejeephero.carlosbusuego15.workers.dev](https://ejeephero.carlosbusuego15.workers.dev), verified to show the sign-in page on 18 November 2026. It serves the existing release until the reviewed changes are deployed.
+The redesigned web app was deployed on 18 November 2026 at [ejeephero.carlosbusuego15.workers.dev](https://ejeephero.carlosbusuego15.workers.dev). The release covered the web app. Production database migrations and the walking-directions function still need deployment.
+
+Operators can use the [route data workbook](eSAKAY-route-data.xlsx) to submit verified stop pins, route lines, measured distances and fare charts for each direction.
 
 Redeploy `herobot-chat` with its updated context builder before using the assistant in production. It no longer supplies default fares, unsourced safety labels or active-shift counts as current GPS information. The chat directs operational quotations and navigation to the sourced Fare and Map screens; its generated prose is not a new source of verified operational data.
 
 See [walking directions setup](walking-directions-setup.md) for the additional migration, server-only routing configuration, authentication, quota limits and exact source-data fields.
+
+## Passenger web map
+
+The passenger website uses a [mapcn](https://www.mapcn.dev/docs/basic-map) adaptation with MapLibre GL and [OpenFreeMap Liberty](https://openfreemap.org/quick_start/). This basemap needs no API key. Browsers that cannot load it fall back to the Leaflet map, which also serves the native app.
+
+eSAKAY supplies verified route geometry, curbside stops, ride distances and fares. The separately configured walking service supplies pedestrian paths.

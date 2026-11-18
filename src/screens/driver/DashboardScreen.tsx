@@ -377,256 +377,235 @@ export default function DashboardScreen() {
   return (
     <View style={styles.container}>
       {!isActive ? (
-        /* BOARD 01: START YOUR SHIFT */
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.pageTitle}>Start your shift</Text>
+        <>
+          <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <View style={styles.masthead}>
+              <Text accessibilityRole="header" style={styles.pageTitle}>Start your shift</Text>
+              <Text style={styles.mastheadLabel}>Route</Text>
+              <TouchableOpacity
+                style={styles.selectButton}
+                onPress={() => setRouteMenuOpen(!routeMenuOpen)}
+                accessibilityRole="button"
+                accessibilityLabel="Choose route"
+                accessibilityState={{ expanded: routeMenuOpen }}
+              >
+                <Text style={styles.selectButtonText}>{currentRouteName || 'Route unavailable'}</Text>
+                <Ionicons name={routeMenuOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
+              </TouchableOpacity>
+              <Text style={styles.mastheadDescription}>{routes.find(route => route.id === selectedRoute)?.description || 'Route description unavailable'}</Text>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Route</Text>
-            <TouchableOpacity
-              style={styles.selectButton}
-              onPress={() => setRouteMenuOpen(!routeMenuOpen)}
-              accessibilityRole="button"
-              accessibilityLabel="Choose route"
-              accessibilityState={{ expanded: routeMenuOpen }}
-            >
-              <Text style={styles.selectButtonText}>{currentRouteName || 'Route unavailable'}</Text>
-              <Ionicons name={routeMenuOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
-            </TouchableOpacity>
-            <Text style={styles.fieldHelper}>{routes.find(route => route.id === selectedRoute)?.description || 'Route description unavailable'}</Text>
-
-            {routeMenuOpen && (
-              <View style={styles.optionList}>
-                {routes.map((r) => (
-                  <TouchableOpacity
-                    key={r.id}
-                    style={[styles.optionRow, selectedRoute === r.id && { backgroundColor: Colors.paleGreen }]}
-                    onPress={() => {
-                      setSelectedRoute(r.id);
-                      setRouteMenuOpen(false);
-                      setShiftError('');
-                    }}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.optionTitle}>{r.name}</Text>
-                    {selectedRoute === r.id && <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Assigned unit</Text>
-            <View style={{ gap: 10 }}>
-              {units.length ? (
-                units.map((unit) => {
-                  const isSelected = unit.bodyNumber === bodyNumber && unit.plateNumber === plateNumber;
-                  const busy = Boolean(unit.busyElsewhere);
-                  return (
+              {routeMenuOpen && (
+                <View style={styles.optionList}>
+                  {routes.map((r) => (
                     <TouchableOpacity
-                      key={`${unit.bodyNumber}-${unit.plateNumber}`}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: isSelected, disabled: busy }}
-                      disabled={busy}
+                      key={r.id}
+                      style={styles.optionRow}
+                      accessibilityState={{ selected: selectedRoute === r.id }}
                       onPress={() => {
-                        setBodyNumber(unit.bodyNumber);
-                        setPlateNumber(unit.plateNumber);
+                        setSelectedRoute(r.id);
+                        setRouteMenuOpen(false);
                         setShiftError('');
                       }}
-                      style={[
-                        styles.unitRadioCard,
-                        isSelected && !busy && styles.unitRadioCardSelected,
-                        busy && styles.unitRadioCardBusy,
-                      ]}
+                      accessibilityRole="button"
                     >
-                      <Ionicons
-                        name={isSelected && !busy ? 'radio-button-on' : 'radio-button-off'}
-                        size={20}
-                        color={isSelected && !busy ? Colors.brandGreen : Colors.subtleGray}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.unitTitle, busy && { color: Colors.subtleGray }]}>
-                          {unit.bodyNumber}
-                        </Text>
-                        <Text style={styles.unitPlate}>Plate {unit.plateNumber}</Text>
-                      </View>
-                      {busy ? (
-                        <Text style={styles.busyLabel}>Already on shift</Text>
-                      ) : (
-                        <View style={styles.availableBadge}>
-                          <Ionicons name="checkmark" size={14} color={Colors.brandGreen} />
-                          <Text style={styles.availableText}>Available</Text>
-                        </View>
-                      )}
+                      <Text style={styles.optionTitle}>{r.name}</Text>
+                      {selectedRoute === r.id && <Ionicons name="checkmark-circle" size={18} color={Colors.action} />}
                     </TouchableOpacity>
-                  );
-                })
-              ) : (
-                <Text style={styles.fieldHelper}>
-                  {unitLoading ? 'Loading units…' : 'No units are available. Ask a supervisor to add your unit.'}
-                </Text>
+                  ))}
+                </View>
               )}
             </View>
-          </View>
 
-          {/* Location Permission State (Board 01 middle vs right) */}
-          {locationGranted ? (
-            <View style={styles.locationEnabledRow}>
-              <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <Ionicons name="checkmark" size={15} color={Colors.brandGreen} />
+            {locationGranted ? (
+              <View style={styles.locationEnabledRow}>
+                <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
+                <View style={{ flex: 1 }}>
                   <Text style={styles.locationEnabledTitle}>Location enabled</Text>
-                </View>
-                <Text style={styles.fieldHelper}>Foreground only: keep this app open and the screen active during your shift.</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.locationRequiredBox}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                <Ionicons name="location-outline" size={20} color={Colors.ink} style={{ marginTop: 2 }} />
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={styles.unitTitle}>Location is required</Text>
-                  <Text style={styles.fieldHelper}>
-                    Allow location access to share your unit position while on duty.
-                  </Text>
+                  <Text style={styles.fieldHelper}>Foreground only: keep this app open and the screen active during your shift.</Text>
                 </View>
               </View>
-              <TouchableOpacity
-                accessibilityRole="button"
-                onPress={() => {
-                  void requestLocationPerm();
-                }}
-                style={styles.primaryBtn}
-              >
-                <Text style={styles.primaryBtnText}>Enable location</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {!!shiftError && (
-            <Text accessibilityRole="alert" style={styles.shiftError}>
-              {shiftError}
-            </Text>
-          )}
-
-          <TouchableOpacity
-            style={[styles.primaryBtn, (!locationGranted || starting) && styles.disabledBtn]}
-            onPress={toggleShift}
-            disabled={!locationGranted || starting}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !locationGranted || starting, busy: starting }}
-          >
-            {starting ? (
-              <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={[styles.primaryBtnText, !locationGranted && { color: Colors.subtleGray }]}>
-                Start shift
+              <View style={styles.locationRequiredBox}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                  <Ionicons name="location-outline" size={20} color={Colors.ink} style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={styles.unitTitle}>Location is required</Text>
+                    <Text style={styles.fieldHelper}>
+                      Allow location access to share your unit position while on duty.
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void requestLocationPerm();
+                  }}
+                  style={styles.primaryBtn}
+                >
+                  <Text style={styles.primaryBtnText}>Enable location</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.fieldGroup}>
+              <Text accessibilityRole="header" style={styles.fieldLabel}>Assigned unit</Text>
+              <View style={styles.unitList}>
+                {units.length ? (
+                  units.map((unit) => {
+                    const isSelected = unit.bodyNumber === bodyNumber && unit.plateNumber === plateNumber;
+                    const busy = Boolean(unit.busyElsewhere);
+                    return (
+                      <TouchableOpacity
+                        key={`${unit.bodyNumber}-${unit.plateNumber}`}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: isSelected, disabled: busy }}
+                        disabled={busy}
+                        onPress={() => {
+                          setBodyNumber(unit.bodyNumber);
+                          setPlateNumber(unit.plateNumber);
+                          setShiftError('');
+                        }}
+                        style={[
+                          styles.unitRadioCard,
+                          isSelected && !busy && styles.unitRadioCardSelected,
+                          busy && styles.unitRadioCardBusy,
+                        ]}
+                      >
+                        <Ionicons
+                          name={isSelected && !busy ? 'radio-button-on' : 'radio-button-off'}
+                          size={20}
+                          color={isSelected && !busy ? Colors.action : Colors.subtleGray}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.unitTitle, busy && { color: Colors.subtleGray }]}>
+                            {unit.bodyNumber}
+                          </Text>
+                          <Text style={styles.unitPlate}>Plate {unit.plateNumber}</Text>
+                        </View>
+                        {busy ? (
+                          <Text style={styles.busyLabel}>Already on shift</Text>
+                        ) : (
+                          <View style={styles.availableBadge}>
+                            <Ionicons name="checkmark" size={14} color={Colors.brandGreen} />
+                            <Text style={styles.availableText}>Available</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })
+                ) : (
+                  <Text style={styles.fieldHelper}>
+                    {unitLoading ? 'Loading units…' : 'No units are available. Ask a supervisor to add your unit.'}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+          </ScrollView>
+          <View style={styles.submitBar}>
+            {!!shiftError && (
+              <Text accessibilityRole="alert" style={[styles.shiftError, { width: '100%' }]}>
+                {shiftError}
               </Text>
             )}
-          </TouchableOpacity>
-        </ScrollView>
+            <Text style={styles.submitUnit}>{[bodyNumber, plateNumber].filter(Boolean).join(' · ') || 'Select an assigned unit'}</Text>
+            <TouchableOpacity
+              style={[styles.primaryBtn, (!locationGranted || starting) && styles.disabledBtn]}
+              onPress={toggleShift}
+              disabled={!locationGranted || starting}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !locationGranted || starting, busy: starting }}
+            >
+              {starting ? (
+                <ActivityIndicator color={Colors.subtleGray} />
+              ) : (
+                <Text style={[styles.primaryBtnText, !locationGranted && { color: Colors.subtleGray }]}>
+                  Start shift
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </>
       ) : (
-        /* BOARD 02 LEFT: ON DUTY */
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.onDutyHeaderRow}>
-            <Text style={styles.pageTitle}>On duty</Text>
-            <View style={styles.shiftActivePill}>
-              <View style={styles.greenDot} />
-              <Text style={styles.shiftActiveText}>Shift active</Text>
+          <View style={styles.masthead}>
+            <View style={styles.onDutyHeaderRow}>
+              <Text style={styles.shiftActiveText}>On duty</Text>
+              <Text style={styles.mastheadDescription}>Started {shiftStartedAt}</Text>
             </View>
+            <Text accessibilityRole="header" style={styles.pageTitle}>{bodyNumber} · {plateNumber}</Text>
+            <Text style={styles.mastheadDescription}>{currentRouteName}</Text>
           </View>
 
-          <View style={styles.vehicleIdentityRow}>
-            <View style={styles.busCircle}>
-              <Ionicons name="bus-outline" size={20} color={Colors.brandGreen} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.unitTitle}>
-                {bodyNumber} · {plateNumber}
-              </Text>
-              <Text style={styles.unitPlate}>{currentRouteName}</Text>
-            </View>
-          </View>
-
-          <View style={styles.mapFrame}>
-            <LeafletMap
-              routes={mapRoutes}
-              terminals={mapTerminals}
-              vehicles={liveVehicle ? [liveVehicle] : []}
-              selectedVehicle={liveVehicle}
-              vehicleSelectionKey={vehicleId}
-              selectedRouteId={selectedRoute}
-              fleetMode
-            />
-            <View style={styles.gpsOverlayPill}>
-              <View style={styles.greenDot} />
-              <Text style={styles.gpsOverlayText}>
-                {locationDescription(currentPosition, now)}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.fieldHelper}>Foreground only. Background or a locked screen can pause tracking.</Text>
-          <Text style={styles.fieldHelper}>{!isConnected ? 'Offline — position is not shared.' : publishedAt ? `Last shared measurement: ${new Date(publishedAt).toLocaleTimeString()} (${Math.max(0, Math.floor((now - publishedAt) / 1000))}s ago)` : 'No position published yet.'}</Text>
-          {(!!telemetryError || !!locationError) && (
-            <Text accessibilityRole="alert" style={styles.shiftError}>
-              {locationError || telemetryError}
-            </Text>
-          )}
-          {!!locationError && <TouchableOpacity accessibilityRole="button" onPress={requestLocationPerm} style={styles.keepActiveBtn}><Text>Enable location / retry</Text></TouchableOpacity>}
-
-          {/* 2-Column Telemetry */}
-          <View style={styles.telemetryGrid}>
-            <View style={styles.telemetryCol}>
-              <Text style={styles.telemetryLabel}>Current speed</Text>
-              <Text
-                style={[
-                  styles.telemetryValue,
-                  currentSpeedKph != null && currentSpeedKph > ESAKAY_OPERATIONS.operatorSpeedCapKph && { color: Colors.primaryRed },
-                ]}
-              >
-                {currentSpeedKph ?? 'Unavailable'} <Text style={styles.telemetryUnit}>km/h</Text>
-              </Text>
-            </View>
-            <View style={styles.telemetryDivider} />
-            <View style={styles.telemetryCol}>
-              <Text style={styles.telemetryLabel}>Operator cap</Text>
-              <Text style={styles.telemetryValue}>
-                {ESAKAY_OPERATIONS.operatorSpeedCapKph} <Text style={styles.telemetryUnit}>km/h</Text>
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.routeStatusRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />
-              <Text style={styles.onRouteText}>Shift active · route adherence unverified</Text>
-            </View>
-            <Text style={styles.startedTimeText}>Started {shiftStartedAt}</Text>
-          </View>
-
-          {/* Tappable Passengers Row -> Opens Passenger Count Sheet */}
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Update passenger count"
+            accessibilityValue={{ text: `${passengerCount ?? 'Unavailable'} · ${seatStatus || 'Occupancy unavailable'}` }}
             onPress={() => setPassengerSheetOpen(true)}
             style={styles.passengersRow}
           >
-            <View style={styles.busCircle}>
-              <Ionicons name="people-outline" size={20} color={Colors.brandGreen} />
-            </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flexGrow: 1, flexBasis: 146 }}>
               <Text style={styles.unitTitle}>Passengers</Text>
-              <Text style={styles.unitPlate}>Update seats when safely stopped.</Text>
+              <Text style={styles.passengerCountNum}>{passengerCount ?? 'Unavailable'}</Text>
+              <Text style={styles.unitPlate}>{seatStatus || 'Occupancy unavailable'}</Text>
             </View>
-            <Text style={styles.passengerCountNum}>{passengerCount ?? 'Unavailable'}</Text>
-            <View style={styles.seatStatusPill}>
-              <Text style={styles.seatStatusText}>{seatStatus || 'Occupancy unavailable'}</Text>
+            <View style={styles.passengerAction}>
+              <Ionicons name="create-outline" size={20} color={Colors.action} />
+              <Text style={styles.passengerTitle}>Update count</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
           </TouchableOpacity>
+          <Text style={styles.fieldHelper}>Update seats when safely stopped.</Text>
+
+          <View style={styles.trackingPanel}>
+            <View style={styles.mapFrame}>
+              <LeafletMap
+                routes={mapRoutes}
+                terminals={mapTerminals}
+                vehicles={liveVehicle ? [liveVehicle] : []}
+                selectedVehicle={liveVehicle}
+                vehicleSelectionKey={vehicleId}
+                selectedRouteId={selectedRoute}
+                fleetMode
+              />
+            </View>
+            <View style={styles.gpsCaption}>
+              <Ionicons name="locate-outline" size={16} color={gpsUsable ? Colors.success : Colors.subtleGray} />
+              <Text style={styles.gpsText}>{locationDescription(currentPosition, now)}</Text>
+            </View>
+
+            <Text style={styles.fieldHelper}>Foreground only. Background or a locked screen can pause tracking.</Text>
+            <Text style={styles.fieldHelper}>{!isConnected ? 'Offline — position is not shared.' : publishedAt ? `Last shared measurement: ${new Date(publishedAt).toLocaleTimeString()} (${Math.max(0, Math.floor((now - publishedAt) / 1000))}s ago)` : 'No position published yet.'}</Text>
+            {(!!telemetryError || !!locationError) && (
+              <Text accessibilityRole="alert" style={styles.shiftError}>
+                {locationError || telemetryError}
+              </Text>
+            )}
+            {!!locationError && <TouchableOpacity accessibilityRole="button" onPress={requestLocationPerm} style={styles.keepActiveBtn}><Text style={styles.keepActiveText}>Enable location / retry</Text></TouchableOpacity>}
+
+            {/* 2-Column Telemetry */}
+            <View style={styles.telemetryGrid}>
+              <View style={styles.telemetryCol}>
+                <Text style={styles.telemetryLabel}>Current speed</Text>
+                <Text
+                  style={[
+                    styles.telemetryValue,
+                    currentSpeedKph != null && currentSpeedKph > ESAKAY_OPERATIONS.operatorSpeedCapKph && { color: Colors.primaryRed },
+                  ]}
+                >
+                  {currentSpeedKph == null ? <Text style={styles.telemetryUnit}>Unavailable</Text> : <>{currentSpeedKph} <Text style={styles.telemetryUnit}>km/h</Text></>}
+                </Text>
+              </View>
+              <View style={styles.telemetryDivider} />
+              <View style={styles.telemetryCol}>
+                <Text style={styles.telemetryLabel}>Operator cap</Text>
+                <Text style={styles.telemetryValue}>
+                  {ESAKAY_OPERATIONS.operatorSpeedCapKph} <Text style={styles.telemetryUnit}>km/h</Text>
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.fieldHelper}>Route adherence unverified</Text>
+          </View>
 
           {!!shiftError && (
             <Text accessibilityRole="alert" style={styles.shiftError}>
@@ -644,7 +623,6 @@ export default function DashboardScreen() {
         </ScrollView>
       )}
 
-      {/* BOARD 02 MIDDLE: PASSENGER COUNT BOTTOM SHEET */}
       <BottomSheetModal
         visible={passengerSheetOpen}
         onClose={() => setPassengerSheetOpen(false)}
@@ -652,7 +630,7 @@ export default function DashboardScreen() {
         contentContainerStyle={{ gap: 16 }}
       >
         <View style={styles.sheetHeaderRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.sheetTitle}>Passenger count</Text>
             <Text style={styles.unitPlate}>
               {bodyNumber || 'Unit unavailable'} · {currentRouteName || 'Route unavailable'}
@@ -662,7 +640,7 @@ export default function DashboardScreen() {
             accessibilityRole="button"
             accessibilityLabel="Close passenger count"
             onPress={() => setPassengerSheetOpen(false)}
-            style={{ padding: 4 }}
+            style={styles.closeButton}
           >
             <Ionicons name="close" size={24} color={Colors.ink} />
           </TouchableOpacity>
@@ -670,6 +648,7 @@ export default function DashboardScreen() {
 
         <View style={styles.stepperBox}>
           <TouchableOpacity
+            accessibilityRole="button"
             style={styles.stepperBtn}
             disabled={savingPassengerCount || starting || !isActive || maxCapacity == null}
             accessibilityState={{ disabled: savingPassengerCount || starting || !isActive || maxCapacity == null }}
@@ -678,8 +657,9 @@ export default function DashboardScreen() {
           >
             <Ionicons name="remove" size={24} color={Colors.ink} />
           </TouchableOpacity>
-          <Text style={styles.stepperValue}>{passengerCount ?? 'Unavailable'}</Text>
+          <Text style={passengerCount == null ? styles.unitPlate : styles.stepperValue}>{passengerCount ?? 'Unavailable'}</Text>
           <TouchableOpacity
+            accessibilityRole="button"
             style={styles.stepperBtn}
             disabled={savingPassengerCount || starting || !isActive || maxCapacity == null}
             accessibilityState={{ disabled: savingPassengerCount || starting || !isActive || maxCapacity == null }}
@@ -701,7 +681,6 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </BottomSheetModal>
 
-      {/* BOARD 03 RIGHT: END SHIFT CONFIRMATION BOTTOM SHEET */}
       <BottomSheetModal
         visible={endShiftSheetOpen}
         onClose={() => setEndShiftSheetOpen(false)}
@@ -772,33 +751,17 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.paper,
-  },
-  scrollContent: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 36,
-    gap: 16,
-  },
-  pageTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.4,
-    color: Colors.ink,
-  },
-  fieldGroup: {
-    gap: 6,
-  },
-  fieldLabel: {
-    color: Colors.ink,
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  container: { flex: 1, backgroundColor: Colors.canvas },
+  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 12 },
+  masthead: { backgroundColor: Colors.midnight, padding: 20, borderRadius: 10, gap: 8 },
+  mastheadLabel: { color: Colors.onDark, fontSize: 14, fontWeight: '600' },
+  mastheadDescription: { color: Colors.onDarkMuted, fontSize: 14, lineHeight: 20 },
+  pageTitle: { fontSize: 28, fontWeight: '800', letterSpacing: -0.6, color: Colors.onDark, marginBottom: 4 },
+  submitBar: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: Colors.paper, borderTopColor: Colors.border, borderTopWidth: 1 },
+  submitUnit: { flexBasis: 140, flexGrow: 1, flexShrink: 1, color: Colors.ink, fontSize: 15, fontWeight: '600' },
+  fieldGroup: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  fieldLabel: { color: Colors.ink, fontSize: 18, fontWeight: '700', padding: 16, paddingBottom: 12 },
+  unitList: { paddingHorizontal: 12, paddingBottom: 10 },
   fieldHelper: {
     color: Colors.subtleGray,
     fontSize: 13,
@@ -811,11 +774,12 @@ const styles = StyleSheet.create({
     minHeight: 50,
     paddingHorizontal: 14,
     backgroundColor: Colors.paper,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   selectButtonText: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: Colors.ink,
@@ -824,7 +788,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   optionRow: {
@@ -837,6 +801,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   optionTitle: {
+    flex: 1,
     color: Colors.ink,
     fontSize: 15,
     fontWeight: '600',
@@ -845,21 +810,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
+    padding: 12,
+    borderTopWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.paper,
   },
-  unitRadioCardSelected: {
-    backgroundColor: Colors.paleGreen,
-    borderColor: Colors.brandGreen,
-    borderWidth: 1.5,
-  },
-  unitRadioCardBusy: {
-    backgroundColor: Colors.canvas,
-    opacity: 0.75,
-  },
+  unitRadioCardSelected: { borderLeftWidth: 3, borderLeftColor: Colors.action, backgroundColor: Colors.actionTint },
+  unitRadioCardBusy: { backgroundColor: Colors.canvas },
   unitTitle: {
     fontSize: 16,
     fontWeight: '700',
@@ -889,10 +846,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
+    padding: 14,
+    borderRadius: 8,
+    backgroundColor: Colors.successBg,
   },
   locationEnabledTitle: {
     fontSize: 15,
@@ -901,7 +857,7 @@ const styles = StyleSheet.create({
   },
   locationRequiredBox: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.paper,
@@ -909,14 +865,14 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: Colors.brandGreen,
+    borderRadius: 8,
+    backgroundColor: Colors.action,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
   },
   disabledBtn: {
-    backgroundColor: '#D5DBD6',
+    backgroundColor: Colors.border,
   },
   primaryBtnText: {
     color: Colors.white,
@@ -928,73 +884,33 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dangerBg,
     borderColor: Colors.primaryRed,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
     fontSize: 13,
     lineHeight: 18,
   },
-  onDutyHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  onDutyHeaderRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  shiftActiveText: { backgroundColor: Colors.successBg, color: Colors.success, fontSize: 13, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
+  passengersRow: {
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border,
+    borderLeftWidth: 4, borderLeftColor: Colors.action, padding: 16, borderRadius: 8,
   },
-  shiftActivePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.paleGreen,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  greenDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.brandGreen,
-  },
-  shiftActiveText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
-  vehicleIdentityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingBottom: 4,
-  },
-  busCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  passengerTitle: { fontSize: 15, fontWeight: '700', color: Colors.action },
+  passengerCountNum: { fontSize: 24, fontVariant: ['tabular-nums'], fontWeight: '700', color: Colors.ink },
+  passengerAction: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  trackingPanel: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 10, padding: 14, gap: 10 },
   mapFrame: {
-    height: 210,
-    borderRadius: 12,
+    height: 248,
+    borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
     position: 'relative',
   },
-  gpsOverlayPill: {
-    position: 'absolute',
-    left: 12,
-    bottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.paper,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  gpsOverlayText: {
+  gpsCaption: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  gpsText: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '600',
     color: Colors.ink,
@@ -1032,50 +948,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.subtleGray,
   },
-  routeStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 4,
-  },
-  onRouteText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  startedTimeText: {
-    fontSize: 14,
-    color: Colors.subtleGray,
-  },
-  passengersRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  passengerCountNum: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.ink,
-    fontVariant: ['tabular-nums'],
-  },
-  seatStatusPill: {
-    backgroundColor: Colors.paleGreen,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  seatStatusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
   endShiftOutlineBtn: {
     minHeight: 52,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: Colors.primaryRed,
     backgroundColor: Colors.paper,
@@ -1104,7 +979,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
     backgroundColor: Colors.paper,
   },
@@ -1124,41 +999,7 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     fontVariant: ['tabular-nums'],
   },
-  presetRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  presetChip: {
-    flex: 1,
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 10,
-    backgroundColor: Colors.paper,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  presetChipActive: {
-    backgroundColor: Colors.paleGreen,
-    borderColor: Colors.brandGreen,
-    borderWidth: 1.5,
-  },
-  presetChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.ink,
-  },
-  presetChipTextActive: {
-    fontWeight: '700',
-    color: Colors.brandGreen,
-  },
-  liveUpdatedText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.brandGreen,
-  },
+  closeButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   endShiftBusIcon: {
     width: 60,
     height: 60,
@@ -1192,13 +1033,16 @@ const styles = StyleSheet.create({
     color: Colors.subtleGray,
   },
   summaryValue: {
+    flexShrink: 1,
+    textAlign: 'right',
+    marginLeft: 16,
     fontSize: 15,
     fontWeight: '700',
     color: Colors.ink,
   },
   keepActiveBtn: {
     minHeight: 50,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: Colors.ink,
     backgroundColor: Colors.paper,
@@ -1212,7 +1056,7 @@ const styles = StyleSheet.create({
   },
   confirmEndBtn: {
     minHeight: 52,
-    borderRadius: 12,
+    borderRadius: 8,
     backgroundColor: Colors.primaryRed,
     alignItems: 'center',
     justifyContent: 'center',

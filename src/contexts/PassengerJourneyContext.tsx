@@ -14,6 +14,7 @@ type JourneyState = {
   selectedRouteId: string | null; setSelectedRouteId: (id: string | null) => void;
   boardingStop: TerminalData | null; setBoardingStop: (stop: TerminalData | null) => void;
   alightingStop: TerminalData | null; setAlightingStop: (stop: TerminalData | null) => void;
+  setRideStops: (boarding: TerminalData, alighting: TerminalData) => void;
   destinationPlace: PassengerPlace | null; setDestinationPlace: (place: PassengerPlace | null) => void;
   walkingRoutes: WalkingRouteGeometry[]; setWalkingRoutes: (routes: WalkingRouteGeometry[]) => void;
   transit: TransitResult;
@@ -28,7 +29,7 @@ type JourneyState = {
 };
 const emptySelection: JourneySelection = { selectedRouteId: null, boardingStop: null, alightingStop: null };
 const emptyTransit: TransitResult = { routes: [], terminals: [], status: 'unavailable', error: 'Loading routes…', syncedAt: null, latencyMs: 0, isFromCache: false };
-const Journey = createContext<JourneyState>({ ...emptySelection, setSelectedRouteId: () => {}, setBoardingStop: () => {}, setAlightingStop: () => {}, destinationPlace: null, setDestinationPlace: () => {}, walkingRoutes: [], setWalkingRoutes: () => {}, transit: emptyTransit, refreshTransit: async () => emptyTransit, walk: null, showWalk: () => false, getJourneyVersion: () => 0, unit: null, setUnit: () => {}, destination: null, setDestination: () => {}, place: null, setPlace: () => {}, vehicles: [], vehicleError: '', nearby: [], signal: '', endRide: () => {} });
+const Journey = createContext<JourneyState>({ ...emptySelection, setSelectedRouteId: () => {}, setBoardingStop: () => {}, setAlightingStop: () => {}, setRideStops: () => {}, destinationPlace: null, setDestinationPlace: () => {}, walkingRoutes: [], setWalkingRoutes: () => {}, transit: emptyTransit, refreshTransit: async () => emptyTransit, walk: null, showWalk: () => false, getJourneyVersion: () => 0, unit: null, setUnit: () => {}, destination: null, setDestination: () => {}, place: null, setPlace: () => {}, vehicles: [], vehicleError: '', nearby: [], signal: '', endRide: () => {} });
 export function PassengerJourneyProvider({ children }: { children: React.ReactNode }) {
   const { location, errorMsg, foreground } = useLocation();
   const { isConnected } = useNetwork();
@@ -68,6 +69,14 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
   }, []);
   const endRide = useCallback(() => { setUnit(null); setPlace(null); ignoredUntil.current = Date.now() + 60_000; setSelection(emptySelection); setSignal('Ride ended. Choose your next destination.'); }, [setUnit, setPlace]);
   const setDestination = useCallback((stop: TerminalData | null) => { evidence.current = null; ignoredUntil.current = 0; setSelection(state => selectJourneyStop(state, stop, 'alighting', transit.routes, transit.terminals)); clearWalk(); }, [transit, clearWalk]);
+  const setRideStops = useCallback((boarding: TerminalData, alighting: TerminalData) => {
+    const next = reconcileJourneySelection({ selectedRouteId: boarding.route_id, boardingStop: boarding, alightingStop: alighting }, transit.routes, transit.terminals);
+    if (!next.boardingStop || !next.alightingStop) return;
+    evidence.current = null;
+    ignoredUntil.current = 0;
+    setSelection(next);
+    clearWalk();
+  }, [transit, clearWalk]);
   useEffect(() => { updateUnit(null); setSelection(emptySelection); setPlace(null); evidence.current = null; setNearby([]); }, [user?.id]);
   const transitRequest = useRef(0);
   const refreshTransit = useCallback(async () => {
@@ -117,6 +126,6 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     if (result.unit) setUnit({ vehicle_id: result.unit.vehicle_id, body_number: result.unit.body_number, plate_number: result.unit.plate_number, source: 'gps' });
     setSignal(result.unit ? 'Unit detected. Emergency details are ready.' : result.nearby.length > 1 ? 'Several units are nearby. Tap the one you boarded to confirm.' : !fix || now - fix.timestamp > 15_000 ? 'Waiting for a fresh GPS location.' : result.evidence ? 'Checking which unit is moving with you…' : 'Your unit will be matched when you travel together.');
   }, [location, vehicles, now, unit, destination, setUnit, foreground, errorMsg, isConnected, selection.selectedRouteId]);
-  return <Journey.Provider value={{ ...selection, setSelectedRouteId, setBoardingStop, setAlightingStop: setDestination, destinationPlace: place, setDestinationPlace: setPlace, walkingRoutes, setWalkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion, unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, signal, endRide }}>{children}</Journey.Provider>;
+  return <Journey.Provider value={{ ...selection, setSelectedRouteId, setBoardingStop, setAlightingStop: setDestination, setRideStops, destinationPlace: place, setDestinationPlace: setPlace, walkingRoutes, setWalkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion, unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, signal, endRide }}>{children}</Journey.Provider>;
 }
 export const usePassengerJourney = () => useContext(Journey);

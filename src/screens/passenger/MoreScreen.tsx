@@ -5,171 +5,61 @@ import { passengerStyles as s } from '../../components/PassengerUI';
 import { Colors } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 
+const rideTools = [
+  { screen: 'PassengerAssistant', name: 'Commuter assistant', detail: 'Ask about stops, fares and boarding.', icon: 'chatbubble-outline' },
+  { screen: 'PassengerWeather', name: 'Makati weather', detail: 'Forecast and travel advisory', icon: 'cloud-outline' },
+  { screen: 'PassengerAbout', name: 'About eSAKAY', detail: 'Service information and boarding guidance', icon: 'information-circle-outline' },
+] as const;
+
 export default function MoreScreen({ navigation }: any) {
   const { signOut } = useAuth();
-
-  const tools = [
-    {
-      screen: 'PassengerAssistant',
-      name: 'ejeepherobot',
-      desc: 'Ask a commuting question',
-      icon: 'chatbubble-outline' as const,
-    },
-    {
-      screen: 'PassengerDirectory',
-      name: 'Routes & trip planner',
-      desc: 'Explore stops and route options',
-      icon: 'git-branch-outline' as const,
-    },
-    {
-      screen: 'PassengerWeather',
-      name: 'Makati weather',
-      desc: 'Forecast and travel advisory',
-      icon: 'cloud-outline' as const,
-    },
-  ];
-
-  const handleSignOut = () => {
-    void signOut().catch(() => Alert.alert('Could not sign out', 'Please try again.'));
-  };
-
+  const open = (screen: string) => navigation.getParent()?.navigate(screen);
   return (
-    <ScrollView style={s.screen} contentContainerStyle={styles.container}>
-      <View style={styles.headerBlock}>
-        <Text style={s.title}>More</Text>
-        <Text style={s.subtitle}>Tools for your everyday commute.</Text>
-      </View>
+    <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}>
+      <Text accessibilityRole="header" style={s.title}>More</Text>
+      <TouchableOpacity accessibilityRole="button" onPress={() => open('PassengerDirectory')} style={[s.heroBanner, styles.directory]}>
+        <Ionicons aria-hidden name="git-branch-outline" size={28} color={Colors.onDark} />
+        <View style={styles.details}>
+          <Text style={[s.sectionTitle, styles.light]}>Route directory</Text>
+          <Text style={[s.muted, styles.light]}>Browse routes and stops in travel order.</Text>
+        </View>
+        <Ionicons aria-hidden name="arrow-forward" size={22} color={Colors.onDark} />
+      </TouchableOpacity>
 
-      <View style={styles.listSection}>
-        {tools.map((item) => (
-          <TouchableOpacity
-            key={item.screen}
-            accessibilityRole="button"
-            onPress={() => navigation.getParent()?.navigate(item.screen)}
-            style={styles.row}
-          >
-            <View style={styles.iconCircle}>
-              <Ionicons name={item.icon} size={20} color={Colors.brandGreen} />
+      <View style={s.section}>
+        {rideTools.map((item, index) => (
+          <TouchableOpacity key={item.screen} accessibilityRole="button" onPress={() => open(item.screen)}
+            style={[styles.row, index > 0 && styles.rule]}>
+            <Ionicons aria-hidden name={item.icon} size={22} color={Colors.action} />
+            <View style={styles.details}>
+              <Text style={s.label}>{item.name}</Text>
+              <Text style={s.muted}>{item.detail}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{item.name}</Text>
-              <Text style={styles.rowDesc}>{item.desc}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+            <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
           </TouchableOpacity>
         ))}
       </View>
 
-      <View style={styles.sectionBand}>
-        <Text style={styles.sectionBandText}>Account</Text>
-      </View>
-
-      <View style={styles.listSection}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => navigation.getParent()?.navigate('PassengerProfile')}
-          style={styles.row}
-        >
-          <View style={styles.iconCircle}>
-            <Ionicons name="person-outline" size={20} color={Colors.brandGreen} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>Profile</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+      <View style={s.section}>
+        <Text accessibilityRole="header" style={s.sectionTitle}>Account</Text>
+        <TouchableOpacity accessibilityRole="button" onPress={() => open('PassengerProfile')} style={styles.row}>
+          <Ionicons aria-hidden name="person-outline" size={22} color={Colors.action} />
+          <Text style={[s.label, styles.details]}>Profile</Text>
+          <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
         </TouchableOpacity>
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => navigation.getParent()?.navigate('PassengerAbout')}
-          style={styles.row}
-        >
-          <View style={styles.iconCircle}>
-            <Ionicons name="information-circle-outline" size={20} color={Colors.brandGreen} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>About ejeephero</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+        <TouchableOpacity accessibilityRole="button" onPress={() => void signOut().catch(() => Alert.alert('Could not sign out', 'Please try again.'))} style={[styles.row, styles.rule]}>
+          <Ionicons aria-hidden name="log-out-outline" size={22} color={Colors.ink} />
+          <Text style={s.label}>Sign out</Text>
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        accessibilityRole="button"
-        onPress={handleSignOut}
-        style={styles.signOutBtn}
-      >
-        <Text style={styles.signOutText}>Sign out</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    paddingBottom: 36,
-  },
-  headerBlock: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
-    gap: 2,
-  },
-  listSection: {
-    borderTopWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.paper,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.ink,
-  },
-  rowDesc: {
-    fontSize: 13,
-    color: Colors.subtleGray,
-    marginTop: 2,
-  },
-  sectionBand: {
-    backgroundColor: Colors.canvas,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-  },
-  sectionBandText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.subtleGray,
-  },
-  signOutBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
-  signOutText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.brandGreen,
-    textDecorationLine: 'underline',
-  },
+  directory: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 22, backgroundColor: Colors.midnight, borderColor: Colors.midnight },
+  details: { flex: 1, minWidth: 0, gap: 3 },
+  light: { color: Colors.onDark },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 48, gap: 12, paddingVertical: 8 },
+  rule: { borderTopWidth: 1, borderTopColor: Colors.border },
 });

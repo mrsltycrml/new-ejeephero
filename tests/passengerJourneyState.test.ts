@@ -72,3 +72,24 @@ test('a slower old catalog refresh cannot restore records removed by a newer suc
   resolves[0](catalog); await old;
   assert.deepEqual(render().transit.routes, []);
 });
+
+test('using a suggested pair replaces both stops together and keeps the final destination', async () => {
+  states = []; refs = []; read = async () => catalog;
+  await render().refreshTransit();
+  const place = { id: 'place', name: 'Final destination', latitude: 14.5, longitude: 121.003 };
+  let journey = render();
+  journey.setDestinationPlace(place);
+  journey.setRideStops(stops[0], stops[1]);
+  journey = render();
+  journey.showWalk(path, 'a', 'b');
+  journey.setRideStops(stops[1], stops[2]);
+  journey = render();
+  assert.equal(journey.boardingStop.id, 'b');
+  assert.equal(journey.alightingStop.id, 'c');
+  assert.equal(journey.selectedRouteId, 'r');
+  assert.equal(journey.destinationPlace, place);
+  assert.equal(journey.walk, null);
+  journey.setRideStops(stops[2], stops[0]);
+  assert.equal(render().boardingStop.id, 'b');
+  assert.equal(render().alightingStop.id, 'c');
+});
