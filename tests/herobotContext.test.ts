@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildTransitChatContext } from '../supabase/functions/herobot-chat/context.ts';
+const boarding = { passenger_use: 'board', passenger_use_verified_at: '2026-01-01', passenger_use_source_url: 'https://operator.example/use' };
 
 test('chat context never turns fare defaults or active shifts into current operational facts', () => {
   const context = buildTransitChatContext([{ id: 'r', name: 'Real route', base_fare: 15, operating_hours: 'Unconfirmed hours' }], [
@@ -17,13 +18,15 @@ test('chat context excludes samples and unpublished routes and requires sourced 
     { id: 'r', name: 'Published route' }, { id: 's', name: 'Seed route', is_sample: true },
     { id: 'a', name: 'Archived route', is_archived: true }, { id: 'c', name: 'Future route', is_coming_soon: true },
   ], [
-    { route_id: 'r', name: 'Sourced stop', latitude: 14.5, longitude: 121, location_source_url: 'https://operator.example/stop', location_verified_at: '2026-01-01', sequence_order: 1 },
+    { ...boarding, route_id: 'r', name: 'Sourced stop', latitude: 14.5, longitude: 121, location_source_url: 'https://operator.example/stop', location_verified_at: '2026-01-01', sequence_order: 1 },
+    { route_id: 'r', name: 'Unconfirmed use', latitude: 14.5, longitude: 121, location_source_url: 'https://operator.example/stop', location_verified_at: '2026-01-01' },
     { route_id: 'r', name: 'Seed stop', is_sample: true, location_source_url: 'https://operator.example/stop', location_verified_at: '2026-01-01' },
     { route_id: 'r', name: 'Invalid stop', latitude: 100, longitude: 121, location_source_url: 'https://operator.example/stop', location_verified_at: '2026-01-01' },
   ]);
   assert.match(context, /Sourced stop/);
   assert.match(context, /https:\/\/operator.example\/stop/);
-  assert.doesNotMatch(context, /Seed|Archived|Future|Invalid stop/);
+  assert.match(context, /"passengerUse":"board"/);
+  assert.doesNotMatch(context, /Seed|Archived|Future|Invalid stop|Unconfirmed use/);
 });
 
 test('failed and empty chat reference reads remain distinct and both forbid invented facts', () => {
@@ -36,7 +39,7 @@ test('failed and empty chat reference reads remain distinct and both forbid inve
 });
 
 test('chat reference excludes future verification while retaining past sourced stops', () => {
-  const stop = { route_id: 'r', name: 'Past stop', latitude: 14.5, longitude: 121, location_source_url: 'https://operator.example/stop', location_verified_at: '2026-01-01' };
+  const stop = { ...boarding, route_id: 'r', name: 'Past stop', latitude: 14.5, longitude: 121, location_source_url: 'https://operator.example/stop', location_verified_at: '2026-01-01' };
   for (const future of ['2099-01-01', new Date(Date.now() + 60000).toISOString()]) {
     const context = buildTransitChatContext([{ id: 'r', name: 'Published route' }], [stop, { ...stop, name: 'Future stop', location_verified_at: future }]);
     assert.match(context, /Past stop/);

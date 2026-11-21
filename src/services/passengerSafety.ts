@@ -1,4 +1,7 @@
-// Pure location rules: an absent stop is never proof that loading is illegal.
+import { permitsPassengerUse } from '../../supabase/functions/_shared/passengerStopUse.ts';
+import type { TerminalData } from './offlineTransitService';
+
+// An absent stop is never proof that loading is illegal.
 export type LoadingZone = {
   id: string; name: string; kind: 'loading' | 'no_loading';
   latitude: number; longitude: number; radius_meters: number;
@@ -23,7 +26,7 @@ export function distanceMeters(a: { latitude: number; longitude: number }, b: { 
   return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export function evaluateBoardingLocation(fix: PassengerFix | null, zones: LoadingZone[], now = Date.now()): BoardingStatus {
+export function evaluateBoardingLocation(fix: PassengerFix | null, zones: LoadingZone[], now = Date.now(), stops: TerminalData[] = []): BoardingStatus {
   if (!fix || !Number.isFinite(fix.timestamp) || now - fix.timestamp > 30_000 || fix.timestamp > now + 5000) return { kind: 'unavailable', title: 'Fresh location needed', detail: 'Enable location and wait for a fresh fix to check your waiting area.' };
   if (!Number.isFinite(fix.latitude) || !Number.isFinite(fix.longitude) || Math.abs(fix.latitude) > 90 || Math.abs(fix.longitude) > 180 || fix.accuracy == null || !Number.isFinite(fix.accuracy) || fix.accuracy < 0 || fix.accuracy > 30) {
     return { kind: 'uncertain', title: 'Checking your location', detail: 'The GPS signal is not precise enough yet. Follow the signs at your stop.' };
@@ -35,9 +38,15 @@ export function evaluateBoardingLocation(fix: PassengerFix | null, zones: Loadin
   if (prohibited) return { kind: 'prohibited', title: 'No loading in this area', detail: `You are in ${prohibited.zone.name}. Move to a designated loading bay before boarding.`, zone: prohibited.zone };
   // A fix that overlaps a prohibited boundary must never be marked safe.
   if (candidates.some(x => x.zone.kind === 'no_loading' && x.distance - fix.accuracy! <= x.zone.radius_meters)) return { kind: 'uncertain', title: 'Near a no-loading boundary', detail: 'Check the posted loading signs before boarding.' };
-  const allowed = candidates.find(x => x.zone.kind === 'loading' && x.distance + fix.accuracy! <= x.zone.radius_meters);
+  const boardingStops = stops.filter(stop => permitsPassengerUse(stop, 'board'));
+  const bays = candidates.filter(x => x.zone.kind === 'loading'
+    && boardingStops.some(stop => distanceMeters(stop, x.zone) <= x.zone.radius_meters));
+  const allowed = bays.find(x => x.distance + fix.accuracy! <= x.zone.radius_meters);
   if (allowed) return { kind: 'allowed', title: 'At a designated loading bay', detail: allowed.zone.name, zone: allowed.zone };
-  const nearest = candidates.filter(x => x.zone.kind === 'loading').sort((a, b) => a.distance - b.distance)[0];
+  if (candidates.some(x => x.zone.kind === 'loading' && x.distance <= x.zone.radius_meters)) {
+    return { kind: 'uncertain', title: 'Boarding here is unconfirmed', detail: 'Check the route’s confirmed boarding stops and posted signs.' };
+  }
+  const nearest = bays.sort((a, b) => a.distance - b.distance)[0];
   if (nearest && nearest.distance <= 1000) return { kind: 'outside', title: 'Outside the mapped loading bays', detail: `Wait at a marked stop. ${nearest.zone.name} is about ${Math.round(nearest.distance)} m away in a straight line.`, zone: nearest.zone };
   return { kind: 'unavailable', title: 'Follow designated loading signs', detail: 'Your location is outside the mapped loading areas. Check the signs where you are waiting.' };
 }

@@ -4,8 +4,8 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { scriptJson } from '../utils/scriptJson';
 import { RouteData, TerminalData, VehicleData } from '../services/offlineTransitService';
 import { GeofenceEvaluationResult } from '../services/geofencingService';
-import { buildJourneyMap, type WalkingRouteGeometry } from '../services/routeMap';
-import { locationQuality, validPoint } from '../services/locationQuality';
+import { buildJourneyMap, passengerUseLabel, type WalkingRouteGeometry } from '../services/routeMap';
+import { locationQuality, validPoint, type Point } from '../services/locationQuality';
 import MapcnPassengerMap from './MapcnPassengerMap';
 
 export interface LeafletMapRef {
@@ -17,6 +17,14 @@ export interface LeafletMapRef {
 }
 
 export interface LeafletMapProps {
+  fieldReview?: {
+    line: { id: string; name: string; color_code: string; coordinates: Point[]; isSelected: boolean };
+    pins: (Point & { id: string; name: string; role: string; isSelected: boolean })[];
+    fitPoints: Point[];
+    cameraKey: string;
+    onSelect: (id: string) => void;
+    onPickCurb?: (point: Point) => void;
+  };
   preferMapcn?: boolean;
   routes: RouteData[];
   terminals: TerminalData[];
@@ -40,6 +48,7 @@ export interface LeafletMapProps {
 }
 
 const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
+  fieldReview,
   preferMapcn = false,
   routes,
   terminals,
@@ -100,7 +109,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   }), [isWeb, showMapcn]);
 
   // Serializable payload for the webview
-  const journeyMap = useMemo(() => buildJourneyMap({ routes, terminals, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes }), [routes, terminals, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes]);
+  const journeyMap = useMemo(() => buildJourneyMap({ routes, terminals, fleetMode, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes }), [routes, terminals, fleetMode, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes]);
   const mapRoutes = useMemo(() => journeyMap.routes.map(r => ({
       id: r.id,
       name: r.name,
@@ -116,11 +125,13 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       is_esakay_hub: t.is_esakay_hub,
       isInside: geofenceResult?.currentZone?.id === t.id,
       isSelected: selectedTerminal?.id === t.id,
-      role: t.id === boardingStop?.id ? 'Board' : t.id === alightingStop?.id ? 'Alight' : 'Stop',
-    })), [journeyMap.terminals, geofenceResult?.currentZone?.id, selectedTerminal?.id, boardingStop?.id, alightingStop?.id]);
+      role: t.id === journeyMap.boarding?.id ? 'Board' : t.id === journeyMap.alighting?.id ? 'Alight' : fleetMode ? 'Stop' : passengerUseLabel(t),
+    })), [journeyMap, fleetMode, geofenceResult?.currentZone?.id, selectedTerminal?.id]);
   const mapData = useMemo(() => ({
-    routes: mapRoutes,
-    terminals: mapTerminals,
+    routes: fieldReview ? [fieldReview.line] : mapRoutes,
+    terminals: fieldReview?.pins ?? mapTerminals,
+    fieldReview: !!fieldReview,
+    canPickCurb: !!fieldReview?.onPickCurb,
     vehicles: vehicles.filter(v => !v.is_sample && ['live', 'weak'].includes(locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now))).map(v => ({
       id: v.id,
       body_number: v.body_number,
@@ -141,8 +152,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     destinationPlace: journeyMap.destinationPlace,
     rideCoordinates: journeyMap.rideCoordinates,
     walkingRoutes: journeyMap.walkingRoutes,
-    fitPoints: journeyMap.fitPoints,
-    cameraKey: journeyMap.cameraKey,
+    fitPoints: fieldReview?.fitPoints ?? journeyMap.fitPoints,
+    cameraKey: fieldReview?.cameraKey ?? journeyMap.cameraKey,
     selectedRouteId,
     selectedVehicleId: selectedVehicle?.id || null,
     vehicleSelectionKey,
@@ -150,7 +161,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     hideOccupancy,
     isOffline: Boolean(isOffline),
   }), [
-    mapRoutes,
+    fieldReview, mapRoutes,
     mapTerminals,
     vehicles,
     userLocation,
@@ -367,7 +378,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
             escapedMapText(t.name) + ' <span style="color:#778493;font-weight:400;">(' + Number(t.latitude).toFixed(4) + ', ' + Number(t.longitude).toFixed(4) + ')</span></div>';
         }).join('');
         mapEl.innerHTML = '<div style="padding:16px;padding-top:48px;height:100%;overflow-y:auto;background:#f4f1ea;">' +
-          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">Map unavailable — verified stop list</div>' +
+          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">' + (data.fieldReview ? 'Map unavailable — field reference points' : 'Map unavailable — verified stop list') + '</div>' +
           listHtml + '</div>';
       };
       window.renderMapData(${scriptJson(initialDataRef.current)});
@@ -475,6 +486,10 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       }
     }
 
+    map.on('click', function(e) {
+      if (window.canPickCurb) sendEvent('PICK_CURB', { latitude: e.latlng.lat, longitude: e.latlng.lng });
+    });
+
     function escapeHtml(value) {
       return String(value).replace(/[&<>"']/g, function(character) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
@@ -482,6 +497,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     }
 
     window.renderMapData = function(data) {
+      window.canPickCurb = data.canPickCurb;
       if (!data) return;
 
       // Update offline badge
@@ -545,7 +561,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       if (data.terminals) {
         data.terminals.forEach(function(term) {
           // Marker
-          var iconSymbol = term.is_esakay_hub ? 'H' : 'S';
+          var iconSymbol = data.fieldReview ? term.role.charAt(0) : (term.is_esakay_hub ? 'H' : 'S');
           var pinClasses = 'terminal-pin' + (term.isSelected ? ' selected' : '');
           
           var html = '<div class="terminal-marker">' +
@@ -559,7 +575,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
             iconAnchor: [17, 17]
           });
 
-          var marker = L.marker([term.latitude, term.longitude], { icon: markerIcon }).addTo(terminalsLayer);
+          var marker = L.marker([term.latitude, term.longitude], { icon: markerIcon, title: term.name }).addTo(terminalsLayer);
           var stopLabel = document.createElement('span'); stopLabel.textContent = term.role + ': ' + term.name; marker.bindTooltip(stopLabel);
           marker.on('click', function() {
             sendEvent('SELECT_TERMINAL', { id: term.id });
@@ -648,7 +664,18 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       try {
         const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!data || typeof data !== 'object') return;
-        const payload = data as { type?: string; id?: string };
+        const payload = data as { type?: string; id?: string; latitude?: number; longitude?: number };
+        if (fieldReview && payload.type === 'PICK_CURB' && typeof payload.latitude === 'number' && typeof payload.longitude === 'number') {
+          const point = { latitude: payload.latitude, longitude: payload.longitude };
+          if (validPoint(point)) fieldReview.onPickCurb?.(point);
+          return;
+        }
+        if (fieldReview && payload.type === 'SELECT_TERMINAL') {
+          const pin = fieldReview.pins.find(p => p.id === payload.id);
+          if (pin && fieldReview.onPickCurb) fieldReview.onPickCurb({ latitude: pin.latitude, longitude: pin.longitude });
+          else if (pin && pin.id !== 'draft-curb') fieldReview.onSelect(pin.id);
+          return;
+        }
         if (payload.type === 'SELECT_TERMINAL' && onSelectTerminal) {
           const found = journeyMap.terminals.find((t) => t.id === payload.id);
           if (found) onSelectTerminal(found);
@@ -660,7 +687,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         // ignore non-map messages
       }
     },
-    [onSelectTerminal, onSelectVehicle, journeyMap.terminals, vehicles]
+    [onSelectTerminal, onSelectVehicle, journeyMap.terminals, vehicles, fieldReview]
   );
 
   useEffect(() => {
@@ -678,7 +705,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
 
   if (isWeb) {
     if (showMapcn) {
-      return <MapcnPassengerMap data={mapData} controls={mapcnControls} onFailure={onMapcnFailure} onSelect={handleRawMessage} />;
+      return <MapcnPassengerMap data={mapData} controls={mapcnControls} onFailure={onMapcnFailure} onSelect={handleRawMessage} onPickCurb={fieldReview?.onPickCurb} />;
     }
     return (
       <View style={styles.container}>

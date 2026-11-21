@@ -4,9 +4,11 @@ import { FRESH_TELEMETRY_WINDOW_MS, pickLatestFreshPositions } from '../utils/op
 import { realRows } from '../utils/realData';
 import { telemetryFix, positionPayload, validPoint, type MeasuredFix } from './locationQuality';
 import { activeRoute, verifiedRoute, verifiedStop } from './routeMap';
+import type { PassengerUse } from '../../supabase/functions/_shared/passengerStopUse';
 
 export interface RouteData {
   id: string;
+  route1_variant?: string | null;
   is_sample?: boolean;
   is_archived?: boolean;
   is_active?: boolean;
@@ -43,6 +45,9 @@ export interface TerminalData {
   geofence_radius_meters?: number;
   location_verified_at?: string | null;
   location_source_url?: string | null;
+  passenger_use?: PassengerUse | null;
+  passenger_use_verified_at?: string | null;
+  passenger_use_source_url?: string | null;
   is_esakay_hub?: boolean;
   landmark_photo?: string;
   landmark_desc?: string;

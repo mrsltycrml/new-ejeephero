@@ -40,6 +40,7 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
   const [place, updatePlace] = useState<PassengerPlace | null>(null);
   const [walkingRoutes, setWalkingRoutes] = useState<WalkingRouteGeometry[]>([]);
   const [transit, setTransit] = useState<TransitResult>(emptyTransit);
+  const currentTransit = useRef(emptyTransit);
   const [walk, setWalk] = useState<JourneyState['walk']>(null);
   const journeyVersion = useRef(0);
   const getJourneyVersion = useCallback(() => journeyVersion.current, []);
@@ -52,7 +53,7 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
   }, []);
   const setPlace = useCallback((value: PassengerPlace | null) => { updatePlace(value); clearWalk(); }, [clearWalk]);
   const setSelectedRouteId = useCallback((id: string | null) => { setSelection(state => selectJourneyRoute(state, id, transit.routes)); clearWalk(); }, [transit.routes, clearWalk]);
-  const setBoardingStop = useCallback((stop: TerminalData | null) => { setSelection(state => selectJourneyStop(state, stop, 'boarding', transit.routes, transit.terminals)); clearWalk(); }, [transit, clearWalk]);
+  const setBoardingStop = useCallback((stop: TerminalData | null) => { setSelection(state => selectJourneyStop(state, stop, 'boarding', currentTransit.current.routes, currentTransit.current.terminals)); clearWalk(); }, [clearWalk]);
   const [vehicles, setVehicles] = useState<VehicleData[]>([]);
   const [vehicleError, setVehicleError] = useState('');
   const [nearby, setNearby] = useState<VehicleData[]>([]);
@@ -68,21 +69,23 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     updateUnit(value ? { ...value, source: value.source || 'confirmed', matchedAt: Date.now() } : null);
   }, []);
   const endRide = useCallback(() => { setUnit(null); setPlace(null); ignoredUntil.current = Date.now() + 60_000; setSelection(emptySelection); setSignal('Ride ended. Choose your next destination.'); }, [setUnit, setPlace]);
-  const setDestination = useCallback((stop: TerminalData | null) => { evidence.current = null; ignoredUntil.current = 0; setSelection(state => selectJourneyStop(state, stop, 'alighting', transit.routes, transit.terminals)); clearWalk(); }, [transit, clearWalk]);
+  const setDestination = useCallback((stop: TerminalData | null) => { evidence.current = null; ignoredUntil.current = 0; setSelection(state => selectJourneyStop(state, stop, 'alighting', currentTransit.current.routes, currentTransit.current.terminals)); clearWalk(); }, [clearWalk]);
   const setRideStops = useCallback((boarding: TerminalData, alighting: TerminalData) => {
-    const next = reconcileJourneySelection({ selectedRouteId: boarding.route_id, boardingStop: boarding, alightingStop: alighting }, transit.routes, transit.terminals);
+    const { routes, terminals } = currentTransit.current;
+    const next = reconcileJourneySelection({ selectedRouteId: boarding.route_id, boardingStop: boarding, alightingStop: alighting }, routes, terminals);
     if (!next.boardingStop || !next.alightingStop) return;
     evidence.current = null;
     ignoredUntil.current = 0;
     setSelection(next);
     clearWalk();
-  }, [transit, clearWalk]);
+  }, [clearWalk]);
   useEffect(() => { updateUnit(null); setSelection(emptySelection); setPlace(null); evidence.current = null; setNearby([]); }, [user?.id]);
   const transitRequest = useRef(0);
   const refreshTransit = useCallback(async () => {
     const request = ++transitRequest.current;
     const data = await offlineTransit.getTransitData();
     if (request === transitRequest.current) {
+      currentTransit.current = data;
       setTransit(data);
       setSelection(state => reconcileJourneySelection(state, data.routes, data.terminals));
       clearWalk();

@@ -14,7 +14,8 @@ const react = {
 };
 const route = { id: 'r', name: 'Fixture route', coordinates: [] };
 const stops = ['a', 'b', 'c'].map((id, sequence_order) => ({ id, name: id, route_id: 'r', sequence_order, latitude: 14.5, longitude: 121 + sequence_order / 1000,
-  location_source_url: 'https://operator.example/stops', location_verified_at: '2026-01-01' }));
+  location_source_url: 'https://operator.example/stops', location_verified_at: '2026-01-01',
+  passenger_use: 'both', passenger_use_source_url: 'https://operator.example/permissions', passenger_use_verified_at: '2026-01-01' }));
 const catalog = { routes: [route], terminals: stops, status: 'ready', syncedAt: '2026-11-18T00:00:00Z', isFromCache: false, latencyMs: 0, error: null };
 let read: () => Promise<any> = async () => catalog;
 Object.assign(globalThis, { __journeyReact: react, __journeyRead: () => read() });
@@ -71,6 +72,22 @@ test('a slower old catalog refresh cannot restore records removed by a newer suc
   resolves[1]({ ...catalog, routes: [], terminals: [] }); await latest;
   resolves[0](catalog); await old;
   assert.deepEqual(render().transit.routes, []);
+});
+
+test('catalog refresh revokes a selected boarding role and its walk while keeping the valid exit', async () => {
+  states = []; refs = []; read = async () => catalog;
+  await render().refreshTransit();
+  render().setRideStops(stops[0], stops[2]);
+  const oldChoice = render().setBoardingStop;
+  render().showWalk(path, 'a', 'b');
+  const version = render().getJourneyVersion();
+  read = async () => ({ ...catalog, terminals: [{ ...stops[0], passenger_use: 'alight' }, ...stops.slice(1)] });
+  await render().refreshTransit();
+  const journey = render();
+  assert.equal(journey.boardingStop, null); assert.equal(journey.alightingStop.id, 'c');
+  assert.equal(journey.walk, null);
+  assert.equal(journey.showWalk(path, 'a', 'b', version), false);
+  oldChoice(stops[0]); assert.equal(render().boardingStop, null);
 });
 
 test('using a suggested pair replaces both stops together and keeps the final destination', async () => {

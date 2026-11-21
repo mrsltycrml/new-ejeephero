@@ -157,7 +157,7 @@ export default function SupervisorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [manageMode, setManageMode] = useState<'none' | 'list'>('none');
+  const [manageMode, setManageMode] = useState<'none' | 'list' | 'route1'>('none');
   const [dataError, setDataError] = useState('');
   const [transitNotice, setTransitNotice] = useState('');
 
@@ -410,10 +410,14 @@ export default function SupervisorDashboardScreen() {
 
   const gpsIssueCount = currentLiveUnits.filter(unit => unit.stale).length;
 
-  if (manageMode === 'list') return <SupervisorRouteManager onChanged={loadDashboard} onBack={() => setManageMode('none')} />;
+  if (manageMode !== 'none') return <SupervisorRouteManager openRoute1={manageMode==='route1'} onChanged={loadDashboard} onBack={() => setManageMode('none')} />;
+  const route1ReviewButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Review Route 1 map and stops" style={styles.backNavRow} onPress={()=>setManageMode('route1')}>
+    <Text style={styles.rowTitle}>Review Route 1 map and stops</Text>
+  </TouchableOpacity>;
   if (loading) return <ScreenSkeleton preset="dashboard" />;
   if (dataError) return <ScrollView style={ops.page} contentContainerStyle={ops.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
     <Text accessibilityRole="alert" style={ops.errorBanner}>{dataError}</Text>
+    {route1ReviewButton}
     <TouchableOpacity accessibilityRole="button" style={styles.backNavRow} onPress={() => setManageMode('list')}>
       <Text style={styles.rowTitle}>Manage routes and stops</Text>
     </TouchableOpacity>
@@ -447,6 +451,7 @@ export default function SupervisorDashboardScreen() {
           <Text accessibilityRole="header" style={ops.mastheadTitle}>Fleet monitor</Text>
           <Text style={ops.mastheadMeta}>{formatReportingPeriod(period)}</Text>
         </View>
+        {route1ReviewButton}
 
         {!!transitNotice && <Text accessibilityRole="alert" style={styles.rowSub}>{transitNotice}</Text>}
 

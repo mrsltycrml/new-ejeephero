@@ -27,6 +27,7 @@ try {
   }
   await db.exec(`
     alter table routes add column geometry_verified_at timestamptz, add column geometry_source_url text,
+      add column r2_geometry_url text,
       add column is_archived boolean not null default false, add column is_coming_soon boolean not null default false,
       alter operating_hours set default '5:00 AM - 10:00 PM', alter fare_effective_date set default '2023-10-08',
       alter fare_source_url set default 'https://ltfrb.gov.ph/';
@@ -52,6 +53,8 @@ try {
   const planning = read('../migrations/20261027130000_passenger_safety_and_fares.sql');
   await db.exec(planning.split('-- Emergency requests')[0]);
   await db.exec(read('../migrations/20261118030000_walking_directions.sql'));
+  await db.exec(read('../migrations/20261118040000_live_route_deviations.sql'));
+  await db.exec(read('../migrations/20261121010000_route_deviation_evidence_window.sql'));
   // The imported route starts at zero. Installing the migration must preserve those values and evidence.
   await db.exec(`
     insert into routes(id,name) values ('00000000-0000-4000-8000-000000000101','Legacy route');
@@ -62,10 +65,13 @@ try {
   await db.exec(read('../migrations/20261121020000_supervisor_catalog.sql'));
   await db.exec(`create trigger vehicles_flag_incomplete_route before update of is_active on vehicles
     for each row execute function public.flag_incomplete_driver_route()`);
-  await db.exec(read('./supervisor_catalog.sql'));
   await db.exec(read('../migrations/20261121030000_idempotent_catalog_create.sql'));
+  await db.exec(`insert into routes(id,name) values ('550e8400-e29b-41d4-a716-446655440000','Existing Route 1')`);
+  await db.exec(read('../migrations/20261121040000_route1_activation.sql'));
+  await db.exec(read('./supervisor_catalog.sql'));
   await db.exec(read('./idempotent_catalog_create.sql'));
-  console.log('Supervisor catalog and idempotent create SQL regressions passed in isolated PostgreSQL.');
+  await db.exec(read('./route1_activation.sql'));
+  console.log('Supervisor catalog, idempotent create and Route 1 SQL regressions passed in isolated PostgreSQL.');
 } catch (error) {
   console.error(error.message, error.where || '', error.detail || '');
   process.exitCode = 1;

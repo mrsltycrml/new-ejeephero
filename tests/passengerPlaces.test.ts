@@ -9,10 +9,12 @@ test('place search accepts mapped places and rejects invalid or out-of-area coor
   assert.equal(parsePlaces({ features: [feature] })[0].name, 'Mall');
   assert.deepEqual(parsePlaces({ features: [{ ...feature, geometry: { coordinates: [0, 0] } }, { ...feature, geometry: { coordinates: ['121', '14'] } }] }), []);
 });
-test('nearest stop matching stays local and preserves provisional location status', () => {
-  assert.equal(nearestRouteStop(place, [stop])?.stop.id, 's');
-  assert.equal(nearestRouteStop(place, [stop])?.verified, false);
-  assert.equal(nearestRouteStop(place, [{ ...stop, latitude: 15 }]), null);
-  assert.equal(nearestRouteStop(place, [{ ...stop, latitude: NaN }]), null);
-  assert.equal(nearestRouteStop(place, [stop, { ...stop, id: 'closer', latitude: 14.5601 }])?.stop.id, 'closer');
+test('nearest destination stop needs current alighting permission', () => {
+  assert.equal(nearestRouteStop(place, [stop]), null);
+  const exit = { ...stop, location_source_url: 'https://example.test/stop', location_verified_at: '2026-01-01',
+    passenger_use: 'alight' as const, passenger_use_source_url: 'https://example.test/use', passenger_use_verified_at: '2026-01-01' };
+  assert.equal(nearestRouteStop(place, [exit])?.stop.id, 's');
+  assert.equal(nearestRouteStop(place, [{ ...exit, latitude: 15 }]), null);
+  assert.equal(nearestRouteStop(place, [{ ...exit, latitude: NaN }]), null);
+  assert.equal(nearestRouteStop(place, [exit, { ...exit, id: 'closer', latitude: 14.5601, passenger_use: 'board' }])?.stop.id, 's');
 });

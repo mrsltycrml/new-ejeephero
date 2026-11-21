@@ -19,7 +19,7 @@ import { getWalkingDirections, type WalkingRoute } from '../../services/walkingD
 import { searchPassengerPlaces } from '../../services/placeSearchService';
 import { type PassengerPlace } from '../../services/passengerPlaces';
 import { locationDescription, locationQuality, vehicleTelemetryReadout } from '../../services/locationQuality';
-import { rideLeg, selectJourneyStop } from '../../services/routeMap';
+import { rideLeg, selectJourneyStop, confirmedPassengerUse, permitsPassengerUse, passengerStopOptions, passengerUseLabel } from '../../services/routeMap';
 import { Colors } from '../../constants/theme';
 import { manilaDateKey } from '../../utils/reportingPeriod';
 
@@ -113,7 +113,11 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     };
   }, [isConnected]);
 
-  const boarding = evaluateBoardingLocation(foreground && !errorMsg ? fix : null, zonesError ? [] : zones, now);
+  const routeStops = useMemo(() => stops.filter(t => (!selectedRouteId || t.route_id === selectedRouteId) && confirmedPassengerUse(t))
+    .sort((a, b) => a.sequence_order - b.sequence_order), [stops, selectedRouteId]);
+  const boardingOptions = passengerStopOptions(routeStops, 'board', alightingStop);
+  const alightingOptions = passengerStopOptions(routeStops, 'alight', boardingStop);
+  const boarding = evaluateBoardingLocation(foreground && !errorMsg ? fix : null, zonesError ? [] : zones, now, routeStops);
   const warningKey = boarding.kind === 'prohibited' ? boarding.zone!.id : null;
   useEffect(() => {
     if (warningKey && lastWarning.current !== warningKey) {
@@ -122,13 +126,11 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     lastWarning.current = warningKey;
   }, [warningKey]);
 
-  const activeStop = inspectedStop ? stops.find(stop => stop.id === inspectedStop.id && (!selectedRouteId || stop.route_id === selectedRouteId)) ?? null : null;
-  const stopBadgeCode = activeStop ? 'VERIFIED STOP' : 'NO STOP SELECTED';
+  const activeStop = routeStops.find(stop => stop.id === inspectedStop?.id) ?? null;
+  const stopBadgeCode = boardingStop && permitsPassengerUse(boardingStop, 'board') ? 'BOARDING CONFIRMED' : 'NO BOARDING STOP';
   const routeName = (id?: string) => routes.find(item => item.id === id)?.name || 'Route unavailable';
 
-  const routeStops = useMemo(() => stops.filter(t => !selectedRouteId || t.route_id === selectedRouteId)
-    .sort((a, b) => a.sequence_order - b.sequence_order), [stops, selectedRouteId]);
-  const results = routeStops.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
+  const results = routeStops.filter(t => permitsPassengerUse(t, 'alight') && t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
   const allModeVehicles = isConnected ? vehicles.filter(vehicle => !vehicle.is_sample && ['live', 'weak'].includes(locationQuality({ ...vehicle, timestamp: Date.parse(vehicle.recorded_at || '') }, now))) : [];
   const displayed = selectedRouteId
     ? allModeVehicles.filter((v) => v.route_id === selectedRouteId)
@@ -169,7 +171,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   }, [hasTrip, transit, user?.id]);
   const fareRead = tripFare && tripFare.catalog === transit && tripFare.owner === user?.id ? tripFare : null;
   const fareDate = manilaDateKey(new Date(now));
-  const rideKm = trip && fareRead?.data ? verifiedRideDistance(trip.boarding.id, trip.alighting.id, trip.route.id, fareRead.data.segments) : null;
+  const rideKm = trip && fareRead?.data ? verifiedRideDistance(trip.boarding.id, trip.alighting.id, trip.route.id, fareRead.data.segments, stops) : null;
   const matrix = trip && fareRead?.data?.matrices.find(value => validFareMatrix(value, trip.route.id, fareDate));
   const fareQuote = trip && rideKm != null ? quotePassengerFare(rideKm, 'regular', trip.route, matrix, fareDate) : null;
   const tripApplied = trip && trip.boarding.id === boardingStop?.id && trip.alighting.id === alightingStop?.id;
@@ -223,6 +225,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     scroll.current?.scrollTo({ y: 0, animated: false });
   };
   const chooseStopAsDestination = (stop: TerminalData) => {
+    if (!permitsPassengerUse(stop, 'alight')) return;
     choosePlace({ id: `stop:${stop.id}`, name: stop.name, address: '', latitude: stop.latitude, longitude: stop.longitude });
     setInspectedStop(stop);
   };
@@ -232,8 +235,10 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     setSelected(vehicle);
   };
 
+  const canBoardUnit = (vehicle: VehicleData) => boardingStop?.route_id === vehicle.route_id && permitsPassengerUse(boardingStop, 'board')
+    && boarding.kind !== 'prohibited' && !vehicle.is_sample && nearby.some(item => item.vehicle_id === vehicle.vehicle_id);
   const boardUnit = (vehicle: VehicleData) => {
-    if (vehicle.is_sample || !nearby.some(item => item.vehicle_id === vehicle.vehicle_id)) return;
+    if (!canBoardUnit(vehicle)) return;
     triggerHaptic('success');
     setUnit({
       vehicle_id: vehicle.vehicle_id,
@@ -251,6 +256,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     .map(stop => ({ stop, distance: distanceMeters(stop, place) })).filter(item => item.distance <= STOP_SEARCH_METERS)
     .sort((a, b) => a.distance - b.distance).slice(0, 3) : [];
   const requestWalk = async (stop: TerminalData, toPlace = false) => {
+    if (!permitsPassengerUse(stop, toPlace ? 'alight' : 'board')) return;
     const request = ++walkingRequest.current;
     const journeyVersion = getJourneyVersion();
     setWalkingError('');
@@ -349,17 +355,17 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
         onSelect={id => { pendingPlace.current = null; setSelectedRouteId(id || null); setInspectedStop(null); setSelected(null); }} />
       {!hasPath && <Text style={s.muted}>Route path unavailable.</Text>}
       {!routeStops.length && <Text style={s.muted}>Verified stop locations unavailable.</Text>}
-      <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!routeStops.length}
-        options={routeStops.filter(stop => !alightingStop || stop.sequence_order < alightingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
-        onSelect={id => setBoardingStop(routeStops.find(stop => stop.id === id) || null)} />
-      <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!routeStops.length}
-        options={routeStops.filter(stop => !boardingStop || stop.sequence_order > boardingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
-        onSelect={id => setDestination(routeStops.find(stop => stop.id === id) || null)} />
+      <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!boardingOptions.length}
+        options={boardingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
+        onSelect={id => setBoardingStop(boardingOptions.find(stop => stop.id === id) || null)} />
+      <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!alightingOptions.length}
+        options={alightingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
+        onSelect={id => setDestination(alightingOptions.find(stop => stop.id === id) || null)} />
       <Text style={s.muted}>Destination place: {place?.name || 'Not selected'}</Text>
       {boardingStop && alightingStop && !rideLeg(selectedRoute, boardingStop, alightingStop).length && <Text style={s.muted}>Ride leg unavailable: verified geometry must connect these stops in route order.</Text>}
       {!!selectedRoute?.coordinates.length && <Text style={s.muted}>Arrows follow published geometry order. Green highlights the selected ride leg.</Text>}
       {!!activeStop && <View style={{ gap: 8 }}>
-        <Text style={s.label}>{activeStop.name} · {routeName(activeStop.route_id)}</Text>
+        <Text style={s.label}>{activeStop.name} · {routeName(activeStop.route_id)} · {passengerUseLabel(activeStop)}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <TouchableOpacity accessibilityRole="button" disabled={!canChooseStop('boarding')} accessibilityState={{ disabled: !canChooseStop('boarding') }} onPress={() => setBoardingStop(activeStop)} style={[s.input, !canChooseStop('boarding') && { opacity: 0.5 }]}><Text>Board here</Text></TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" disabled={!canChooseStop('alighting')} accessibilityState={{ disabled: !canChooseStop('alighting') }} onPress={() => setDestination(activeStop)} style={[s.input, !canChooseStop('alighting') && { opacity: 0.5 }]}><Text>Alight here</Text></TouchableOpacity>
@@ -506,7 +512,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   // 2) WHERE TO BOARD VIEW (Board 02 left)
   if (boardingOpen) {
     const targetVehicle = currentSelected;
-    const canBoardLive = targetVehicle && !targetVehicle.is_sample && nearby.some((v) => v.vehicle_id === targetVehicle.vehicle_id);
+    const canBoardLive = targetVehicle && canBoardUnit(targetVehicle);
     const isProhibited = boarding.kind === 'prohibited';
 
     return (
@@ -597,7 +603,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           <Text style={s.buttonText}>I boarded this unit</Text>
         </TouchableOpacity>
 
-        {!canBoardLive && <Text style={s.muted}>Select a nearby unit with current GPS to confirm your ride.</Text>}
+        {!canBoardLive && <Text style={s.muted}>Choose a confirmed boarding stop and a nearby unit on its route. Follow the loading signs.</Text>}
 
       </FormScrollView>
     );

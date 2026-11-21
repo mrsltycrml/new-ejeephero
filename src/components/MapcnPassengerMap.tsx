@@ -4,6 +4,7 @@ import type { WalkingRouteGeometry } from '../services/routeMap';
 import type { LeafletMapRef } from './LeafletMap';
 
 export type MapcnPassengerMapProps = {
+  onPickCurb?: (point: Point) => void;
   controls: React.Ref<LeafletMapRef>;
   onFailure: () => void;
   onSelect: (data: { type: 'SELECT_TERMINAL' | 'SELECT_VEHICLE'; id: string }) => void;

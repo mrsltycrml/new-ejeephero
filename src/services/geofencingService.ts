@@ -1,4 +1,5 @@
 import type { TerminalData } from './offlineTransitService';
+import { permitsPassengerUse } from './routeMap.ts';
 
 export interface GeofenceEvaluationResult {
   isInsideLegalZone: boolean;
@@ -57,7 +58,7 @@ export function evaluateGeofence(
   userLon: number,
   terminals: TerminalData[] = []
 ): GeofenceEvaluationResult {
-  terminals = terminals.filter(stop => !stop.is_sample && stop.location_verified_at && stop.location_source_url && Number.isFinite(stop.geofence_radius_meters) && stop.geofence_radius_meters! > 0);
+  terminals = terminals.filter(stop => permitsPassengerUse(stop, 'board') && Number.isFinite(stop.geofence_radius_meters) && stop.geofence_radius_meters! > 0);
   if (!Number.isFinite(userLat) || !Number.isFinite(userLon) || !terminals.length) {
     return { isInsideLegalZone: false, currentZone: null, nearestZone: null, distanceToNearestMeters: null, bearingToNearestDegrees: null, statusMessage: 'Verified loading areas unavailable.' };
   }

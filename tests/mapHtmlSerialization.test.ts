@@ -36,14 +36,15 @@ test('serialized map executes safely, frames journeys, preserves camera on telem
   const name = '</script><script>globalThis.injected=true</script>';
   const verifiedAt = new Date(Date.now() - 60000).toISOString();
   const route = { id: 'arbitrary', name, coordinates: [a, b], geometry_verified_at: verifiedAt, geometry_source_url: 'https://example.test/route' };
-  const stop = { ...a, id: 'stop', name, route_id: route.id, sequence_order: 1, location_verified_at: verifiedAt, location_source_url: 'https://example.test/stop' };
+  const stop = { ...a, id: 'stop', name, route_id: route.id, sequence_order: 1, location_verified_at: verifiedAt, location_source_url: 'https://example.test/stop',
+    passenger_use: 'board', passenger_use_source_url: 'https://example.test/permissions', passenger_use_verified_at: verifiedAt };
   const markup = renderToStaticMarkup(React.createElement(LeafletMap, { routes: [route], terminals: [stop], vehicles: [], selectedRouteId: route.id, selectedVehicle: { id: 'pending' }, vehicleSelectionKey: 'selected-unit', vehicleFocusRequestId: 'first-request' } as any));
   const html = markup.match(/srcDoc="([^"]*)"/i)![1].replace(/&(quot|amp|lt|gt|#x27);/g, (_, key) => ({ quot: '"', amp: '&', lt: '<', gt: '>', '#x27': "'" }[key]!));
   const script = html.match(/<script>([\s\S]*?)<\/script>/)![1];
   const fits: any[] = [], flights: any[] = [], markers: any[] = [], messages: any[] = [], lines: any[] = [];
   let options: any;
   const layer = () => ({ addTo() { return this; }, clearLayers() {}, bindTooltip(value: any) { this.label = value; return this; }, bindPopup() { return this; }, on(event: string, fn: () => void) { this[event] = fn; return this; } } as any);
-  const map = { setView() { return this; }, getZoom: () => 14, fitBounds(points: any) { fits.push(points); }, flyTo(...args: any[]) { flights.push(args); } };
+  const map = { setView() { return this; }, on() { return this; }, getZoom: () => 14, fitBounds(points: any) { fits.push(points); }, flyTo(...args: any[]) { flights.push(args); } };
   const context: any = { document: { getElementById: () => ({ style: {} }), createElement: () => ({ textContent: '' }) }, L: {
     map: (_: string, value: any) => { options = value; return map; }, TileLayer: { extend: () => {} }, tileLayer: layer, layerGroup: layer,
     polyline: (points: any, settings: any) => { const value = { ...layer(), points, settings }; lines.push(value); return value; },

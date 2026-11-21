@@ -51,7 +51,8 @@ const hooks = registerHooks({
 const { default: SupervisorDashboardScreen } = await import('../src/screens/admin/SupervisorDashboardScreen.tsx');
 hooks.deregister();
 const render = () => { index = 0; effects = []; return SupervisorDashboardScreen(); };
-const find = (node: any, type: string): any => node?.type === type ? node : (node?.props?.children || []).flat(Infinity).map((child: any) => find(child, type)).find(Boolean);
+const find = (node: any, type: string, label?: string): any => node?.type === type && (!label || node.props.accessibilityLabel === label)
+  ? node : (node?.props?.children || []).flat(Infinity).map((child: any) => find(child, type, label)).find(Boolean);
 const identity = (props: any) => props.vehicleSelectionKey === undefined ? props.selectedVehicle?.id ?? null : props.vehicleSelectionKey;
 const textOf = (node: any): string => typeof node === 'string' || typeof node === 'number' ? String(node) : (node?.props?.children || []).flat(Infinity).map(textOf).join('');
 const liveKpi = (node: any): any => {
@@ -100,6 +101,19 @@ test('actual supervisor Live units KPI excludes weak and unknown accuracy', asyn
     positions[0].accuracy = 5;
     await find(render(), 'Scroll').props.refreshControl.props.onRefresh();
     assert.equal(liveKpi(render()), 1);
+  } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); }
+});
+
+test('Fleet opens Route 1 review in one tap and returns to the monitor', async () => {
+  states.length = 0;
+  render(); const cleanup = effects.map(effect => effect());
+  try {
+    await setImmediate();
+    find(render(),'Button','Review Route 1 map and stops').props.onPress();
+    const manager = find(render(),'RouteManager');
+    assert.equal(manager.props.openRoute1,true);
+    manager.props.onBack();
+    assert.ok(find(render(),'Map'));
   } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); }
 });
 

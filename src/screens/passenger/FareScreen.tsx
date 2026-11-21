@@ -12,6 +12,7 @@ import type { TransitResult } from '../../services/offlineTransitService';
 import { findVerifiedSavings, quotePassengerFare, validFareMatrix, verifiedRideDistance } from '../../services/passengerFare';
 import type { FarePassengerType } from '../../services/fareCalculator';
 import { manilaDateKey } from '../../utils/reportingPeriod';
+import { passengerStopOptions } from '../../services/routeMap';
 
 const TYPES: { id: FarePassengerType; name: string }[] = [
   { id: 'regular', name: 'Regular' }, { id: 'student', name: 'Student' }, { id: 'senior', name: 'Senior' }, { id: 'pwd', name: 'PWD' },
@@ -30,7 +31,8 @@ function usePlanningRows<T>(read: () => Promise<T[]>, catalog: TransitResult, ow
 }
 
 export default function FareScreen({ navigation, route: screenRoute }: any) {
-  const { transit, refreshTransit, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setAlightingStop, destinationPlace, showWalk } = usePassengerJourney();
+  const { transit, refreshTransit, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setAlightingStop, destinationPlace, showWalk, getJourneyVersion } = usePassengerJourney();
+  const journeyVersion = getJourneyVersion();
   const { user } = useAuth();
   const { now } = useLocation();
   const matrices = usePlanningRows(loadPassengerFareMatrices, transit, user?.id);
@@ -47,11 +49,13 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
   const scroll = useRef<React.ElementRef<typeof FormScrollView>>(null);
   const route = transit.routes.find(item => item.id === selectedRouteId);
   const stops = transit.terminals.filter(stop => stop.route_id === selectedRouteId).sort((a, b) => a.sequence_order - b.sequence_order);
+  const boardingOptions = passengerStopOptions(stops, 'board', alightingStop);
+  const alightingOptions = passengerStopOptions(stops, 'alight', boardingStop);
   const today = manilaDateKey(new Date(now));
   const matrix = matrices?.find(item => route && validFareMatrix(item, route.id, today));
   const km = mode === 'distance' ? (distance.trim() ? Number(distance) : null)
     : boardingStop && alightingStop && route && segments && boardingStop.sequence_order < alightingStop.sequence_order
-      ? verifiedRideDistance(boardingStop.id, alightingStop.id, route.id, segments) : null;
+      ? verifiedRideDistance(boardingStop.id, alightingStop.id, route.id, segments, stops) : null;
   const quote = route && km != null ? quotePassengerFare(km, type, route, matrix, today) : null;
   const savings = !refreshing && mode === 'stops' && route && boardingStop && alightingStop && matrices && segments && walks
     ? findVerifiedSavings({ originId: boardingStop.id, destinationId: alightingStop.id, routeId: route.id, type, stops,
@@ -116,12 +120,12 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
           ))}
         </View>
         {mode === 'stops' ? <>
-          <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!stops.length}
-            options={stops.filter(stop => !alightingStop || stop.sequence_order < alightingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
-            onSelect={id => setBoardingStop(stops.find(stop => stop.id === id) || null)} />
-          <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!stops.length}
-            options={stops.filter(stop => !boardingStop || stop.sequence_order > boardingStop.sequence_order).map(stop => ({ value: stop.id, label: stop.name }))}
-            onSelect={id => setAlightingStop(stops.find(stop => stop.id === id) || null)} />
+          <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!boardingOptions.length}
+            options={boardingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
+            onSelect={id => setBoardingStop(boardingOptions.find(stop => stop.id === id) || null)} />
+          <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!alightingOptions.length}
+            options={alightingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
+            onSelect={id => setAlightingStop(alightingOptions.find(stop => stop.id === id) || null)} />
           {!stops.length && <Text style={s.muted}>Verified stops unavailable for this route.</Text>}
           {destinationPlace && <Text style={s.muted}>Your final destination is {destinationPlace.name}. The fare covers the ride to the alighting stop.</Text>}
         </> : <View style={styles.field}>
@@ -162,8 +166,8 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
                 <Text style={s.body}>{category} fare drops from {peso(item.currentFare)} to {peso(item.fare)}.</Text>
                 <Text style={s.muted}>{item.walk.accessible === true ? 'Step-free access verified.' : item.walk.accessible === false ? 'This path is not step-free.' : 'Step-free access unconfirmed.'}</Text>
                 <TouchableOpacity accessibilityRole="button" onPress={() => {
-                  const stop = stops.find(value => value.id === item.stop.id);
-                  if (!stop || !boardingStop || !matrix || !validFareMatrix(matrix, route!.id, manilaDateKey(new Date()))) return;
+                  const stop = boardingOptions.find(value => value.id === item.stop.id);
+                  if (journeyVersion !== getJourneyVersion() || !stop || !boardingStop || !matrix || !validFareMatrix(matrix, route!.id, manilaDateKey(new Date()))) return;
                   const fromLabel = boardingStop.name;
                   setBoardingStop(stop); showWalk(item.walk, fromLabel, stop.name); navigation.navigate('Map');
                 }} style={s.button}><Text style={[s.buttonText, { flexShrink: 1, textAlign: 'center' }]}>Use stop &amp; view walking directions</Text></TouchableOpacity>

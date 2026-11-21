@@ -17,11 +17,12 @@ export function stopForm(position: number, stop?: TerminalData) {
   return { name: stop?.name ?? '', sequence_order: String(position), latitude: stop?.latitude?.toString() ?? '',
     longitude: stop?.longitude?.toString() ?? '', location_source_url: stop?.location_source_url ?? '',
     landmark_desc: stop?.landmark_desc ?? '', boarding_side: stop?.boarding_side ?? '', travel_direction: stop?.travel_direction ?? '',
-    entrance_instructions: stop?.entrance_instructions ?? '', stop_details_source_url: stop?.stop_details_source_url ?? '' };
+    entrance_instructions: stop?.entrance_instructions ?? '', stop_details_source_url: stop?.stop_details_source_url ?? '',
+    useAction: '', useSource: '' };
 }
 
 type StopForm = ReturnType<typeof stopForm>;
-function https(value: string) {
+export function https(value: string) {
   try { return /^https:\/\/[^/\s?#]+[^\s]*$/.test(value) && !!new URL(value).hostname; } catch { return false; }
 }
 
@@ -42,7 +43,7 @@ export function stopChanges(form: StopForm, initial: StopForm, creating: boolean
     if (creating || !initial[key].trim() || Number(value) !== Number(initial[key])) data[key] = Number(value);
   }
   const moved = !creating && ('latitude' in data || 'longitude' in data);
-  const pinEdited = creating || moved || changed('location_source_url') || (verified && needsVerification);
+  const pinEdited = creating || moved || changed('location_source_url') || (verified && needsVerification && form.useAction !== 'withdraw');
   if (pinEdited) {
     if (!https(form.location_source_url.trim())) throw new Error('Enter the HTTPS source for this stop location.');
     data.location_source_url = form.location_source_url.trim();
@@ -59,5 +60,12 @@ export function stopChanges(form: StopForm, initial: StopForm, creating: boolean
     if (moved) for (const key of detailKeys) data[key] = form[key].trim() || null;
   }
   if ((pinEdited || detailsEdited) && !verified) throw new Error('Confirm that you checked the location or boarding details against the source.');
+  if (form.useAction) {
+    if (!['board','alight','both','withdraw'].includes(form.useAction)) throw new Error('Choose a passenger use.');
+    if (!https(form.useSource.trim())) throw new Error('Enter the HTTPS operator source for this passenger use decision.');
+    if (!verified) throw new Error('Confirm the passenger use decision against the operator source.');
+    data.passenger_use = form.useAction === 'withdraw' ? null : form.useAction;
+    data.passenger_use_source_url = form.useSource.trim();
+  } else if (form.useSource.trim()) throw new Error('Choose a passenger use decision for this source.');
   return data;
 }

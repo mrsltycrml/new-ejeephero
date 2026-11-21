@@ -6,8 +6,9 @@ import PassengerRouteRow from '../../components/PassengerRouteRow';
 import { ScreenSkeleton } from '../../components/AppUI';
 import { Colors } from '../../constants/theme';
 import { offlineTransit, type TransitResult } from '../../services/offlineTransitService';
+import { confirmedPassengerUse, passengerUseLabel } from '../../services/routeMap';
 
-export default function DirectoryScreen(_props: { navigation?: any; driverMode?: boolean }) {
+export default function DirectoryScreen({ driverMode }: { navigation?: any; driverMode?: boolean }) {
   const [data, setData] = useState<TransitResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState('');
@@ -19,7 +20,7 @@ export default function DirectoryScreen(_props: { navigation?: any; driverMode?:
   useEffect(() => { void refresh(); }, []);
   if (loading && !data) return <ScreenSkeleton preset="cards" />;
   const route = data?.routes.find(item => item.id === selectedRoute) ?? data?.routes[0];
-  const stops = (data?.terminals ?? []).filter(stop => stop.route_id === route?.id).sort((a, b) => a.sequence_order - b.sequence_order);
+  const stops = (data?.terminals ?? []).filter(stop => stop.route_id === route?.id && (driverMode || confirmedPassengerUse(stop))).sort((a, b) => a.sequence_order - b.sequence_order);
   return (
     <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}>
@@ -36,11 +37,12 @@ export default function DirectoryScreen(_props: { navigation?: any; driverMode?:
         : 'Route data unavailable. Refresh to try again.'}</Text>}
       {route && <View style={s.section}>
         <Text accessibilityRole="header" style={s.sectionTitle}>Stops in travel order</Text>
-        {!stops.length && <Text style={s.muted}>Verified stop locations unavailable.</Text>}
+        {!stops.length && <Text style={s.muted}>{driverMode ? 'Verified stop locations unavailable.' : 'Confirmed passenger stops unavailable.'}</Text>}
         <View>
           {stops.map((stop, index) => (
             <PassengerRouteRow key={stop.id} first={index === 0} last={index === stops.length - 1}>
               <Text style={s.body}>{stop.name}</Text>
+              {!driverMode && <Text style={s.muted}>{passengerUseLabel(stop)}</Text>}
             </PassengerRouteRow>
           ))}
         </View>

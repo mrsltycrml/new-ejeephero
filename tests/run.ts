@@ -9,6 +9,7 @@ import './passengerSafety.test.ts';
 import './passengerJourney.test.ts';
 import './passengerPlaces.test.ts';
 import './passengerTrip.test.ts';
+import './passengerStopControls.test.ts';
 import './scriptJson.test.ts';
 import './worker.test.ts';
 import './operations.test.ts';

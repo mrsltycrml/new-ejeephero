@@ -1,14 +1,29 @@
 import type { RouteData, TerminalData } from './offlineTransitService';
 import { meters } from './passengerJourney.ts';
 import { validPoint, type Point } from './locationQuality.ts';
+import { verifiedStop, confirmedPassengerUse, permitsPassengerUse } from '../../supabase/functions/_shared/passengerStopUse.ts';
+export { verifiedStop, confirmedPassengerUse, permitsPassengerUse };
 
 /** Actual routing-provider geometry, never a straight-line estimate. */
 export type WalkingRouteGeometry = { id: string; coordinates: Point[]; source: string; generatedAt: string };
 export type JourneySelection = { selectedRouteId: string | null; boardingStop: TerminalData | null; alightingStop: TerminalData | null };
 const verifiedEvidence = (date: string | null | undefined, source: string | null | undefined) => Number.isFinite(Date.parse(date || '')) && Date.parse(date || '') <= Date.now() && /^https?:\/\/\S+$/.test(source?.trim() || '');
-export const verifiedStop = (stop: TerminalData) => !stop.is_sample && stop.is_active !== false && !stop.deleted_at && verifiedEvidence(stop.location_verified_at, stop.location_source_url) && validPoint(stop);
 export const activeRoute = (route: RouteData) => !route.is_sample && !route.is_archived && route.is_active !== false && route.is_published !== false && !route.deleted_at && !route.is_coming_soon && (!route.status || ['active', 'published'].includes(route.status));
 export const verifiedRoute = (route: RouteData) => activeRoute(route) && verifiedEvidence(route.geometry_verified_at, route.geometry_source_url) && Array.isArray(route.coordinates) && route.coordinates.length > 1 && route.coordinates.every(validPoint);
+
+export function passengerStopOptions(stops: TerminalData[], role: 'board' | 'alight', other: TerminalData | null) {
+  return stops.filter(stop => permitsPassengerUse(stop, role) && Number.isFinite(stop.sequence_order)
+    && (!other || (stop.route_id === other.route_id && (role === 'board' ? stop.sequence_order < other.sequence_order : stop.sequence_order > other.sequence_order))));
+}
+
+export function passengerUseLabel(stop: TerminalData) {
+  switch (confirmedPassengerUse(stop)) {
+    case 'board': return 'Boarding only';
+    case 'alight': return 'Alighting only';
+    case 'both': return 'Boarding and alighting';
+    default: return 'Passenger use unconfirmed';
+  }
+}
 
 export function selectJourneyRoute(state: JourneySelection, id: string | null, routes: RouteData[]): JourneySelection {
   const selectedRouteId = routes.some(r => r.id === id && activeRoute(r)) ? id : null;
@@ -18,7 +33,7 @@ export function selectJourneyRoute(state: JourneySelection, id: string | null, r
 export function selectJourneyStop(state: JourneySelection, value: TerminalData | null, role: 'boarding' | 'alighting', routes: RouteData[], stops: TerminalData[]): JourneySelection {
   const key = role === 'boarding' ? 'boardingStop' : 'alightingStop';
   if (!value) return { ...state, [key]: null };
-  const stop = stops.find(s => s.id === value.id && verifiedStop(s));
+  const stop = stops.find(s => s.id === value.id && permitsPassengerUse(s, role === 'boarding' ? 'board' : 'alight'));
   if (!stop || !Number.isFinite(stop.sequence_order) || !routes.some(r => r.id === stop.route_id && activeRoute(r)) || (state.selectedRouteId && state.selectedRouteId !== stop.route_id)) return state;
   const other = role === 'boarding' ? state.alightingStop : state.boardingStop;
   if (other && (other.id === stop.id || !Number.isFinite(stop.sequence_order) || !Number.isFinite(other.sequence_order) || (role === 'boarding' ? stop.sequence_order >= other.sequence_order : stop.sequence_order <= other.sequence_order))) return state;
@@ -50,21 +65,21 @@ function projectStop(coordinates: Point[], stop: Point) {
 }
 
 export function rideLeg(route: RouteData | undefined, boarding: TerminalData | null | undefined, alighting: TerminalData | null | undefined): Point[] {
-  if (!route || !verifiedRoute(route) || !boarding || !alighting || !verifiedStop(boarding) || !verifiedStop(alighting) || boarding.route_id !== route.id || alighting.route_id !== route.id || !(boarding.sequence_order < alighting.sequence_order)) return [];
+  if (!route || !verifiedRoute(route) || !boarding || !alighting || !permitsPassengerUse(boarding, 'board') || !permitsPassengerUse(alighting, 'alight') || boarding.route_id !== route.id || alighting.route_id !== route.id || !(boarding.sequence_order < alighting.sequence_order)) return [];
   const from = projectStop(route.coordinates, boarding), to = projectStop(route.coordinates, alighting);
   if (!from || !to || from.along >= to.along) return [];
   return [from.point, ...route.coordinates.slice(from.index + 1, to.index + 1), to.point].filter((p, i, points) => i === 0 || meters(p, points[i - 1]) > 0.01);
 }
 
-export function buildJourneyMap(input: { routes: RouteData[]; terminals: TerminalData[]; selectedRouteId?: string | null; boardingStop?: TerminalData | null; alightingStop?: TerminalData | null; destinationPlace?: (Point & { name: string }) | null; walkingRoutes?: WalkingRouteGeometry[] }) {
+export function buildJourneyMap(input: { routes: RouteData[]; terminals: TerminalData[]; fleetMode?: boolean; selectedRouteId?: string | null; boardingStop?: TerminalData | null; alightingStop?: TerminalData | null; destinationPlace?: (Point & { name: string }) | null; walkingRoutes?: WalkingRouteGeometry[] }) {
   const routes = input.routes.filter(verifiedRoute);
-  const terminals = input.terminals.filter(t => verifiedStop(t) && input.routes.some(r => r.id === t.route_id && activeRoute(r)));
+  const terminals = input.terminals.filter(t => (input.fleetMode ? verifiedStop(t) : confirmedPassengerUse(t)) && input.routes.some(r => r.id === t.route_id && activeRoute(r)));
   const route = routes.find(r => r.id === input.selectedRouteId);
-  const boarding = terminals.find(t => t.id === input.boardingStop?.id && t.route_id === input.selectedRouteId);
-  const alighting = terminals.find(t => t.id === input.alightingStop?.id && t.route_id === input.selectedRouteId);
+  const boarding = terminals.find(t => t.id === input.boardingStop?.id && t.route_id === input.selectedRouteId && permitsPassengerUse(t, 'board'));
+  const alighting = terminals.find(t => t.id === input.alightingStop?.id && t.route_id === input.selectedRouteId && permitsPassengerUse(t, 'alight'));
   const destinationPlace = input.destinationPlace && validPoint(input.destinationPlace) ? input.destinationPlace : null;
   const walkingRoutes = (input.walkingRoutes || []).filter(w => w.source?.trim() && Number.isFinite(Date.parse(w.generatedAt)) && Array.isArray(w.coordinates) && w.coordinates.length > 1 && w.coordinates.every(validPoint));
   const fitPoints = [...(input.selectedRouteId ? route?.coordinates || [] : routes.flatMap(r => r.coordinates)), ...[boarding, alighting, destinationPlace].filter((p): p is NonNullable<typeof p> => Boolean(p)), ...walkingRoutes.flatMap(w => w.coordinates)].map(p => ({ latitude: p.latitude, longitude: p.longitude }));
   const cameraKey = JSON.stringify([input.selectedRouteId, boarding?.id, alighting?.id, fitPoints]);
-  return { routes, terminals, destinationPlace, walkingRoutes, rideCoordinates: rideLeg(route, boarding, alighting), fitPoints, cameraKey };
+  return { routes, terminals, boarding, alighting, destinationPlace, walkingRoutes, rideCoordinates: rideLeg(route, boarding, alighting), fitPoints, cameraKey };
 }

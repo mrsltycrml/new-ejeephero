@@ -1,4 +1,5 @@
 import type { TerminalData } from './offlineTransitService';
+import { permitsPassengerUse } from './routeMap.ts';
 
 export type PassengerPlace = { id: string; name: string; address: string; latitude: number; longitude: number };
 export function parsePlaces(data: any): PassengerPlace[] {
@@ -17,8 +18,8 @@ function distance(a: PassengerPlace, b: TerminalData) {
   return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 export function nearestRouteStop(place: PassengerPlace, stops: TerminalData[]) {
-  const candidates = stops.filter(s => Number.isFinite(s.latitude) && Number.isFinite(s.longitude) && Math.abs(s.latitude) <= 90 && Math.abs(s.longitude) <= 180)
-    .map(stop => ({ stop, distance: distance(place, stop), verified: Boolean(stop.location_verified_at && stop.location_source_url) }))
+  const candidates = stops.filter(stop => permitsPassengerUse(stop, 'alight'))
+    .map(stop => ({ stop, distance: distance(place, stop), verified: true }))
     .filter(s => s.distance <= 2000).sort((a, b) => a.distance - b.distance);
   return candidates[0] || null;
 }

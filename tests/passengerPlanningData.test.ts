@@ -36,7 +36,10 @@ test('a walking outage preserves the sourced fare, discount and paginated ride d
   const [{ segments, matrices }] = await Promise.all([loadPassengerFareData(), assert.rejects(loadPassengerWalkLinks())]);
   assert.deepEqual(matrices, [matrix]);
   assert.equal(segments.length, 1001);
-  const distance = verifiedRideDistance('998', '1001', 'r', segments);
+  const stops = [998,999,1000,1001].map(i => ({ id: String(i), name: String(i), route_id: 'r', sequence_order: i, latitude: 14.5, longitude: 121,
+    location_verified_at: source.verified_at, location_source_url: source.source_url, passenger_use: 'both' as const,
+    passenger_use_source_url: source.source_url, passenger_use_verified_at: source.verified_at }));
+  const distance = verifiedRideDistance('998', '1001', 'r', segments, stops);
   assert.equal(distance, 0.3);
   const fare = quotePassengerFare(distance!, 'student', { id: 'r' }, matrices[0], '2026-01-01');
   assert.equal(fare?.amount, 12);

@@ -7,6 +7,7 @@ import { BOARDING_EDUCATION, type BoardingStatus } from '../services/passengerSa
 import { stopLandmarks } from '../services/stopLandmarks';
 import { LANDMARK_REFERENCE } from '../constants/esakayOperations';
 import type { TerminalData } from '../services/offlineTransitService';
+import { confirmedPassengerUse, permitsPassengerUse, passengerUseLabel } from '../services/routeMap';
 
 export default function PassengerStopGuide({ boarding, landmarks, selectedStop, onSelectStop, onWalk, walkingBusy,
   onRefresh, loading, loadError, openRequest }: {
@@ -18,7 +19,8 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   useEffect(() => { if (openRequest || selectedStop) setOpen(true); }, [openRequest, selectedStop?.id]);
-  const active = landmarks.find(stop => stop.id === selectedStop?.id) || null;
+  const stops = landmarks.filter(confirmedPassengerUse);
+  const active = stops.find(stop => stop.id === selectedStop?.id) || null;
   const details = stopLandmarks(active);
   const boardingColor = boarding.kind === 'prohibited' ? Colors.primaryRed : boarding.kind === 'allowed' ? Colors.success : Colors.warning;
   return (
@@ -35,15 +37,15 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
           <Text accessibilityRole={boarding.kind === 'prohibited' ? 'alert' : undefined} style={s.label}>{boarding.title}</Text>
           <Text style={s.body}>{boarding.detail}</Text>
         </View>
-        <PassengerSelect label="Inspect a stop" value={active?.id || ''} disabled={!landmarks.length}
-          options={landmarks.map(stop => ({ value: stop.id, label: stop.name }))}
-          onSelect={id => { const stop = landmarks.find(item => item.id === id); if (stop) onSelectStop(stop); }} />
-        {!landmarks.length && <Text style={s.muted}>Verified stop locations are unavailable. The historical landmark reference is available below.</Text>}
+        <PassengerSelect label="Inspect a stop" value={active?.id || ''} disabled={!stops.length}
+          options={stops.map(stop => ({ value: stop.id, label: `${stop.name} · ${passengerUseLabel(stop)}` }))}
+          onSelect={id => { const stop = stops.find(item => item.id === id); if (stop) onSelectStop(stop); }} />
+        {!stops.length && <Text style={s.muted}>Confirmed passenger stops are unavailable. The historical landmark reference is available below.</Text>}
         {active && <>
-          <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} accessibilityState={{ disabled: walkingBusy }}
+          {permitsPassengerUse(active, 'board') && <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} accessibilityState={{ disabled: walkingBusy }}
             onPress={() => onWalk(active)} style={[s.button, walkingBusy && { opacity: 0.6 }]}>
             <Text style={s.buttonText}>{walkingBusy ? 'Finding a walking route…' : 'Walk to this stop'}</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
           {details?.photo && failedPhoto !== details.photo ? <>
             <Image source={{ uri: details.photo }} accessibilityLabel={`Recorded landmark at ${active.name}`} resizeMode="contain"
               style={styles.photo} onError={() => setFailedPhoto(details.photo)} />
@@ -52,7 +54,7 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
           <Text style={s.body}>{details?.description || 'Landmark description unavailable.'}</Text>
           <View>
             {[
-              ['Boarding side', details?.boardingSide],
+              ...(permitsPassengerUse(active, 'board') ? [['Boarding side', details?.boardingSide]] : []),
               ['Travel direction', details?.direction],
               ['Entrance', details?.entrance],
             ].map(([label, value]) => <View key={label} style={styles.detail}>

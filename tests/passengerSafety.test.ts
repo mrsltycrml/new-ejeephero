@@ -5,6 +5,9 @@ import { findVerifiedSavings, quotePassengerFare, verifiedRideDistance, type Roa
 const now = Date.parse('2026-10-27T04:00:00Z');
 const fix = { latitude: 14.56, longitude: 121.03, accuracy: 5, timestamp: now };
 const zone: LoadingZone = { id: 'z', name: 'Verified zone', kind: 'no_loading', latitude: fix.latitude, longitude: fix.longitude, radius_meters: 40, source_url: 'https://example.test/official-zone', verified_at: '2026-10-27' };
+const stops = ['a', 'b', 'c'].map((id, i) => ({ id, name: id, route_id: 'r', latitude: 14.56, longitude: 121.03 + i * .001, sequence_order: i,
+  location_source_url: 'https://example.test/stop', location_verified_at: '2026-10-27',
+  passenger_use: 'both' as const, passenger_use_source_url: 'https://example.test/use', passenger_use_verified_at: '2026-10-27' }));
 
 test('loading warning needs a verified zone and a fresh precise GPS fix', () => {
   assert.equal(evaluateBoardingLocation(fix, [zone], now).kind, 'prohibited');
@@ -15,12 +18,14 @@ test('loading warning needs a verified zone and a fresh precise GPS fix', () => 
 });
 test('GPS uncertainty overlapping a boundary does not declare the zone safe or prohibited', () => {
   assert.equal(evaluateBoardingLocation({ ...fix, longitude: fix.longitude + 0.00035, accuracy: 20 }, [zone], now).kind, 'uncertain');
-  assert.equal(evaluateBoardingLocation({ ...fix, longitude: fix.longitude + 0.002 }, [{ ...zone, kind: 'loading' }], now).kind, 'outside');
+  assert.equal(evaluateBoardingLocation({ ...fix, longitude: fix.longitude + 0.002 }, [{ ...zone, kind: 'loading' }], now, stops).kind, 'outside');
 });
 test('designated-bay status requires valid source metadata and never overrides a no-loading zone', () => {
   const allowed: LoadingZone = { ...zone, kind: 'loading' };
-  assert.equal(evaluateBoardingLocation(fix, [allowed], now).kind, 'allowed');
-  assert.equal(evaluateBoardingLocation(fix, [allowed, { ...zone, id: 'restricted' }], now).kind, 'prohibited');
+  assert.equal(evaluateBoardingLocation(fix, [allowed], now, stops).kind, 'allowed');
+  assert.equal(evaluateBoardingLocation(fix, [allowed], now).kind, 'uncertain');
+  assert.equal(evaluateBoardingLocation(fix, [allowed], now, [{ ...stops[0], passenger_use: 'alight' }]).kind, 'uncertain');
+  assert.equal(evaluateBoardingLocation(fix, [allowed, { ...zone, id: 'restricted' }], now, stops).kind, 'prohibited');
   for (const bad of [{ ...allowed, verified_at: 'invalid' }, { ...allowed, source_url: 'javascript:alert(1)' }, { ...allowed, latitude: 100 }, { ...allowed, radius_meters: 1000 }]) {
     assert.equal(evaluateBoardingLocation(fix, [bad], now).kind, 'unavailable');
   }
@@ -35,10 +40,10 @@ test('emergency message contains the selected body, plate and timestamped curren
 const segments: RoadSegment[] = [{ route_id: 'r', from_stop_id: 'a', to_stop_id: 'b', distance_meters: 3000, source_url: 'https://example.test/road', verified_at: '2026-10-27' }, { route_id: 'r', from_stop_id: 'b', to_stop_id: 'c', distance_meters: 4000, source_url: 'https://example.test/road', verified_at: '2026-10-27' }];
 const route = { id: 'r' };
 test('route distance requires connected verified segments in the correct direction', () => {
-  assert.equal(verifiedRideDistance('a', 'c', 'r', segments), 7);
-  assert.equal(verifiedRideDistance('c', 'a', 'r', segments), null);
-  assert.equal(verifiedRideDistance('a', 'c', 'r', segments.slice(1)), null);
-  assert.equal(verifiedRideDistance('a', 'c', 'other-route', segments), null);
+  assert.equal(verifiedRideDistance('a', 'c', 'r', segments, stops), 7);
+  assert.equal(verifiedRideDistance('c', 'a', 'r', segments, stops), null);
+  assert.equal(verifiedRideDistance('a', 'c', 'r', segments.slice(1), stops), null);
+  assert.equal(verifiedRideDistance('a', 'c', 'other-route', segments, stops), null);
 });
 test('source-backed fare table applies all concession categories and expiry', () => {
   const matrix: FareMatrix = { route_id: 'r', currency: 'PHP', source_url: 'https://example.test/matrix', verified_at: '2026-10-27', effective_from: '2026-10-01', effective_to: '2026-10-31', brackets: [{ up_to_km: 4, regular: 15, discounted: 12 }, { up_to_km: 5, regular: 17.25, discounted: 13.75 }] };
@@ -48,7 +53,6 @@ test('source-backed fare table applies all concession categories and expiry', ()
   assert.equal(quotePassengerFare(NaN, 'regular', route), null);
 });
 test('walking savings use sourced walking time and road distance, and respect accessibility', () => {
-  const stops = ['a', 'b', 'c'].map((id, i) => ({ id, name: id, route_id: 'r', latitude: 14.56, longitude: 121.03 + i * .001, sequence_order: i, location_source_url: 'https://example.test/stop', location_verified_at: '2026-10-27' }));
   const args = { originId: 'a', destinationId: 'c', routeId: 'r', type: 'regular' as const, route, segments, stops,
     date: '2026-10-27', matrix: { route_id: 'r', currency: 'PHP', source_url: 'https://example.test/matrix', verified_at: '2026-10-27', effective_from: '2026-10-01', effective_to: null, brackets: [{ up_to_km: 4, regular: 15, discounted: 12 }, { up_to_km: 8, regular: 18, discounted: 14 }] },
     walks: [{ from_stop_id: 'a', to_stop_id: 'b', distance_meters: 108, duration_seconds: 120, source_url: 'https://example.test/footpath', verified_at: '2026-10-27', accessible: false,

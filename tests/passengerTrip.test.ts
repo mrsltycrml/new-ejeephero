@@ -13,6 +13,23 @@ const route = (id: string, coordinates = [point(121), point(121.015), point(121.
 const stop = (id: string, routeId: string, longitude: number, sequence_order: number): TerminalData => ({
   ...point(longitude), id, route_id: routeId, name: id, sequence_order,
   location_source_url: source, location_verified_at: verifiedAt,
+  passenger_use: 'both', passenger_use_source_url: source, passenger_use_verified_at: verifiedAt,
+});
+
+test('automatic trips skip nearer wrong-role stops and manual trips reject a stale permission', () => {
+  const r = route('outbound');
+  const stops = [
+    { ...stop('wrong board', r.id, 121, 0), passenger_use: 'alight' as const },
+    { ...stop('board', r.id, 121.002, 1), passenger_use: 'board' as const },
+    { ...stop('exit', r.id, 121.023, 2), passenger_use: 'alight' as const },
+    { ...stop('wrong exit', r.id, 121.025, 3), passenger_use: 'board' as const },
+  ];
+  const trip = suggestPassengerTrip(point(121), point(121.025), [r], stops)!;
+  assert.deepEqual([trip.boarding.id, trip.alighting.id], ['board', 'exit']);
+  const selected = { selectedRouteId: r.id, boardingStop: trip.boarding, alightingStop: trip.alighting };
+  const revoked = stops.map(s => s.id === 'exit' ? { ...s, passenger_use: null } : s);
+  assert.equal(passengerPlanRide(null, point(121.025), [r], revoked, selected), null);
+  assert.equal(suggestPassengerTrip(point(121.025), point(121), [r], stops), null);
 });
 
 test('suggests the nearest compatible boarding stop and a downstream alighting stop on its route', () => {

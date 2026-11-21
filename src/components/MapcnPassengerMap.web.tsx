@@ -27,7 +27,7 @@ const coordinates = (p: Point): [number, number] => [p.longitude, p.latitude];
 const streetStyle = 'https://tiles.openfreemap.org/styles/liberty';
 const sourceId = 'esakay-journey';
 
-export default function MapcnPassengerMap({ data, controls, onFailure, onSelect }: MapcnPassengerMapProps) {
+export default function MapcnPassengerMap({ data, controls, onFailure, onSelect, onPickCurb }: MapcnPassengerMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<{ map: MapLibre.Map; lib: MapLibrary } | null>(null);
   const select = useRef(onSelect);
@@ -65,6 +65,16 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect 
       map?.remove();
     };
   }, [onFailure]);
+
+  useEffect(() => {
+    if (!view || !onPickCurb) return;
+    const pick = (event: MapLibre.MapMouseEvent) => {
+      const point = { latitude: event.lngLat.lat, longitude: event.lngLat.lng };
+      if (validPoint(point)) onPickCurb(point);
+    };
+    view.map.on('click', pick);
+    return () => { view.map.off('click', pick); };
+  }, [view, onPickCurb]);
 
   useImperativeHandle(controls, () => {
     const centerOn = (latitude: number, longitude: number, zoom = 16) => {
@@ -136,7 +146,8 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect 
   useEffect(() => {
     if (!view) return;
     const markers = terminals.map(stop => {
-      const color = stop.role === 'Board' ? '#12734a' : stop.role === 'Alight' ? '#b45309' : '#225ca0';
+      const color = stop.role === 'Landmark' || stop.role === 'Alight' ? '#a45600'
+        : stop.role === 'Curb' || stop.role === 'Board' ? '#12734a' : '#225ca0';
       return addPin(view, stop, `${stop.role}: ${stop.name}`, color, stop.role[0],
         () => select.current({ type: 'SELECT_TERMINAL', id: stop.id }), stop.isSelected ? 15 : 2);
     });

@@ -1,14 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildJourneyMap, rideLeg, selectJourneyStop, selectJourneyRoute, reconcileJourneySelection } from '../src/services/routeMap.ts';
+import { buildJourneyMap, rideLeg, selectJourneyStop, selectJourneyRoute, reconcileJourneySelection, permitsPassengerUse, passengerStopOptions } from '../src/services/routeMap.ts';
 import { scriptJson } from '../src/utils/scriptJson.ts';
 
 const a = { latitude: 14.6, longitude: 121 };
 const b = { latitude: 14.6, longitude: 121.01 };
 const c = { latitude: 14.61, longitude: 121.01 };
 const route: any = { id: 'r-any', name: '</script><b>Route</b>', coordinates: [a, b, c], geometry_verified_at: '2026-11-01', geometry_source_url: 'https://example.test/survey' };
-const stop = (id: string, point: typeof a, order: number, route_id = route.id): any => ({ id, ...point, route_id, sequence_order: order, name: id, location_verified_at: '2026-11-01', location_source_url: 'https://example.test/stops' });
+const stop = (id: string, point: typeof a, order: number, route_id = route.id): any => ({ id, ...point, route_id, sequence_order: order, name: id, location_verified_at: '2026-11-01', location_source_url: 'https://example.test/stops',
+  passenger_use: 'both', passenger_use_verified_at: '2026-11-01', passenger_use_source_url: 'https://example.test/operations' });
 const origin = stop('a', a, 1), end = stop('c', c, 3);
+test('passenger roles need both verified location and explicit current operating evidence', () => {
+  for (const [use, board, alight] of [['board', true, false], ['alight', false, true], ['both', true, true], [null, false, false], ['unknown', false, false]]) {
+    assert.equal(permitsPassengerUse({ ...origin, passenger_use: use }, 'board'), board);
+    assert.equal(permitsPassengerUse({ ...origin, passenger_use: use }, 'alight'), alight);
+  }
+  for (const change of [{ passenger_use_verified_at: null }, { passenger_use_verified_at: '2099-01-01' },
+    { passenger_use_verified_at: '2026-02-31' }, { passenger_use_source_url: 'http://example.test' },
+    { passenger_use_source_url: 'https:example.test' }, { location_verified_at: null }, { is_sample: true },
+    { is_active: false }, { deleted_at: '2026-11-01' }, { longitude: 181 }]) {
+    assert.equal(permitsPassengerUse({ ...origin, ...change }, 'board'), false);
+  }
+});
+test('manual options, selection and map use current role and direction on each route', () => {
+  const board = { ...origin, passenger_use: 'board' }, exit = { ...end, passenger_use: 'alight' };
+  const legacy = { ...stop('intermediate', b, 2), passenger_use: undefined };
+  const stops = [board, legacy, exit];
+  assert.deepEqual(passengerStopOptions(stops, 'board', exit), [board]);
+  assert.deepEqual(passengerStopOptions(stops, 'alight', board), [exit]);
+  const empty = { selectedRouteId: route.id, boardingStop: null, alightingStop: null };
+  assert.equal(selectJourneyStop(empty, origin, 'alighting', [route], stops), empty);
+  assert.equal(selectJourneyStop(empty, end, 'boarding', [route], stops), empty);
+  const input = { ...empty, routes: [route], terminals: stops, boardingStop: exit, alightingStop: board };
+  const map = buildJourneyMap(input);
+  assert.deepEqual(map.terminals, [board, exit]);
+  assert.equal(map.boarding, undefined); assert.equal(map.alighting, undefined);
+  assert.deepEqual(map.rideCoordinates, []);
+  assert.deepEqual(buildJourneyMap({ ...input, fleetMode: true }).terminals, stops);
+});
 test('ride highlight follows verified bends and rejects reverse, wrong-route, off-route or unverified stops', () => {
   assert.deepEqual(rideLeg(route, origin, end), [a, b, c]);
   assert.deepEqual(rideLeg(route, end, origin), []);

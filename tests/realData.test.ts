@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { setImmediate } from 'node:timers/promises';
+import { passengerStopOptions } from '../src/services/routeMap.ts';
 
 // Replace only storage/network boundaries; exercise the production services.
 const cache = new Map<string, string>();
@@ -108,6 +109,16 @@ test('old seeded cache cannot reappear after an unavailable read', async () => {
   assert.deepEqual(result.routes, []);
   assert.deepEqual(result.terminals, []);
   failed = false;
+});
+
+test('legacy disk snapshot retains verified points without granting either passenger role', async () => {
+  failed = true;
+  cache.set('@ejeephero_real_transit_v1', JSON.stringify({ routes: [route], terminals: [stop], syncedAt: new Date().toISOString() }));
+  const result = await offlineTransit.getTransitData();
+  assert.equal(result.status, 'cached');
+  assert.deepEqual(result.terminals.map(s => s.id), [stop.id]);
+  assert.deepEqual(passengerStopOptions(result.terminals, 'board', null), []);
+  assert.deepEqual(passengerStopOptions(result.terminals, 'alight', null), []);
 });
 
 test('malformed cached rows return unavailable while preserving the source error', async () => {
