@@ -362,7 +362,9 @@
         "Sign in again with an active account to request directions.": "Mag-sign in muli gamit ang aktibong account para humingi ng direksiyon.",
         "Walking directions are unavailable. Try again later and follow local signs.": "Walang makuhang direksiyon sa paglalakad. Subukan mamaya at sundin ang mga karatula.",
         "Could not load walking directions. Check your connection and try again.": "Hindi makuha ang direksiyon sa paglalakad. Tingnan ang koneksiyon at subukang muli."
-      }
+      },
+      "walkAvailable": "May naitalang daang malalakad",
+      "walkUnknown": "Hindi pa kumpirmado kung may daang malalakad"
     },
     "map": {
       "centerOnLocation": "Itapat ang mapa sa lokasyon ko",
@@ -703,7 +705,8 @@
       "title": "I-install ang eSAKAY",
       "close": "Isara ang gabay sa pag-install",
       "androidHelp": "Buksan ang na-download na APK sa telepono. Kung hingin ng Android, payagan ang pag-install mula sa pinagmulang ito.",
-      "download": "I-download ang Android app"
+      "download": "I-download ang Android app",
+      "safari": "Buksan ang eSAKAY sa Safari. Pindutin ang <menu>Share</menu>, saka ang <menu>Add to Home Screen</menu>."
     },
     "boarding": {
       "labels": {
@@ -767,7 +770,13 @@
       "confirmNew": "Kumpirmahin ang bagong password",
       "confirmPlaceholder": "Kumpirmahin ang bagong password",
       "update": "Palitan ang password",
-      "installationGuide": "Gabay sa pag-install sa Android at iOS"
+      "installationGuide": "Gabay sa pag-install sa Android at iOS",
+      "states": {
+        "approved": "Aprubado",
+        "pending": "Naghihintay ng pag-apruba",
+        "suspended": "Suspendido",
+        "rejected": "Hindi inaprubahan"
+      }
     },
     "pending": {
       "rejected": "Hindi inaprubahan ang pagpaparehistro",

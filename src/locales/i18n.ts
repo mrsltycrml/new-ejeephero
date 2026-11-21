@@ -30,10 +30,11 @@ i18next
   });
 
 // Load language preference from AsyncStorage on app start
+let languageChosen = false;
 export const initializeLanguage = async () => {
   try {
     const savedLanguage = await AsyncStorage.getItem('app_language');
-    if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'fil')) {
+    if (!languageChosen && (savedLanguage === 'en' || savedLanguage === 'fil')) {
       await i18next.changeLanguage(savedLanguage);
     }
   } catch (err) {
@@ -44,12 +45,9 @@ export const initializeLanguage = async () => {
 // Function to change language and persist it
 export const changeLanguage = async (lang: string) => {
   if (lang !== 'en' && lang !== 'fil') return;
-  try {
-    await i18next.changeLanguage(lang);
-    await AsyncStorage.setItem('app_language', lang);
-  } catch (err) {
-    console.error('Error changing language:', err);
-  }
+  languageChosen = true;
+  await i18next.changeLanguage(lang);
+  await AsyncStorage.setItem('app_language', lang);
 };
 
 export default i18next;

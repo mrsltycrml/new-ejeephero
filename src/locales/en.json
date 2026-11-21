@@ -362,7 +362,9 @@
         "Sign in again with an active account to request directions.": "Sign in again with an active account to request directions.",
         "Walking directions are unavailable. Try again later and follow local signs.": "Walking directions are unavailable. Try again later and follow local signs.",
         "Could not load walking directions. Check your connection and try again.": "Could not load walking directions. Check your connection and try again."
-      }
+      },
+      "walkAvailable": "Walking path available",
+      "walkUnknown": "Walking availability unconfirmed"
     },
     "map": {
       "centerOnLocation": "Center on my location",
@@ -703,7 +705,8 @@
       "title": "Install eSAKAY",
       "close": "Close installation guide",
       "androidHelp": "Open the downloaded APK on your phone. If Android prompts you, allow installation from this source.",
-      "download": "Download Android app"
+      "download": "Download Android app",
+      "safari": "Open eSAKAY in Safari. Tap <menu>Share</menu>, then <menu>Add to Home Screen</menu>."
     },
     "boarding": {
       "labels": {
@@ -767,7 +770,13 @@
       "confirmNew": "Confirm New Password",
       "confirmPlaceholder": "Confirm new password",
       "update": "Update password",
-      "installationGuide": "Android APK and iOS installation guide"
+      "installationGuide": "Android APK and iOS installation guide",
+      "states": {
+        "approved": "Approved",
+        "pending": "Pending",
+        "suspended": "Suspended",
+        "rejected": "Rejected"
+      }
     },
     "pending": {
       "rejected": "Registration rejected",

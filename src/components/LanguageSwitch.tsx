@@ -1,17 +1,17 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../locales/i18n';
 import { Colors } from '../constants/theme';
 
 export default function LanguageSwitch() {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const next = i18n.language === 'fil' ? 'en' : 'fil';
   return (
     <TouchableOpacity accessibilityRole="button"
       accessibilityLabel={next === 'fil' ? 'Gamitin ang Tagalog' : 'Use English'}
-      onPress={() => void changeLanguage(next)} style={styles.button}>
+      onPress={() => void changeLanguage(next).catch(() => Alert.alert(t('passenger.profile.languageError')))} style={styles.button}>
       <Ionicons aria-hidden name="language-outline" size={17} color={Colors.signal} />
       <Text style={styles.label}>{next === 'fil' ? 'Tagalog' : 'English'}</Text>
     </TouchableOpacity>

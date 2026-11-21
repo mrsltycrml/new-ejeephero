@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,8 +55,7 @@ export default function AppDownloadModal({ visible, onClose }: AppDownloadModalP
             <Text accessibilityRole="header" style={styles.sectionTitle}>iPhone</Text>
           </View>
           <Text style={styles.description}>
-            Open eSAKAY in Safari. Tap <Text style={styles.menuItem}>Share</Text>, then
-            {' '}<Text style={styles.menuItem}>Add to Home Screen</Text>.
+            <Trans i18nKey="passenger.install.safari" components={{ menu: <Text style={styles.menuItem} /> }} />
           </Text>
         </View>
       </View>

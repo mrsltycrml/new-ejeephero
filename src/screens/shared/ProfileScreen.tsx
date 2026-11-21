@@ -76,7 +76,6 @@ export default function ProfileScreen() {
     try {
       await changeLanguage(lang);
       setShowLanguageSelector(false);
-      Alert.alert(t('common.success'), `${lang === 'en' ? 'English' : 'Tagalog'} selected!`);
     } catch (err) {
       Alert.alert(t('common.error'), t('passenger.profile.languageError'));
     }
@@ -218,7 +217,7 @@ export default function ProfileScreen() {
         {role !== 'driver' && (
           <View style={styles.detailRow}>
             <Text style={styles.secondaryText}>{t('passenger.profile.status')}</Text>
-            <Text style={[styles.status, { color: statusColor }]}>{status || t('passenger.profile.unknown')}</Text>
+            <Text style={[styles.status, { color: statusColor }]}>{status ? t('passenger.profile.states.' + status, status) : t('passenger.profile.unknown')}</Text>
           </View>
         )}
         {role === 'passenger' && !isAdmin && (

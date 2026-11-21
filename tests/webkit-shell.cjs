@@ -87,6 +87,7 @@ async function main() {
     await page.getByRole('radio', { name: 'Drayber' }).tap();
     assert.ok(await page.getByRole('radio', { name: 'Drayber' }).isChecked(), 'one tap selects the signup role');
     await visibleViewport(page, 844);
+    await button('Bumalik sa pag-sign in').getByText('Bumalik sa pag-sign in', { exact: true }).waitFor();
     await button('Bumalik sa pag-sign in').tap();
     await button('Nakalimutan ang password?').tap();
     await page.getByRole('heading', { name: 'Palitan ang password' }).waitFor();
@@ -106,7 +107,10 @@ async function main() {
       });
       near(title + ' exposed canvas', Math.max(0, 844 - panelEnd), 0);
       if (title === 'Welcome back') await screenshot('sign-in');
-      if (title !== 'Welcome back') await button('Back to sign in').click();
+      if (title !== 'Welcome back') {
+        await button('Back to sign in').getByText('Back to sign in', { exact: true }).waitFor();
+        await button('Back to sign in').click();
+      }
     }
     await email.focus();
     await visibleViewport(page, 496, 24);
