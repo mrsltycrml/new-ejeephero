@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { BottomSheetModal, ScreenSkeleton, triggerHaptic } from '../../components/AppUI';
+import { transitStyles } from '../../constants/transitStyles';
 import { operationsStyles as ops } from './operationsStyles';
 import AdminRegistryManager from '../../components/AdminRegistryManager';
 import { Colors } from '../../constants/theme';
@@ -239,7 +240,7 @@ export function AdminDriversScreen() {
             }}
             style={styles.topAddBtn}
           >
-            <Ionicons name="people-outline" size={18} color={Colors.onDark} />
+            <Ionicons name="people-outline" size={18} color={Colors.ink} />
             <Text style={styles.topAddText}>Driver roster</Text>
           </TouchableOpacity>
         </View>
@@ -672,7 +673,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
             }}
             style={styles.topAddBtn}
           >
-            <Ionicons name="add" size={18} color={Colors.onDark} />
+            <Ionicons name="add" size={18} color={Colors.ink} />
             <Text style={styles.topAddText}>Add unit</Text>
           </TouchableOpacity>
         </View>
@@ -777,7 +778,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
                     {!!u.registryDeletedAt && <Text style={styles.rowSub}>Inactive in registry · historical records kept</Text>}
                   </View>
 
-                  <Ionicons name={isSelected ? 'checkmark-circle' : 'ellipse-outline'} size={19} color={isSelected ? Colors.action : Colors.subtleGray} />
+                  <Ionicons name={isSelected ? 'checkmark-circle' : 'ellipse-outline'} size={19} color={isSelected ? Colors.brandGreen : Colors.subtleGray} />
                 </TouchableOpacity>
                 {!!u.registryDeletedAt && (
                   <TouchableOpacity
@@ -1117,7 +1118,7 @@ export function AdminReportsScreen() {
             onPress={() => setPreviewOpen(true)}
             style={[styles.topAddBtn, (loading || !!error) && styles.disabledAction]}
           >
-            <Ionicons name="document-text-outline" size={18} color={Colors.onDark} />
+            <Ionicons name="document-text-outline" size={18} color={Colors.ink} />
             <Text style={styles.topAddText}>Export PDF</Text>
           </TouchableOpacity>
         </View>
@@ -1151,11 +1152,11 @@ export function AdminReportsScreen() {
 
             <View style={styles.selectorRowCard}>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous reporting period" onPress={() => stepPeriod(-1)} style={styles.stepButton}>
-                <Ionicons name="chevron-back" size={18} color={Colors.action} />
+                <Ionicons name="chevron-back" size={18} color={Colors.brandGreen} />
               </TouchableOpacity>
               <Text style={styles.selectorRowText}>{formatReportingPeriod(period)}</Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next reporting period" onPress={() => stepPeriod(1)} style={styles.stepButton}>
-                <Ionicons name="chevron-forward" size={18} color={Colors.action} />
+                <Ionicons name="chevron-forward" size={18} color={Colors.brandGreen} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1267,10 +1268,10 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     letterSpacing: -0.4,
   },
-  topAddBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: Colors.onDarkMuted, backgroundColor: Colors.action },
+  topAddBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 10, backgroundColor: Colors.signal },
   recordButton: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, minHeight: 60, paddingVertical: 10, gap: 10 },
   recordHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
-  selectedUnit: { backgroundColor: Colors.actionTint, borderLeftWidth: 3, borderLeftColor: Colors.action },
+  selectedUnit: { backgroundColor: Colors.paleGreen },
   dockHeading: { flexDirection: 'row', alignItems: 'center', flexGrow: 1, gap: 6 },
   dockActions: { flexDirection: 'row', flexWrap: 'wrap', flexGrow: 1, flexShrink: 1, gap: 6 },
   dockButton: { flexGrow: 1, minHeight: 44, paddingHorizontal: 8, paddingVertical: 6 },
@@ -1280,7 +1281,7 @@ const styles = StyleSheet.create({
   panelTitle: { fontSize: 18, fontWeight: '700', color: Colors.ink },
   stepButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   disabledAction: { opacity: 0.6 },
-  topAddText: { fontSize: 14, fontWeight: '700', color: Colors.onDark },
+  topAddText: { fontSize: 14, fontWeight: '700', color: Colors.ink },
   searchBar: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: Colors.paper, borderRadius: 6, borderWidth: 1, borderColor: Colors.border },
   searchInput: {
     flex: 1,
@@ -1330,14 +1331,14 @@ const styles = StyleSheet.create({
   badgeGrayText: {
     color: Colors.subtleGray,
   },
-  reviewBtn: { backgroundColor: Colors.action, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 5 },
+  reviewBtn: { paddingHorizontal: 10, paddingVertical: 6 },
   reviewText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: Colors.white,
+    color: Colors.brandGreen,
   },
-  restoreOutlineBtn: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: Colors.action, paddingHorizontal: 10, borderRadius: 6 },
-  restoreOutlineText: { fontSize: 13, fontWeight: '700', color: Colors.action },
+  restoreOutlineBtn: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: Colors.brandGreen, paddingHorizontal: 10, borderRadius: 6 },
+  restoreOutlineText: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
   backNavRow: {
     minHeight: 44,
     flexDirection: 'row',
@@ -1388,13 +1389,7 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     backgroundColor: Colors.paper,
   },
-  primaryBtn: {
-    minHeight: 52,
-    borderRadius: 8,
-    backgroundColor: Colors.action,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  primaryBtn: transitStyles.primaryButton,
   primaryBtnText: {
     fontSize: 16,
     fontWeight: '700',
@@ -1429,7 +1424,7 @@ const styles = StyleSheet.create({
     minHeight: 46,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: Colors.action,
+    borderColor: Colors.brandGreen,
     backgroundColor: Colors.paper,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1437,7 +1432,7 @@ const styles = StyleSheet.create({
   outlineText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.action,
+    color: Colors.brandGreen,
   },
   outlineDarkBtn: {
     minHeight: 50,
@@ -1462,7 +1457,7 @@ const styles = StyleSheet.create({
     width: '100%', maxWidth: 992, alignSelf: 'center',
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
     gap: 8, paddingHorizontal: 14, paddingVertical: 10,
-    backgroundColor: Colors.paper, borderTopWidth: 2, borderTopColor: Colors.action,
+    backgroundColor: Colors.paper, borderTopWidth: 2, borderTopColor: Colors.brandGreen,
   },
   dockSelectedLabel: { color: Colors.ink, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   staleBanner: {

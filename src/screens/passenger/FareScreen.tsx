@@ -72,11 +72,11 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
   };
 
   return (
-    <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={[s.content, styles.column]}>
+    <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={[s.content, styles.layout]}>
       <View style={[s.heroBanner, styles.ticket]}>
         <View style={styles.headingRow}>
-          <Ionicons aria-hidden name="ticket-outline" color={Colors.onDark} size={24} />
-          <Text accessibilityRole="header" style={[s.heroTitle, styles.light, styles.grow]}>Fare</Text>
+          <Ionicons aria-hidden name="ticket-outline" color={Colors.signal} size={24} />
+          <Text accessibilityRole="header" style={[s.heroTitle, styles.grow]}>Fare</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh fares, walks, stops and routes" accessibilityState={{ disabled: refreshing }}
             disabled={refreshing} onPress={() => void refresh()} style={[styles.source, refreshing && { opacity: 0.6 }]}>
             <Ionicons aria-hidden name="refresh-outline" size={18} color={Colors.onDark} />
@@ -107,92 +107,94 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
           </>}
       </View>
 
-      <View style={s.section}>
-        <PassengerSelect label="Route" value={selectedRouteId || ''} disabled={!transit.routes.length}
-          options={transit.routes.map(item => ({ value: item.id, label: item.name }))} onSelect={setSelectedRouteId} />
-        {transit.status !== 'ready' && <Text style={s.muted}>{transit.syncedAt ? `Using route records read ${new Date(transit.syncedAt).toLocaleString()}. Refresh unavailable.` : 'Route information unavailable.'}</Text>}
-        <View style={styles.segmented}>
-          {(['stops', 'distance'] as const).map(value => (
-            <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: mode === value }}
-              onPress={() => setMode(value)} style={[styles.segment, mode === value && styles.activeSegment]}>
-              <Text style={[s.label, styles.segmentText, mode === value && styles.light]}>{value === 'stops' ? 'Selected stops' : 'Enter distance'}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        {mode === 'stops' ? <>
-          <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!boardingOptions.length}
-            options={boardingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
-            onSelect={id => setBoardingStop(boardingOptions.find(stop => stop.id === id) || null)} />
-          <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!alightingOptions.length}
-            options={alightingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
-            onSelect={id => setAlightingStop(alightingOptions.find(stop => stop.id === id) || null)} />
-          {!stops.length && <Text style={s.muted}>Verified stops unavailable for this route.</Text>}
-          {destinationPlace && <Text style={s.muted}>Your final destination is {destinationPlace.name}. The fare covers the ride to the alighting stop.</Text>}
-        </> : <View style={styles.field}>
-          <Text style={s.label}>Known ride distance (km)</Text>
-          <TextInput accessibilityLabel="Journey distance in kilometres" style={s.input} keyboardType="decimal-pad" value={distance} onChangeText={setDistance} placeholder="Enter distance in km" placeholderTextColor={Colors.subtleGray} />
-          <Text style={s.muted}>The fare uses your entered distance and the current fare source.</Text>
-          {!!distance && (km == null || !Number.isFinite(km) || km <= 0 || km > 200) && <Text accessibilityRole="alert" style={[s.muted, { color: Colors.primaryRed }]}>Enter a distance greater than 0 and up to 200 km.</Text>}
-        </View>}
-        <View style={s.divider} />
-        <PassengerSelect label="Passenger category" value={type} options={TYPES.map(item => ({ value: item.id, label: item.name }))}
-          onSelect={value => { const selected = TYPES.find(item => item.id === value); if (selected) setType(selected.id); }} />
-        {type !== 'regular' && <Text style={s.muted}>{category} fare uses the concession in the current fare source. Bring the required proof of eligibility.</Text>}
-        {!loading && quote && <TouchableOpacity accessibilityRole="button" onPress={() => scroll.current?.scrollTo({ y: 0, animated: false })} style={s.button}>
-          <Text style={s.buttonText}>View fare · {peso(quote.amount)}</Text>
-        </TouchableOpacity>}
-      </View>
-
-      <View style={s.section}>
-        <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: walkExpanded }} onPress={() => setWalkExpanded(!walkExpanded)} style={styles.disclosure}>
-          <Ionicons aria-hidden name="walk-outline" size={24} color={Colors.action} />
-          <View style={styles.grow}><Text style={s.sectionTitle}>Walk &amp; Save</Text><Text accessibilityLiveRegion="polite" style={s.muted}>{(!walkExpanded && walkError) || 'Compare fares from later boarding stops.'}</Text></View>
-          <Ionicons aria-hidden name={walkExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.ink} />
-        </TouchableOpacity>
-        {walkExpanded && <>
-          <View style={s.divider} />
-          <Text style={s.muted}>Walk from your selected boarding stop and keep the same alighting stop, destination and passenger category.</Text>
-          <PassengerSelect label="Maximum extra walking" value={String(maxWalk)} options={[100, 250, 500, 1000, 2000].map(value => ({ value: String(value), label: `${value} m` }))} onSelect={value => setMaxWalk(Number(value))} />
-          <View style={styles.disclosure}><Text style={[s.label, styles.grow]}>Step-free paths only</Text><Switch accessibilityLabel="Step-free walking routes only" value={stepFree} onValueChange={setStepFree} trackColor={{ true: Colors.action }} /></View>
-          {!savings ? <Text accessibilityLiveRegion="polite" style={s.muted}>{walkError || (loading || walks === undefined ? 'Refreshing comparison information…'
-            : 'Choose a route, boarding stop and alighting stop in Selected stops mode.')}</Text> : <>
-            <Text style={s.label}>{savings.status === 'available' ? 'Lower fares found' : savings.status === 'no-saving' ? 'No saving on the compared paths' : 'Walking comparison unavailable'}</Text>
-            <Text style={s.muted}>{savings.reason}</Text>
-            {savings.suggestions.map(item => (
-              <View key={`${item.stop.id}:${item.walk.source_url}`} style={styles.suggestion}>
-                <Text style={[s.label, styles.saving]}>Save {peso(item.savings)}</Text>
-                <Text style={s.sectionTitle}>Board at {item.stop.name}</Text>
-                <Text style={s.body}>{Math.round(item.walk.distance_meters)} m · about {item.minutes} min from {boardingStop!.name}</Text>
-                <Text style={s.body}>{category} fare drops from {peso(item.currentFare)} to {peso(item.fare)}.</Text>
-                <Text style={s.muted}>{item.walk.accessible === true ? 'Step-free access verified.' : item.walk.accessible === false ? 'This path is not step-free.' : 'Step-free access unconfirmed.'}</Text>
-                <TouchableOpacity accessibilityRole="button" onPress={() => {
-                  const stop = boardingOptions.find(value => value.id === item.stop.id);
-                  if (journeyVersion !== getJourneyVersion() || !stop || !boardingStop || !matrix || !validFareMatrix(matrix, route!.id, manilaDateKey(new Date()))) return;
-                  const fromLabel = boardingStop.name;
-                  setBoardingStop(stop); showWalk(item.walk, fromLabel, stop.name); navigation.navigate('Map');
-                }} style={s.button}><Text style={[s.buttonText, { flexShrink: 1, textAlign: 'center' }]}>Use stop &amp; view walking directions</Text></TouchableOpacity>
-              </View>
+      <View style={styles.controls}>
+        <View style={s.section}>
+          <PassengerSelect label="Route" value={selectedRouteId || ''} disabled={!transit.routes.length}
+            options={transit.routes.map(item => ({ value: item.id, label: item.name }))} onSelect={setSelectedRouteId} />
+          {transit.status !== 'ready' && <Text style={s.muted}>{transit.syncedAt ? `Using route records read ${new Date(transit.syncedAt).toLocaleString()}. Refresh unavailable.` : 'Route information unavailable.'}</Text>}
+          <View style={styles.segmented}>
+            {(['stops', 'distance'] as const).map(value => (
+              <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: mode === value }}
+                onPress={() => setMode(value)} style={[styles.segment, mode === value && s.selected]}>
+                <Text style={[s.label, styles.segmentText, mode === value && s.selectedText]}>{value === 'stops' ? 'Selected stops' : 'Enter distance'}</Text>
+              </TouchableOpacity>
             ))}
+          </View>
+          {mode === 'stops' ? <>
+            <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!boardingOptions.length}
+              options={boardingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
+              onSelect={id => setBoardingStop(boardingOptions.find(stop => stop.id === id) || null)} />
+            <PassengerSelect label="Alighting stop" value={alightingStop?.id || ''} disabled={!alightingOptions.length}
+              options={alightingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
+              onSelect={id => setAlightingStop(alightingOptions.find(stop => stop.id === id) || null)} />
+            {!stops.length && <Text style={s.muted}>Verified stops unavailable for this route.</Text>}
+            {destinationPlace && <Text style={s.muted}>Your final destination is {destinationPlace.name}. The fare covers the ride to the alighting stop.</Text>}
+          </> : <View style={styles.field}>
+            <Text style={s.label}>Known ride distance (km)</Text>
+            <TextInput accessibilityLabel="Journey distance in kilometres" style={s.input} keyboardType="decimal-pad" value={distance} onChangeText={setDistance} placeholder="Enter distance in km" placeholderTextColor={Colors.subtleGray} />
+            <Text style={s.muted}>The fare uses your entered distance and the current fare source.</Text>
+            {!!distance && (km == null || !Number.isFinite(km) || km <= 0 || km > 200) && <Text accessibilityRole="alert" style={[s.muted, { color: Colors.primaryRed }]}>Enter a distance greater than 0 and up to 200 km.</Text>}
+          </View>}
+          <View style={s.divider} />
+          <PassengerSelect label="Passenger category" value={type} options={TYPES.map(item => ({ value: item.id, label: item.name }))}
+            onSelect={value => { const selected = TYPES.find(item => item.id === value); if (selected) setType(selected.id); }} />
+          {type !== 'regular' && <Text style={s.muted}>{category} fare uses the concession in the current fare source. Bring the required proof of eligibility.</Text>}
+          {!loading && quote && <TouchableOpacity accessibilityRole="button" onPress={() => scroll.current?.scrollTo({ y: 0, animated: false })} style={s.button}>
+            <Text style={s.buttonText}>View fare · {peso(quote.amount)}</Text>
+          </TouchableOpacity>}
+        </View>
+
+        <View style={s.section}>
+          <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: walkExpanded }} onPress={() => setWalkExpanded(!walkExpanded)} style={styles.disclosure}>
+            <Ionicons aria-hidden name="walk-outline" size={24} color={Colors.brandGreen} />
+            <View style={styles.grow}><Text style={s.sectionTitle}>Walk &amp; Save</Text><Text accessibilityLiveRegion="polite" style={s.muted}>{(!walkExpanded && walkError) || 'Compare fares from later boarding stops.'}</Text></View>
+            <Ionicons aria-hidden name={walkExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.ink} />
+          </TouchableOpacity>
+          {walkExpanded && <>
+            <View style={s.divider} />
+            <Text style={s.muted}>Walk from your selected boarding stop and keep the same alighting stop, destination and passenger category.</Text>
+            <PassengerSelect label="Maximum extra walking" value={String(maxWalk)} options={[100, 250, 500, 1000, 2000].map(value => ({ value: String(value), label: `${value} m` }))} onSelect={value => setMaxWalk(Number(value))} />
+            <View style={styles.disclosure}><Text style={[s.label, styles.grow]}>Step-free paths only</Text><Switch accessibilityLabel="Step-free walking routes only" value={stepFree} onValueChange={setStepFree} trackColor={{ true: Colors.brandGreen }} /></View>
+            {!savings ? <Text accessibilityLiveRegion="polite" style={s.muted}>{walkError || (loading || walks === undefined ? 'Refreshing comparison information…'
+              : 'Choose a route, boarding stop and alighting stop in Selected stops mode.')}</Text> : <>
+              <Text style={s.label}>{savings.status === 'available' ? 'Lower fares found' : savings.status === 'no-saving' ? 'No saving on the compared paths' : 'Walking comparison unavailable'}</Text>
+              <Text style={s.muted}>{savings.reason}</Text>
+              {savings.suggestions.map(item => (
+                <View key={`${item.stop.id}:${item.walk.source_url}`} style={styles.suggestion}>
+                  <Text style={[s.label, styles.saving]}>Save {peso(item.savings)}</Text>
+                  <Text style={s.sectionTitle}>Board at {item.stop.name}</Text>
+                  <Text style={s.body}>{Math.round(item.walk.distance_meters)} m · about {item.minutes} min from {boardingStop!.name}</Text>
+                  <Text style={s.body}>{category} fare drops from {peso(item.currentFare)} to {peso(item.fare)}.</Text>
+                  <Text style={s.muted}>{item.walk.accessible === true ? 'Step-free access verified.' : item.walk.accessible === false ? 'This path is not step-free.' : 'Step-free access unconfirmed.'}</Text>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => {
+                    const stop = boardingOptions.find(value => value.id === item.stop.id);
+                    if (journeyVersion !== getJourneyVersion() || !stop || !boardingStop || !matrix || !validFareMatrix(matrix, route!.id, manilaDateKey(new Date()))) return;
+                    const fromLabel = boardingStop.name;
+                    setBoardingStop(stop); showWalk(item.walk, fromLabel, stop.name); navigation.navigate('Map');
+                  }} style={s.button}><Text style={[s.buttonText, { flexShrink: 1, textAlign: 'center' }]}>Use stop &amp; view walking directions</Text></TouchableOpacity>
+                </View>
+              ))}
+            </>}
           </>}
-        </>}
+        </View>
       </View>
     </FormScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  column: { maxWidth: 640 },
-  ticket: { backgroundColor: Colors.midnight, borderColor: Colors.midnight, gap: 12 },
+  layout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', maxWidth: 1024 },
+  ticket: { flexBasis: 300, flexGrow: 3, flexShrink: 1, minWidth: 0, gap: 12 },
+  controls: { flexBasis: 360, flexGrow: 5, flexShrink: 1, minWidth: 0, gap: 16 },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   total: { gap: 2 },
-  amount: { alignSelf: 'flex-start', paddingHorizontal: 8, borderRadius: 4, color: Colors.midnight, backgroundColor: Colors.signal, fontSize: 42, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  amount: { color: Colors.signal, fontSize: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
   ticketDetail: { color: Colors.onDarkMuted, fontSize: 15, lineHeight: 21 },
-  ticketFooter: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.onDark, paddingTop: 10, gap: 3 },
+  ticketFooter: { borderTopWidth: 1, borderTopColor: Colors.onDarkMuted, borderStyle: 'dashed', paddingTop: 12, gap: 4 },
   light: { color: Colors.onDark },
   source: { flexDirection: 'row', gap: 8, alignItems: 'center', minHeight: 48, alignSelf: 'flex-start' },
   segmented: { flexDirection: 'row', padding: 3, backgroundColor: Colors.canvas, borderRadius: 8 },
   segment: { flex: 1, minHeight: 48, padding: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
-  activeSegment: { backgroundColor: Colors.action },
   segmentText: { textAlign: 'center' },
   field: { gap: 6 },
   disclosure: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12 },

@@ -4,6 +4,7 @@ import { ScreenSkeleton } from '../../components/AppUI';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/theme';
+import { transitStyles } from '../../constants/transitStyles';
 
 const observed = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const reading = (value: unknown, unit: string, round = false) => observed(value) ? `${round ? Math.round(value) : value}${unit}` : 'Unavailable';
@@ -126,7 +127,7 @@ export default function WeatherScreen() {
               {new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}
             </Text>
           </View>
-          <Ionicons name={icon} size={38} color={Colors.onDark} />
+          <Ionicons aria-hidden name={icon} size={38} color={Colors.signal} />
         </View>
         <View style={styles.observation}>
           <Text style={styles.temp}>{Math.round(weather.main.temp)}°C</Text>
@@ -167,9 +168,9 @@ export default function WeatherScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16, gap: 10, backgroundColor: Colors.canvas },
-  page: { flex: 1, backgroundColor: Colors.canvas },
-  container: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 14 },
-  masthead: { backgroundColor: Colors.midnight, borderRadius: 10, padding: 20, gap: 20 },
+  page: transitStyles.page,
+  container: transitStyles.content,
+  masthead: { ...transitStyles.masthead, gap: 16 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { color: Colors.onDark, fontSize: 22, fontWeight: '700' },
   date: { color: Colors.onDark, fontSize: 14, marginTop: 3 },

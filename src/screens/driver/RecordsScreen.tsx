@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { realRows } from '../../utils/realData';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
+import { transitStyles } from '../../constants/transitStyles';
 import {
   currentReportingPeriod,
   formatReportingPeriod,
@@ -223,27 +224,27 @@ export default function RecordsScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: Colors.canvas },
-  content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 14 },
-  periodPanel: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
-  masthead: { backgroundColor: Colors.midnight, padding: 20, gap: 10 },
-  title: { color: Colors.onDark, fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
+  page: transitStyles.page,
+  content: transitStyles.content,
+  periodPanel: { ...transitStyles.panel, overflow: 'hidden' },
+  masthead: { ...transitStyles.masthead, borderRadius: 0 },
+  title: transitStyles.heading,
   dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   arrowBtn: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.onDark, borderRadius: 6 },
   dateNavText: { flex: 1, textAlign: 'center', fontSize: 16, color: Colors.onDark, fontWeight: '600' },
-  segmentBar: { flexDirection: 'row', paddingHorizontal: 6 },
-  segmentBtn: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
-  segmentBtnActive: { borderBottomColor: Colors.action },
+  segmentBar: { flexDirection: 'row', padding: 4, gap: 4 },
+  segmentBtn: { flex: 1, minHeight: 44, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
+  segmentBtnActive: transitStyles.selected,
   segmentText: { fontSize: 14, fontWeight: '600', color: Colors.subtleGray },
-  segmentTextActive: { color: Colors.action, fontWeight: '700' },
-  gradePanel: { borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.paper },
-  scorePanel: { padding: 18, gap: 6 },
+  segmentTextActive: transitStyles.selectedText,
+  gradePanel: { ...transitStyles.panel, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden' },
+  scorePanel: { flexGrow: 1, flexShrink: 1, flexBasis: 230, padding: 18, gap: 6, justifyContent: 'center', backgroundColor: Colors.mutedBackground },
   gradeTitle: { fontSize: 18, fontWeight: '700', color: Colors.ink },
   scoreBig: { fontSize: 38, fontWeight: '800', color: Colors.ink, fontVariant: ['tabular-nums'] },
   scoreDenom: { fontSize: 20, fontWeight: '500', color: Colors.subtleGray },
   scoreNote: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   scoreSubText: { flexShrink: 1, color: Colors.ink, fontSize: 14 },
-  breakdownList: { paddingHorizontal: 18, borderTopWidth: 1, borderColor: Colors.border },
+  breakdownList: { flexGrow: 2, flexShrink: 1, flexBasis: 260, paddingHorizontal: 18 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderColor: Colors.border },
   breakdownLabel: { flex: 1, fontSize: 14, color: Colors.subtleGray },
   breakdownVal: { fontSize: 16, fontWeight: '700', color: Colors.ink, fontVariant: ['tabular-nums'] },

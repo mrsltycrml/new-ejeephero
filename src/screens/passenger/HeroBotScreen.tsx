@@ -77,7 +77,7 @@ export default function HeroBotScreen() {
           );
         })}
         {loading && <View style={styles.status}>
-          <ActivityIndicator size="small" color={Colors.action} />
+          <ActivityIndicator size="small" color={Colors.brandGreen} />
           <Text accessibilityLiveRegion="polite" style={s.muted}>Waiting for a reply…</Text>
         </View>}
         {showSuggestions && <View style={s.section}>
@@ -85,7 +85,7 @@ export default function HeroBotScreen() {
           {SUGGESTIONS.map(question => (
             <TouchableOpacity key={question} accessibilityRole="button" onPress={() => void sendMessage(question)} disabled={loading} style={styles.question}>
               <Text style={[s.link, { flex: 1 }]}>{question}</Text>
-              <Ionicons aria-hidden name="arrow-forward" size={18} color={Colors.action} />
+              <Ionicons aria-hidden name="arrow-forward" size={18} color={Colors.brandGreen} />
             </TouchableOpacity>
           ))}
         </View>}
@@ -96,7 +96,7 @@ export default function HeroBotScreen() {
           {messages.length > 1 && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Suggested questions"
             accessibilityState={{ expanded: showSuggestions, disabled: loading }} disabled={loading} style={styles.iconButton}
             onPress={() => { setShowSuggestions(!showSuggestions); if (!showSuggestions) requestAnimationFrame(() => chat.current?.scrollToEnd({ animated: false })); }}>
-            <Ionicons aria-hidden name="help-circle-outline" size={24} color={Colors.action} />
+            <Ionicons aria-hidden name="help-circle-outline" size={24} color={Colors.brandGreen} />
           </TouchableOpacity>}
           <TextInput style={[s.input, { flex: 1, minWidth: 0 }]} value={input} onChangeText={setInput} placeholder="Ask a question" placeholderTextColor={Colors.subtleGray}
             onSubmitEditing={() => void sendMessage()} returnKeyType="send" accessibilityLabel="Message the commuter assistant" maxLength={2000} />
@@ -113,14 +113,14 @@ export default function HeroBotScreen() {
 const styles = StyleSheet.create({
   column: { maxWidth: 640, gap: 12 },
   bubble: { gap: 6, padding: 14, maxWidth: '94%', borderRadius: 10 },
-  incoming: { alignSelf: 'flex-start', backgroundColor: Colors.paper, borderLeftWidth: 3, borderColor: Colors.action },
+  incoming: { alignSelf: 'flex-start', backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border },
   outgoing: { alignSelf: 'flex-end', backgroundColor: Colors.midnight },
-  sender: { color: Colors.action },
+  sender: { color: Colors.brandGreen },
   light: { color: Colors.onDark },
   status: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   question: { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 48, paddingVertical: 8, borderTopWidth: 1, borderColor: Colors.border },
   composer: { backgroundColor: Colors.paper, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', maxWidth: 640, paddingHorizontal: 16, alignSelf: 'center' },
   iconButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  send: { backgroundColor: Colors.action, borderRadius: 8 },
+  send: { backgroundColor: Colors.brandGreen, borderRadius: 10 },
 });

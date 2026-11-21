@@ -112,9 +112,9 @@ export default function SafetyScreen() {
 
   return (
     <FormScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}>
-      <View style={[s.heroBanner, styles.masthead]}>
-        <Text accessibilityRole="header" style={[s.heroTitle, styles.light]}>Safety</Text>
-        <Text style={[s.heroSubtitle, styles.light]}>Send your location and ride details to trusted contacts. You have five seconds to cancel.</Text>
+      <View style={s.heroBanner}>
+        <Text accessibilityRole="header" style={s.heroTitle}>Safety</Text>
+        <Text style={s.heroSubtitle}>Send your location and ride details to trusted contacts. You have five seconds to cancel.</Text>
         <SOSButton activeVehicleId={unit?.vehicle_id} activeVehicleBody={unit?.body_number} activeVehiclePlate={unit?.plate_number || undefined} />
         <View style={styles.ride}>
           <Ionicons aria-hidden name="bus-outline" size={20} color={Colors.onDark} />
@@ -163,7 +163,7 @@ export default function SafetyScreen() {
                 onPress={() => startEdit(c)}
                 style={styles.iconBtn}
               >
-                <Ionicons name="pencil-outline" size={19} color={Colors.action} />
+                <Ionicons name="pencil-outline" size={19} color={Colors.brandGreen} />
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
@@ -245,7 +245,7 @@ export default function SafetyScreen() {
               }}
               style={[s.button, s.secondary]}
             >
-              <Ionicons name="add" size={20} color={Colors.action} />
+              <Ionicons name="add" size={20} color={Colors.brandGreen} />
               <Text style={s.link}>Add contact</Text>
             </TouchableOpacity>
           )
@@ -257,9 +257,8 @@ export default function SafetyScreen() {
 }
 
 const styles = StyleSheet.create({
-  masthead: { gap: 12, backgroundColor: Colors.midnight, borderColor: Colors.midnight },
   light: { color: Colors.onDark },
-  ride: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 },
+  ride: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.onDarkMuted },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   contactRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, borderBottomWidth: 1, borderColor: Colors.border },
   iconBtn: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },

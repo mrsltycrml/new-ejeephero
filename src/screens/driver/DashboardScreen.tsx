@@ -24,6 +24,7 @@ import {
 } from '../../services/offlineTransitService';
 import { ESAKAY_OPERATIONS } from '../../constants/esakayOperations';
 import { Colors } from '../../constants/theme';
+import { transitStyles } from '../../constants/transitStyles';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
 import { BottomSheetModal, triggerHaptic } from '../../components/AppUI';
@@ -424,41 +425,46 @@ export default function DashboardScreen() {
       {!isActive ? (
         <>
           <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            <View style={styles.masthead}>
-              <Text accessibilityRole="header" style={styles.pageTitle}>Start your shift</Text>
-              <Text style={styles.mastheadLabel}>Route</Text>
-              <TouchableOpacity
-                style={styles.selectButton}
-                onPress={() => setRouteMenuOpen(!routeMenuOpen)}
-                accessibilityRole="button"
-                accessibilityLabel="Choose route"
-                accessibilityState={{ expanded: routeMenuOpen }}
-              >
-                <Text style={styles.selectButtonText}>{currentRouteName || 'Route unavailable'}</Text>
-                <Ionicons name={routeMenuOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
-              </TouchableOpacity>
-              <Text style={styles.mastheadDescription}>{routes.find(route => route.id === selectedRoute)?.description || 'Route description unavailable'}</Text>
+            <View style={styles.fieldGroup}>
+              <View style={styles.setupHeader}>
+                <Ionicons aria-hidden name="bus-outline" color={Colors.signal} size={26} />
+                <Text accessibilityRole="header" style={styles.pageTitle}>Start your shift</Text>
+              </View>
+              <View style={styles.routeFields}>
+                <Text style={styles.unitTitle}>Route</Text>
+                <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={() => setRouteMenuOpen(!routeMenuOpen)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose route"
+                  accessibilityState={{ expanded: routeMenuOpen }}
+                >
+                  <Text style={styles.selectButtonText}>{currentRouteName || 'Route unavailable'}</Text>
+                  <Ionicons name={routeMenuOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
+                </TouchableOpacity>
+                <Text style={styles.fieldHelper}>{routes.find(route => route.id === selectedRoute)?.description || 'Route description unavailable'}</Text>
 
-              {routeMenuOpen && (
-                <View style={styles.optionList}>
-                  {routes.map((r) => (
-                    <TouchableOpacity
-                      key={r.id}
-                      style={styles.optionRow}
-                      accessibilityState={{ selected: selectedRoute === r.id }}
-                      onPress={() => {
-                        setSelectedRoute(r.id);
-                        setRouteMenuOpen(false);
-                        setShiftError('');
-                      }}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.optionTitle}>{r.name}</Text>
-                      {selectedRoute === r.id && <Ionicons name="checkmark-circle" size={18} color={Colors.action} />}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                {routeMenuOpen && (
+                  <View style={styles.optionList}>
+                    {routes.map((r) => (
+                      <TouchableOpacity
+                        key={r.id}
+                        style={styles.optionRow}
+                        accessibilityState={{ selected: selectedRoute === r.id }}
+                        onPress={() => {
+                          setSelectedRoute(r.id);
+                          setRouteMenuOpen(false);
+                          setShiftError('');
+                        }}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.optionTitle}>{r.name}</Text>
+                        {selectedRoute === r.id && <Ionicons name="checkmark-circle" size={18} color={Colors.brandGreen} />}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
 
             {locationReady ? (
@@ -521,7 +527,7 @@ export default function DashboardScreen() {
                         <Ionicons
                           name={isSelected && !busy ? 'radio-button-on' : 'radio-button-off'}
                           size={20}
-                          color={isSelected && !busy ? Colors.action : Colors.subtleGray}
+                          color={isSelected && !busy ? Colors.brandGreen : Colors.subtleGray}
                         />
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.unitTitle, busy && { color: Colors.subtleGray }]}>
@@ -557,7 +563,7 @@ export default function DashboardScreen() {
             )}
             <Text style={styles.submitUnit}>{[bodyNumber, plateNumber].filter(Boolean).join(' · ') || 'Select an assigned unit'}</Text>
             <TouchableOpacity
-              style={[styles.primaryBtn, !canStartShift && styles.disabledBtn]}
+              style={[styles.primaryBtn, transitStyles.selected, !canStartShift && styles.disabledBtn]}
               onPress={toggleShift}
               disabled={!canStartShift}
               accessibilityRole="button"
@@ -566,7 +572,7 @@ export default function DashboardScreen() {
               {starting ? (
                 <ActivityIndicator color={Colors.subtleGray} />
               ) : (
-                <Text style={[styles.primaryBtnText, !locationReady && { color: Colors.subtleGray }]}>
+                <Text style={[styles.primaryBtnText, transitStyles.selectedText, !canStartShift && { color: Colors.subtleGray }]}>
                   Start shift
                 </Text>
               )}
@@ -595,13 +601,13 @@ export default function DashboardScreen() {
               <Text style={styles.unitTitle}>Passengers</Text>
               <Text style={styles.passengerCountNum}>{passengerCount ?? 'Unavailable'}</Text>
               <Text style={styles.unitPlate}>{seatStatus || 'Occupancy unavailable'}</Text>
+              <Text style={styles.fieldHelper}>Update seats when safely stopped.</Text>
             </View>
             <View style={styles.passengerAction}>
-              <Ionicons name="create-outline" size={20} color={Colors.action} />
+              <Ionicons aria-hidden name="create-outline" size={20} color={Colors.brandGreen} />
               <Text style={styles.passengerTitle}>Update count</Text>
             </View>
           </TouchableOpacity>
-          <Text style={styles.fieldHelper}>Update seats when safely stopped.</Text>
 
           <View style={styles.trackingPanel}>
             <View style={styles.mapFrame}>
@@ -740,7 +746,7 @@ export default function DashboardScreen() {
         <TouchableOpacity
           accessibilityRole="button"
           onPress={() => setEndShiftSheetOpen(false)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+          style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 4 }}
         >
           <Ionicons name="chevron-back" size={20} color={Colors.ink} />
           <Text style={styles.unitTitle}>End shift</Text>
@@ -801,15 +807,16 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.canvas },
-  scrollContent: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 12 },
-  masthead: { backgroundColor: Colors.midnight, padding: 20, borderRadius: 10, gap: 8 },
-  mastheadLabel: { color: Colors.onDark, fontSize: 14, fontWeight: '600' },
-  mastheadDescription: { color: Colors.onDarkMuted, fontSize: 14, lineHeight: 20 },
-  pageTitle: { fontSize: 28, fontWeight: '800', letterSpacing: -0.6, color: Colors.onDark, marginBottom: 4 },
+  container: transitStyles.page,
+  scrollContent: transitStyles.content,
+  masthead: transitStyles.masthead,
+  setupHeader: { ...transitStyles.masthead, borderRadius: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  routeFields: { padding: 16, gap: 8 },
+  mastheadDescription: transitStyles.description,
+  pageTitle: { ...transitStyles.heading, flexShrink: 1 },
   submitBar: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: Colors.paper, borderTopColor: Colors.border, borderTopWidth: 1 },
   submitUnit: { flexBasis: 140, flexGrow: 1, flexShrink: 1, color: Colors.ink, fontSize: 15, fontWeight: '600' },
-  fieldGroup: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  fieldGroup: { ...transitStyles.panel, overflow: 'hidden' },
   fieldLabel: { color: Colors.ink, fontSize: 18, fontWeight: '700', padding: 16, paddingBottom: 12 },
   unitList: { paddingHorizontal: 12, paddingBottom: 10 },
   fieldHelper: {
@@ -842,6 +849,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   optionRow: {
+    minHeight: 48,
     paddingHorizontal: 14,
     paddingVertical: 13,
     borderBottomWidth: 1,
@@ -865,7 +873,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     backgroundColor: Colors.paper,
   },
-  unitRadioCardSelected: { borderLeftWidth: 3, borderLeftColor: Colors.action, backgroundColor: Colors.actionTint },
+  unitRadioCardSelected: { backgroundColor: Colors.paleGreen },
   unitRadioCardBusy: { backgroundColor: Colors.canvas },
   unitTitle: {
     fontSize: 16,
@@ -913,22 +921,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paper,
     gap: 12,
   },
-  primaryBtn: {
-    minHeight: 52,
-    borderRadius: 8,
-    backgroundColor: Colors.action,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-  },
+  primaryBtn: transitStyles.primaryButton,
   disabledBtn: {
     backgroundColor: Colors.border,
   },
-  primaryBtnText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  primaryBtnText: transitStyles.primaryText,
   shiftError: {
     color: Colors.primaryRed,
     backgroundColor: Colors.dangerBg,
@@ -943,12 +940,11 @@ const styles = StyleSheet.create({
   shiftActiveText: { backgroundColor: Colors.successBg, color: Colors.success, fontSize: 13, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
   passengersRow: {
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12,
-    backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border,
-    borderLeftWidth: 4, borderLeftColor: Colors.action, padding: 16, borderRadius: 8,
+    ...transitStyles.panel, padding: 16,
   },
-  passengerTitle: { fontSize: 15, fontWeight: '700', color: Colors.action },
+  passengerTitle: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen, flexShrink: 1 },
   passengerCountNum: { fontSize: 24, fontVariant: ['tabular-nums'], fontWeight: '700', color: Colors.ink },
-  passengerAction: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  passengerAction: { alignItems: 'center', flexDirection: 'row', gap: 6, minHeight: 44, paddingHorizontal: 12, borderRadius: 10, backgroundColor: Colors.paleGreen },
   trackingPanel: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 10, padding: 14, gap: 10 },
   mapFrame: {
     height: 248,

@@ -4,6 +4,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { useAuth } from '../../contexts/AuthContext';
 import { isClerkConfigured } from '../../lib/clerk';
 import { Colors } from '../../constants/theme';
+import { transitStyles } from '../../constants/transitStyles';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase, supabaseAuth } from '../../lib/supabase';
 import { useTranslation } from 'react-i18next';
@@ -175,7 +176,7 @@ export default function ProfileScreen() {
               onPress={() => { setIsEditingName(true); setNewName(fullName); }}
               style={styles.editButton}
             >
-              <Ionicons name="pencil" size={16} color={Colors.onDark} />
+              <Ionicons name="pencil" size={16} color={Colors.ink} />
               <Text style={styles.editText}>{t('common.edit')}</Text>
             </TouchableOpacity>
           )}
@@ -236,7 +237,7 @@ export default function ProfileScreen() {
           accessibilityState={{ expanded: showPasswordSection }}
           onPress={() => setShowPasswordSection(!showPasswordSection)}
         >
-          <Ionicons name="lock-closed-outline" size={21} color={Colors.action} />
+          <Ionicons name="lock-closed-outline" size={21} color={Colors.brandGreen} />
           <Text style={styles.rowTitle}>Password &amp; security</Text>
           <Ionicons
             name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
@@ -301,7 +302,7 @@ export default function ProfileScreen() {
           style={styles.settingsRow}
           onPress={() => setShowLanguageSelector(true)}
         >
-          <Ionicons name="globe-outline" size={21} color={Colors.action} />
+          <Ionicons name="globe-outline" size={21} color={Colors.brandGreen} />
           <View style={{ flex: 1 }}>
             <Text style={styles.rowTitle}>{t('profile.language')}</Text>
             <Text style={styles.secondaryText}>
@@ -316,7 +317,7 @@ export default function ProfileScreen() {
           style={styles.settingsRow}
           onPress={() => setDownloadModalVisible(true)}
         >
-          <Ionicons name="phone-portrait-outline" size={21} color={Colors.action} />
+          <Ionicons name="phone-portrait-outline" size={21} color={Colors.brandGreen} />
           <View style={{ flex: 1 }}>
             <Text style={styles.rowTitle}>Install eSAKAY</Text>
             <Text style={styles.secondaryText}>Android APK and iOS installation guide</Text>
@@ -350,7 +351,7 @@ export default function ProfileScreen() {
             <Ionicons 
               name={i18n.language === 'en' ? 'radio-button-on' : 'radio-button-off'} 
               size={24} 
-              color={i18n.language === 'en' ? Colors.action : Colors.subtleGray}
+              color={i18n.language === 'en' ? Colors.brandGreen : Colors.subtleGray}
               style={{ marginRight: 12 }}
             />
             <Text style={[styles.languageOptionText, i18n.language === 'en' && styles.languageOptionTextActive]}>
@@ -370,7 +371,7 @@ export default function ProfileScreen() {
             <Ionicons 
               name={i18n.language === 'fil' ? 'radio-button-on' : 'radio-button-off'} 
               size={24} 
-              color={i18n.language === 'fil' ? Colors.action : Colors.subtleGray}
+              color={i18n.language === 'fil' ? Colors.brandGreen : Colors.subtleGray}
               style={{ marginRight: 12 }}
             />
             <Text style={[styles.languageOptionText, i18n.language === 'fil' && styles.languageOptionTextActive]}>
@@ -395,15 +396,15 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.canvas },
-  content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 16 },
-  identityCard: { backgroundColor: Colors.paper, borderRadius: 10, borderColor: Colors.border, borderWidth: 1, overflow: 'hidden' },
-  masthead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: 20, backgroundColor: Colors.midnight },
+  container: transitStyles.page,
+  content: transitStyles.content,
+  identityCard: { ...transitStyles.panel, overflow: 'hidden' },
+  masthead: { ...transitStyles.masthead, borderRadius: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14 },
   heroIdentity: { minWidth: 0, flexBasis: 180, flexGrow: 1, flexShrink: 1, gap: 4 },
   nameHeader: { color: Colors.onDark, fontSize: 26, letterSpacing: -0.6, fontWeight: '800' },
   emailHeader: { color: Colors.onDark, fontSize: 14, lineHeight: 20, ...(Platform.OS === 'web' ? { overflowWrap: 'anywhere' as const } : {}) },
-  editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, minHeight: 44, borderRadius: 6, borderWidth: 1, borderColor: Colors.onDark },
-  editText: { fontWeight: '700', fontSize: 14, color: Colors.onDark },
+  editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, minHeight: 44, borderRadius: 10, backgroundColor: Colors.signal },
+  editText: { fontWeight: '700', fontSize: 14, color: Colors.ink },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderTopWidth: 1, borderColor: Colors.border },
   secondaryText: { color: Colors.subtleGray, fontSize: 14, lineHeight: 20 },
   status: { textTransform: 'capitalize', fontWeight: '700', fontSize: 15 },
@@ -411,11 +412,11 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 15, fontWeight: '600', color: Colors.ink },
   input: { minHeight: 48, paddingVertical: 10, paddingHorizontal: 12, fontSize: 15, color: Colors.ink, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.subtleGray, borderRadius: 6 },
   editActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  primaryButton: { backgroundColor: Colors.action, minHeight: 46, borderRadius: 6, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  primaryText: { color: Colors.onDark, fontSize: 15, fontWeight: '700' },
+  primaryButton: transitStyles.primaryButton,
+  primaryText: transitStyles.primaryText,
   cancelButton: { paddingHorizontal: 16, justifyContent: 'center', minHeight: 46 },
-  actionText: { color: Colors.action, fontSize: 15, fontWeight: '700' },
-  settingsPanel: { backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 10, overflow: 'hidden' },
+  actionText: { color: Colors.brandGreen, fontSize: 15, fontWeight: '700' },
+  settingsPanel: { ...transitStyles.panel, overflow: 'hidden' },
   settingsRow: { minHeight: 56, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
   rowTitle: { flexShrink: 1, flexGrow: 1, fontSize: 16, fontWeight: '700', color: Colors.ink },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 },
@@ -423,9 +424,9 @@ const styles = StyleSheet.create({
   closeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   languageOptions: { gap: 8 },
   languageOption: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 6, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border },
-  languageOptionActive: { borderColor: Colors.action },
+  languageOptionActive: { borderColor: Colors.brandGreen, backgroundColor: Colors.paleGreen },
   languageOptionText: { flexShrink: 1, fontSize: 16, fontWeight: '600', color: Colors.ink },
-  languageOptionTextActive: { color: Colors.action },
+  languageOptionTextActive: { color: Colors.brandGreen },
   logoutButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', minHeight: 46, paddingHorizontal: 14, gap: 8, borderWidth: 1, borderColor: Colors.primaryRed, borderRadius: 6 },
   logoutText: { color: Colors.primaryRed, fontSize: 15, fontWeight: '700' },
 });

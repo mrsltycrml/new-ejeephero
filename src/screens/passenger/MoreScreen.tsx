@@ -18,19 +18,19 @@ export default function MoreScreen({ navigation }: any) {
     <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}>
       <Text accessibilityRole="header" style={s.title}>More</Text>
       <TouchableOpacity accessibilityRole="button" onPress={() => open('PassengerDirectory')} style={[s.heroBanner, styles.directory]}>
-        <Ionicons aria-hidden name="git-branch-outline" size={28} color={Colors.onDark} />
+        <Ionicons aria-hidden name="git-branch-outline" size={28} color={Colors.signal} />
         <View style={styles.details}>
           <Text style={[s.sectionTitle, styles.light]}>Route directory</Text>
-          <Text style={[s.muted, styles.light]}>Browse routes and stops in travel order.</Text>
+          <Text style={s.heroSubtitle}>Browse routes and stops in travel order.</Text>
         </View>
-        <Ionicons aria-hidden name="arrow-forward" size={22} color={Colors.onDark} />
+        <Ionicons aria-hidden name="arrow-forward" size={22} color={Colors.signal} />
       </TouchableOpacity>
 
-      <View style={s.section}>
+      <View style={[s.section, styles.list]}>
         {rideTools.map((item, index) => (
           <TouchableOpacity key={item.screen} accessibilityRole="button" onPress={() => open(item.screen)}
             style={[styles.row, index > 0 && styles.rule]}>
-            <Ionicons aria-hidden name={item.icon} size={22} color={Colors.action} />
+            <Ionicons aria-hidden name={item.icon} size={22} color={Colors.brandGreen} />
             <View style={styles.details}>
               <Text style={s.label}>{item.name}</Text>
               <Text style={s.muted}>{item.detail}</Text>
@@ -40,10 +40,10 @@ export default function MoreScreen({ navigation }: any) {
         ))}
       </View>
 
-      <View style={s.section}>
-        <Text accessibilityRole="header" style={s.sectionTitle}>Account</Text>
+      <Text accessibilityRole="header" style={s.sectionTitle}>Account</Text>
+      <View style={[s.section, styles.list]}>
         <TouchableOpacity accessibilityRole="button" onPress={() => open('PassengerProfile')} style={styles.row}>
-          <Ionicons aria-hidden name="person-outline" size={22} color={Colors.action} />
+          <Ionicons aria-hidden name="person-outline" size={22} color={Colors.brandGreen} />
           <Text style={[s.label, styles.details]}>Profile</Text>
           <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
         </TouchableOpacity>
@@ -57,9 +57,10 @@ export default function MoreScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  directory: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 22, backgroundColor: Colors.midnight, borderColor: Colors.midnight },
+  directory: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  list: { paddingVertical: 0, gap: 0 },
   details: { flex: 1, minWidth: 0, gap: 3 },
   light: { color: Colors.onDark },
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 48, gap: 12, paddingVertical: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: 12, paddingVertical: 12 },
   rule: { borderTopWidth: 1, borderTopColor: Colors.border },
 });

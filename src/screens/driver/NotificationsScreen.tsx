@@ -15,6 +15,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouteWarnings } from '../../contexts/RouteWarningsContext';
 import { Colors } from '../../constants/theme';
+import { transitStyles } from '../../constants/transitStyles';
 import { offlineTransit, type RouteData, type TerminalData } from '../../services/offlineTransitService';
 
 type AlertItem = {
@@ -174,7 +175,7 @@ export default function NotificationsScreen() {
         ? Colors.primaryRed
         : item.severity === 'warning'
           ? Colors.warning
-          : Colors.action;
+          : Colors.ink;
     const timeText = new Date(item.timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
@@ -209,9 +210,7 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <View style={styles.headerBlock}>
-          <Text accessibilityRole="header" style={styles.title}>Shift alerts</Text>
-        </View>
+        <Text accessibilityRole="header" style={styles.title}>Shift alerts</Text>
 
         {!!loadError && <Text accessibilityRole="alert" style={styles.error}>{loadError}</Text>}
         {!!warningError && <Text accessibilityRole="alert" style={styles.error}>{warningError}</Text>}
@@ -305,14 +304,13 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.canvas },
-  content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 14 },
-  headerBlock: { backgroundColor: Colors.midnight, borderRadius: 10, padding: 20 },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.6, color: Colors.onDark },
+  container: transitStyles.page,
+  content: transitStyles.content,
+  title: { ...transitStyles.heading, color: Colors.ink },
   groupBand: { paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   groupBandText: { fontSize: 18, fontWeight: '700', color: Colors.ink },
   groupCount: { fontSize: 14, color: Colors.subtleGray, fontVariant: ['tabular-nums'] },
-  listSection: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 10 },
+  listSection: transitStyles.panel,
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderTopWidth: 1, borderColor: Colors.border },
   message: { flex: 1, minWidth: 0, gap: 4 },
   rowTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },

@@ -9,10 +9,10 @@ import { BOARDING_EDUCATION } from '../../services/passengerSafety';
 export default function AboutScreen() {
   return (
     <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}>
-      <View style={[s.heroBanner, { backgroundColor: Colors.midnight, borderColor: Colors.midnight }]}>
+      <View style={s.heroBanner}>
         <ESakayLogo />
-        <Text accessibilityRole="header" style={[s.heroTitle, { color: Colors.onDark }]}>Electric jeepney service</Text>
-        <Text style={[s.heroSubtitle, { color: Colors.onDark }]}>MRT Buendia to Mandaluyong City Hall</Text>
+        <Text accessibilityRole="header" style={s.heroTitle}>Electric jeepney service</Text>
+        <Text style={s.heroSubtitle}>MRT Buendia to Mandaluyong City Hall</Text>
       </View>
 
       <View style={s.section}>
@@ -30,7 +30,7 @@ export default function AboutScreen() {
           { icon: 'chatbubble-outline', label: 'Commuter assistant', detail: 'Ask about routes, stops and using the service.' },
         ] as const).map(item => (
           <View key={item.label} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12 }}>
-            <Ionicons aria-hidden name={item.icon} size={21} color={Colors.action} />
+            <Ionicons aria-hidden name={item.icon} size={21} color={Colors.ink} />
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={s.label}>{item.label}</Text>
               <Text style={s.muted}>{item.detail}</Text>
@@ -43,7 +43,7 @@ export default function AboutScreen() {
         onPress={() => Linking.openURL('https://meralcomain.s3.ap-southeast-1.amazonaws.com/2020-04/mer_sustainabilityreport2019_final.pdf')}
         style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Text style={[s.link, { flexShrink: 1 }]}>Meralco sustainability report (PDF)</Text>
-        <Ionicons aria-hidden name="open-outline" size={16} color={Colors.action} />
+        <Ionicons aria-hidden name="open-outline" size={16} color={Colors.brandGreen} />
       </TouchableOpacity>
     </ScrollView>
   );

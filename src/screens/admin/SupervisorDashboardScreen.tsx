@@ -411,11 +411,13 @@ export default function SupervisorDashboardScreen() {
   const gpsIssueCount = currentLiveUnits.filter(unit => unit.stale).length;
 
   if (manageMode !== 'none') return <SupervisorRouteManager initialPage={manageMode} onChanged={loadDashboard} onBack={() => setManageMode('none')} />;
-  const addRouteButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add route" style={styles.backNavRow} onPress={() => setManageMode('add')}>
-    <Text style={styles.rowTitle}>Add route</Text>
+  const addRouteButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add route" style={styles.routeAction} onPress={() => setManageMode('add')}>
+    <Ionicons aria-hidden name="add" size={18} color={Colors.brandGreen} />
+    <Text style={styles.routeActionText}>Add route</Text>
   </TouchableOpacity>;
-  const route1ReviewButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Review Route 1 map and stops" style={styles.backNavRow} onPress={()=>setManageMode('route1')}>
-    <Text style={styles.rowTitle}>Review Route 1 map and stops</Text>
+  const route1ReviewButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Review Route 1 map and stops" style={styles.routeAction} onPress={()=>setManageMode('route1')}>
+    <Ionicons aria-hidden name="git-branch-outline" size={18} color={Colors.brandGreen} />
+    <Text style={styles.routeActionText}>Review Route 1 map and stops</Text>
   </TouchableOpacity>;
   if (loading) return <ScreenSkeleton preset="dashboard" />;
   if (dataError) return <ScrollView style={ops.page} contentContainerStyle={ops.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
@@ -455,43 +457,32 @@ export default function SupervisorDashboardScreen() {
           <Text accessibilityRole="header" style={ops.mastheadTitle}>Fleet monitor</Text>
           <Text style={ops.mastheadMeta}>{formatReportingPeriod(period)}</Text>
         </View>
-        {route1ReviewButton}
-        {addRouteButton}
 
         {!!transitNotice && <Text accessibilityRole="alert" style={styles.rowSub}>{transitNotice}</Text>}
 
-        <View style={styles.kpiGrid}>
-          <View style={[styles.kpiTile, styles.kpiTileGreen]}>
-            <View style={styles.kpiTopRow}>
+        <View style={ops.panel}>
+          <View style={styles.kpiGrid}>
+            <View style={styles.kpiTile}>
               <Text style={styles.kpiLabel}>Live units</Text>
-              <Ionicons name="bus-outline" size={17} color={Colors.brandGreen} />
+              <Text style={[styles.kpiNumber, { color: Colors.brandGreen }]}>{currentLiveUnits.length - gpsIssueCount}</Text>
             </View>
-            <Text style={styles.kpiNumber}>{currentLiveUnits.length - gpsIssueCount}</Text>
-          </View>
 
-          <View style={styles.kpiTile}>
-            <View style={styles.kpiTopRow}>
+            <View style={styles.kpiTile}>
               <Text style={styles.kpiLabel}>Shifts started</Text>
-              <Ionicons name="people-outline" size={17} color={Colors.ink} />
+              <Text style={styles.kpiNumber}>{periodTripCount ?? 'Unavailable'}</Text>
             </View>
-            <Text style={styles.kpiNumber}>{periodTripCount ?? 'Unavailable'}</Text>
-          </View>
 
-          <View style={styles.kpiTile}>
-            <View style={styles.kpiTopRow}>
+            <View style={styles.kpiTile}>
               <Text style={styles.kpiLabel}>Speed offenses</Text>
-              <Ionicons name="speedometer-outline" size={17} color={Colors.ink} />
+              <Text style={styles.kpiNumber}>{speedEvents.length}</Text>
             </View>
-            <Text style={styles.kpiNumber}>{speedEvents.length}</Text>
-          </View>
 
-          <View style={[styles.kpiTile, styles.kpiTileAmber]}>
-            <View style={styles.kpiTopRow}>
+            <View style={styles.kpiTile}>
               <Text style={styles.kpiLabel}>Pending flags</Text>
-              <Ionicons name="flag-outline" size={17} color={Colors.warning} />
+              <Text style={[styles.kpiNumber, pendingCount > 0 && { color: Colors.warning }]}>{pendingCount}</Text>
             </View>
-            <Text style={styles.kpiNumber}>{pendingCount}</Text>
           </View>
+          <View style={styles.routeActions}>{route1ReviewButton}{addRouteButton}</View>
         </View>
 
         <View style={ops.segmentBar}>
@@ -653,9 +644,7 @@ export default function SupervisorDashboardScreen() {
                   onPress={() => setManageMode('list')}
                   style={styles.listRow}
                 >
-                  <View style={styles.routeIconCircle}>
-                    <Ionicons name="git-branch-outline" size={19} color={Colors.action} />
-                  </View>
+                  <Ionicons aria-hidden name="git-branch-outline" size={20} color={Colors.brandGreen} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>Manage routes and stops</Text>
                     <Text style={styles.rowSub}>Published routes and verified stops</Text>
@@ -668,9 +657,7 @@ export default function SupervisorDashboardScreen() {
                   onPress={() => setActivityView('cuts')}
                   style={styles.listRow}
                 >
-                  <View style={[styles.routeIconCircle, { backgroundColor: Colors.warningBg }]}>
-                    <Ionicons name="flag-outline" size={19} color={Colors.warning} />
-                  </View>
+                  <Ionicons aria-hidden name="flag-outline" size={20} color={pendingCount > 0 ? Colors.warning : Colors.ink} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>Review route flags</Text>
                     <Text style={styles.rowSub}>{pendingCount} awaiting review</Text>
@@ -782,9 +769,7 @@ export default function SupervisorDashboardScreen() {
             ).map((ev) => (
               <View key={ev.id} style={styles.speedOffenseCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={[styles.routeIconCircle, { backgroundColor: Colors.dangerBg }]}>
-                    <Ionicons name="warning-outline" size={20} color={Colors.primaryRed} />
-                  </View>
+                  <Ionicons aria-hidden name="warning-outline" size={20} color={Colors.primaryRed} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowTitle, { color: Colors.primaryRed }]}>
                       Operator cap exceeded
@@ -852,9 +837,7 @@ export default function SupervisorDashboardScreen() {
                   onPress={() => setSelectedViolation(item)}
                   style={styles.listRow}
                 >
-                  <View style={[styles.routeIconCircle, { backgroundColor: Colors.warningBg }]}>
-                    <Ionicons name="git-branch-outline" size={19} color={Colors.warning} />
-                  </View>
+                  <Ionicons aria-hidden name="git-branch-outline" size={19} color={Colors.warning} />
                   <View style={{ flex: 1 }}>
                     <View style={styles.rowHeading}>
                       <Text style={styles.rowTitle}>
@@ -1014,27 +997,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   rowHeading: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  routeActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', paddingHorizontal: 12, columnGap: 16, borderTopWidth: 1, borderTopColor: Colors.border },
+  routeAction: { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 6, paddingHorizontal: 4, flexShrink: 1 },
+  routeActionText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen, flexShrink: 1 },
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 8 },
   kpiTile: {
     flexGrow: 1,
-    flexBasis: 136,
-    paddingHorizontal: 12,
+    flexBasis: 140,
+    paddingHorizontal: 8,
     paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 7,
-    backgroundColor: Colors.paper,
     gap: 4,
   },
-  kpiTileGreen: { borderTopColor: Colors.success, borderTopWidth: 3 },
-  kpiTileAmber: { borderTopColor: Colors.warning, borderTopWidth: 3 },
-  kpiTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   kpiLabel: { flexShrink: 1, fontSize: 13, fontWeight: '600', color: Colors.subtleGray },
-  kpiNumber: { fontSize: 26, fontWeight: '800', color: Colors.ink, fontVariant: ['tabular-nums'] },
+  kpiNumber: { fontSize: 22, fontWeight: '700', color: Colors.ink, fontVariant: ['tabular-nums'] },
   mapLayout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 12 },
   mapColumn: { flexBasis: 510, flexGrow: 3, flexShrink: 1, minWidth: 0 },
   mapActions: { flexBasis: 260, flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 10 },
@@ -1071,7 +1046,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
-  routeIconCircle: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.actionTint, alignItems: 'center', justifyContent: 'center' },
   initialsCircle: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.mutedBackground, alignItems: 'center', justifyContent: 'center' },
   initialsText: { fontSize: 14, fontWeight: '800', color: Colors.ink },
   rowTitle: {
@@ -1156,7 +1130,7 @@ const styles = StyleSheet.create({
   primaryBtn: {
     minHeight: 48,
     borderRadius: 8,
-    backgroundColor: Colors.action,
+    backgroundColor: Colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,

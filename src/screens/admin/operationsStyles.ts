@@ -1,44 +1,26 @@
 import { StyleSheet } from 'react-native';
 import { Colors } from '../../constants/theme';
+import { transitStyles } from '../../constants/transitStyles';
 
 export const operationsStyles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: Colors.canvas },
+  page: transitStyles.page,
   content: {
-    alignSelf: 'center',
-    width: '100%',
+    ...transitStyles.content,
     maxWidth: 1024,
-    padding: 16,
-    paddingBottom: 32,
-    gap: 12,
   },
   masthead: {
+    ...transitStyles.masthead,
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    backgroundColor: Colors.midnight,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.signal,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
   },
-  mastheadTitle: {
-    color: Colors.onDark,
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.6,
-  },
-  mastheadMeta: { color: Colors.onDarkMuted, fontSize: 14, fontWeight: '600' },
-  panel: {
-    backgroundColor: Colors.paper,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-  },
+  mastheadTitle: transitStyles.heading,
+  mastheadMeta: transitStyles.description,
+  panel: transitStyles.panel,
   toolbar: { gap: 8, padding: 12 },
-  segmentBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  segmentBar: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, gap: 4, borderRadius: 10, backgroundColor: Colors.mutedBackground },
   segmentBtn: {
     flexGrow: 1,
     minHeight: 44,
@@ -46,12 +28,11 @@ export const operationsStyles = StyleSheet.create({
     paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 5,
-    backgroundColor: Colors.mutedBackground,
+    borderRadius: 7,
   },
-  segmentBtnActive: { backgroundColor: Colors.action },
+  segmentBtnActive: transitStyles.selected,
   segmentText: { color: Colors.ink, fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  segmentTextActive: { color: Colors.onDark, fontWeight: '700' },
+  segmentTextActive: transitStyles.selectedText,
   emptyState: { padding: 16, color: Colors.subtleGray, fontSize: 14 },
   errorBanner: {
     padding: 12,

@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/theme';
+import { transitStyles } from '../constants/transitStyles';
 
 export function PassengerSelect({
   label,
@@ -24,18 +25,18 @@ export function PassengerSelect({
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityLabel={label || 'Select option'}
-        accessibilityState={{ expanded: open, disabled }}
+        accessibilityValue={{ text: selectedLabel || 'Choose an option' }}
+        accessibilityState={{ expanded: open && !disabled, disabled }}
         disabled={disabled}
         onPress={() => setOpen(!open)}
         style={[
           passengerStyles.input,
           { flexDirection: 'row', alignItems: 'center', gap: 10 },
-          open && { borderColor: Colors.action, backgroundColor: Colors.paper },
+          open && { borderColor: Colors.brandGreen },
           disabled && { opacity: 0.6 },
         ]}
       >
         <Text
-          numberOfLines={1}
           style={[
             passengerStyles.body,
             { flex: 1, minWidth: 0, fontWeight: '600', color: selectedLabel ? Colors.ink : Colors.subtleGray },
@@ -45,7 +46,7 @@ export function PassengerSelect({
         </Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
       </TouchableOpacity>
-      {open && (
+      {open && !disabled && (
         <ScrollView
           style={{
             maxHeight: 240,
@@ -73,7 +74,7 @@ export function PassengerSelect({
                   paddingHorizontal: 14,
                   paddingVertical: 13,
                   minHeight: 48,
-                  backgroundColor: isSelected ? Colors.actionTint : Colors.paper,
+                  backgroundColor: isSelected ? Colors.paleGreen : Colors.paper,
                   opacity: o.disabled ? 0.55 : 1,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -90,7 +91,7 @@ export function PassengerSelect({
                 >
                   {o.label}
                 </Text>
-                {isSelected && <Ionicons name="checkmark-circle" color={Colors.action} size={20} />}
+                {isSelected && <Ionicons aria-hidden name="checkmark-circle" color={Colors.brandGreen} size={20} />}
               </TouchableOpacity>
             );
           })}
@@ -101,27 +102,17 @@ export function PassengerSelect({
 }
 
 export const passengerStyles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.canvas },
-  content: { width: '100%', maxWidth: 920, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40, gap: 16 },
-  heroBanner: {
-    backgroundColor: Colors.paper,
-    borderRadius: 10,
-    padding: 16,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
+  screen: transitStyles.page,
+  content: { ...transitStyles.content, maxWidth: 920 },
+  heroBanner: transitStyles.masthead,
   eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: Colors.action },
   title: { fontSize: 32, fontWeight: '800', letterSpacing: -0.95, color: Colors.ink },
-  heroTitle: { fontSize: 32, fontWeight: '800', letterSpacing: -0.95, color: Colors.ink },
+  heroTitle: transitStyles.heading,
   subtitle: { fontSize: 15, lineHeight: 21, color: Colors.subtleGray, marginTop: 2 },
-  heroSubtitle: { fontSize: 15, lineHeight: 21, color: Colors.subtleGray, marginTop: 2 },
+  heroSubtitle: transitStyles.description,
   section: {
-    backgroundColor: Colors.paper,
+    ...transitStyles.panel,
     padding: 18,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
     gap: 12,
   },
   sectionTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.45, color: Colors.ink },
@@ -140,29 +131,11 @@ export const passengerStyles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.ink,
   },
-  button: {
-    minHeight: 50,
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.action,
-  },
-  buttonMint: {
-    minHeight: 50,
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.action,
-  },
-  buttonText: { fontSize: 16, fontWeight: '700', color: Colors.white },
+  button: transitStyles.primaryButton,
+  buttonMint: transitStyles.primaryButton,
+  buttonText: transitStyles.primaryText,
+  selected: transitStyles.selected,
+  selectedText: transitStyles.selectedText,
   secondary: { backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border },
   pill: {
     flexDirection: 'row',
@@ -184,5 +157,5 @@ export const passengerStyles = StyleSheet.create({
   },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' },
   divider: { height: 1, backgroundColor: Colors.border },
-  link: { fontSize: 14, fontWeight: '700', color: Colors.action },
+  link: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
 });
