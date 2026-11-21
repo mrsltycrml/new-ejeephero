@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,22 +11,40 @@ export function PassengerSelect({
   options,
   onSelect,
   disabled = false,
+  inline = false,
+  emptyLabel,
 }: {
   label: string;
   value: string;
   options: { value: string; label: string; disabled?: boolean }[];
   onSelect: (id: string) => void;
   disabled?: boolean;
+  inline?: boolean;
+  emptyLabel?: string;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
   const selectedLabel = options.find((o) => o.value === value)?.label;
+  const choices = (inline || open) && options.map(o => {
+    const selected = o.value === value;
+    return <TouchableOpacity key={o.value} accessibilityRole="button" accessibilityLabel={o.label}
+      accessibilityState={{ selected, disabled: disabled || !!o.disabled }} disabled={disabled || o.disabled}
+      onPress={() => { onSelect(o.value); setOpen(false); }}
+      style={[passengerStyles.input, { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, flexShrink: 1 },
+        selected && passengerStyles.selected, (disabled || o.disabled) && { opacity: 0.55 }]}>
+      <Text style={[passengerStyles.label, { flexShrink: 1 }, selected && passengerStyles.selectedText]}>{o.label}</Text>
+      {selected && <Ionicons aria-hidden name="checkmark" size={16} color={Colors.ink} />}
+    </TouchableOpacity>;
+  });
   return (
     <View style={{ gap: 6, flexShrink: 1, minWidth: 0, width: '100%' }}>
       {!!label && <Text style={passengerStyles.label}>{label}</Text>}
+      {!options.length ? <Text accessibilityLiveRegion="polite" style={passengerStyles.muted}>{emptyLabel ?? t('passenger.select.noOptions')}</Text>
+        : inline ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{choices}</View> : <>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel={label || 'Select option'}
-        accessibilityValue={{ text: selectedLabel || 'Choose an option' }}
+        accessibilityLabel={label || t('passenger.select.select')}
+        accessibilityValue={{ text: selectedLabel || t('passenger.select.choose') }}
         accessibilityState={{ expanded: open && !disabled, disabled }}
         disabled={disabled}
         onPress={() => setOpen(!open)}
@@ -42,7 +61,7 @@ export function PassengerSelect({
             { flex: 1, minWidth: 0, fontWeight: '600', color: selectedLabel ? Colors.ink : Colors.subtleGray },
           ]}
         >
-          {selectedLabel || 'Choose an option'}
+          {selectedLabel || t('passenger.select.choose')}
         </Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
       </TouchableOpacity>
@@ -56,47 +75,12 @@ export function PassengerSelect({
             backgroundColor: Colors.paper,
           }}
           nestedScrollEnabled
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
         >
-          {options.map((o) => {
-            const isSelected = value === o.value;
-            return (
-              <TouchableOpacity
-                key={o.value}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isSelected, disabled: o.disabled }}
-                disabled={o.disabled}
-                onPress={() => {
-                  onSelect(o.value);
-                  setOpen(false);
-                }}
-                style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 13,
-                  minHeight: 48,
-                  backgroundColor: isSelected ? Colors.paleGreen : Colors.paper,
-                  opacity: o.disabled ? 0.55 : 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 10,
-                  borderBottomWidth: 1,
-                  borderBottomColor: Colors.border,
-                }}
-              >
-                <Text
-                  style={[
-                    passengerStyles.body,
-                    { flex: 1, fontWeight: isSelected ? '700' : '500', color: Colors.ink },
-                  ]}
-                >
-                  {o.label}
-                </Text>
-                {isSelected && <Ionicons aria-hidden name="checkmark-circle" color={Colors.brandGreen} size={20} />}
-              </TouchableOpacity>
-            );
-          })}
+          {choices}
         </ScrollView>
       )}
+      </>}
     </View>
   );
 }

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
 
 export default function ServiceAccountMenu({ open, onClose, onProfile, onAbout }: { open: boolean; onClose: () => void; onProfile: () => void; onAbout?: () => void }) {
+  const { t } = useTranslation();
   const { user, fullName, signOut } = useAuth();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -15,16 +17,16 @@ export default function ServiceAccountMenu({ open, onClose, onProfile, onAbout }
 
   const logOut = () => {
     close();
-    void signOut().catch(() => Alert.alert('Could not sign out', 'Please try again.'));
+    void signOut().catch(() => Alert.alert(t('passenger.menu.logoutError'), t('passenger.menu.retry')));
   };
 
   return <View style={styles.layer}>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close account menu" onPress={close} style={styles.backdrop} />
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.menu.close')} onPress={close} style={styles.backdrop} />
     <View style={[styles.menu, { top: 58 + insets.top, width: Math.min(300, width - 24) }]}>
-      <View style={styles.identity}><View style={styles.avatar}><Ionicons name="person-outline" size={20} color={Colors.action} /></View><View style={styles.identityText}><Text style={styles.name} numberOfLines={1}>{fullName || 'Your account'}</Text><Text style={styles.email} numberOfLines={2}>{user?.email || ''}</Text></View></View>
-      <TouchableOpacity accessibilityRole="button" onPress={() => { close(); onProfile(); }} style={styles.action}><Ionicons name="person-circle-outline" size={20} color={Colors.ink} /><Text style={styles.actionText}>Profile</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>
-      {onAbout && <TouchableOpacity accessibilityRole="button" onPress={() => { close(); onAbout(); }} style={styles.action}><Ionicons name="information-circle-outline" size={20} color={Colors.ink} /><Text style={styles.actionText}>About eSAKAY</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>}
-      {confirmLogout ? <View style={styles.confirmBox}><Text style={styles.confirmTitle}>Sign out of eSAKAY?</Text><View style={styles.confirmRow}><TouchableOpacity accessibilityRole="button" onPress={logOut} style={styles.confirmDanger}><Text style={styles.confirmDangerText}>Sign out</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(false)} style={styles.confirmCancel}><Text style={styles.actionText}>Cancel</Text></TouchableOpacity></View></View> : <TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(true)} style={styles.action}><Ionicons name="log-out-outline" size={20} color={Colors.action} /><Text style={[styles.actionText, styles.logout]}>Sign out</Text></TouchableOpacity>}
+      <View style={styles.identity}><View style={styles.avatar}><Ionicons name="person-outline" size={20} color={Colors.action} /></View><View style={styles.identityText}><Text style={styles.name} numberOfLines={1}>{fullName || t('passenger.menu.account')}</Text><Text style={styles.email} numberOfLines={2}>{user?.email || ''}</Text></View></View>
+      <TouchableOpacity accessibilityRole="button" onPress={() => { close(); onProfile(); }} style={styles.action}><Ionicons name="person-circle-outline" size={20} color={Colors.ink} /><Text style={styles.actionText}>{t('passenger.nav.profile')}</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>
+      {onAbout && <TouchableOpacity accessibilityRole="button" onPress={() => { close(); onAbout(); }} style={styles.action}><Ionicons name="information-circle-outline" size={20} color={Colors.ink} /><Text style={styles.actionText}>{t('passenger.nav.about')}</Text><Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} /></TouchableOpacity>}
+      {confirmLogout ? <View style={styles.confirmBox}><Text style={styles.confirmTitle}>{t('passenger.menu.confirmLogout')}</Text><View style={styles.confirmRow}><TouchableOpacity accessibilityRole="button" onPress={logOut} style={styles.confirmDanger}><Text style={styles.confirmDangerText}>{t('passenger.menu.signOut')}</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(false)} style={styles.confirmCancel}><Text style={styles.actionText}>{t('common.cancel')}</Text></TouchableOpacity></View></View> : <TouchableOpacity accessibilityRole="button" onPress={() => setConfirmLogout(true)} style={styles.action}><Ionicons name="log-out-outline" size={20} color={Colors.action} /><Text style={[styles.actionText, styles.logout]}>{t('passenger.menu.signOut')}</Text></TouchableOpacity>}
     </View>
   </View>;
 }

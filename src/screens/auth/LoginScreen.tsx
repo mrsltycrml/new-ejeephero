@@ -20,14 +20,15 @@ type CredentialsProps = {
 };
 
 function Credentials({ email, password, onEmail, onPassword, onSubmit, onForgot, loading }: CredentialsProps) {
+  const { t } = useTranslation();
   return (
     <>
-      <AuthField label="Email address" placeholder="you@example.com" value={email} onChangeText={onEmail}
+      <AuthField label={t('passenger.authLogin.email')} placeholder="you@example.com" value={email} onChangeText={onEmail}
         autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
-      <AuthField label="Password" passwordToggle value={password} onChangeText={onPassword}
+      <AuthField label={t('passenger.authLogin.password')} passwordToggle value={password} onChangeText={onPassword}
         autoCapitalize="none" autoComplete="current-password" onSubmitEditing={loading ? undefined : onSubmit} />
-      <View style={styles.forgot}><AuthLink label="Forgot password?" onPress={onForgot} /></View>
-      <AuthAction label="Sign in" loading={loading} onPress={onSubmit} />
+      <View style={styles.forgot}><AuthLink label={t('passenger.authLogin.forgot')} onPress={onForgot} /></View>
+      <AuthAction label={t('passenger.authLogin.signIn')} loading={loading} onPress={onSubmit} />
     </>
   );
 }
@@ -70,7 +71,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
       if (!isLoaded || !signIn) {
         const legacyOk = await tryLegacySupabaseSignIn(normalizedEmail, password);
         if (legacyOk) return;
-        setErrorMessage('Authentication service is still initializing. Please try again in a moment.');
+        setErrorMessage(t('passenger.authLogin.initializing'));
         return;
       }
 
@@ -86,7 +87,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
       if (attempt.status === 'needs_second_factor') {
         await signIn.prepareSecondFactor({ strategy: 'email_code' } as any);
         setPendingFactor('second');
-        setStatusMessage(`Enter the 6-digit verification code sent to ${normalizedEmail} for this new device.`);
+        setStatusMessage(t('passenger.authLogin.newDeviceCode', { email: normalizedEmail }));
       } else if (attempt.status === 'needs_first_factor') {
         const emailFactor = (attempt.supportedFirstFactors as any[])?.find((f) => f.strategy === 'email_code');
         if (emailFactor?.emailAddressId) {
@@ -95,15 +96,15 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
             emailAddressId: emailFactor.emailAddressId,
           });
           setPendingFactor('first');
-          setStatusMessage(`Enter the 6-digit verification code sent to ${normalizedEmail}.`);
+          setStatusMessage(t('passenger.authLogin.enterCode', { email: normalizedEmail }));
         } else {
           setErrorMessage(
-            'Additional verification is required. Please use Forgot password to verify your email with a 6-digit code.'
+            t('passenger.authLogin.verifyReset')
           );
         }
       } else {
         setErrorMessage(
-          'Additional verification is required. Please use Forgot password to verify your email with a 6-digit code.'
+          t('passenger.authLogin.verifyReset')
         );
       }
     } catch (err: any) {
@@ -114,7 +115,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
         err?.errors?.[0]?.longMessage ||
         err?.errors?.[0]?.message ||
         err?.message ||
-        'Unable to sign in. Check your email and password.';
+        t('passenger.authLogin.failed');
       setErrorMessage(msg);
     } finally {
       setLoading(false);
@@ -126,7 +127,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
     if (!isLoaded || !signIn) return;
     const cleanCode = code.replace(/\s+/g, '');
     if (!cleanCode) {
-      setErrorMessage('Please enter the 6-digit verification code.');
+      setErrorMessage(t('passenger.authLogin.codeRequired'));
       return;
     }
     setLoading(true);
@@ -138,14 +139,14 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
       } else {
-        setErrorMessage('Verification incomplete. Please double-check the 6-digit code.');
+        setErrorMessage(t('passenger.authLogin.incomplete'));
       }
     } catch (err: any) {
       const msg =
         err?.errors?.[0]?.longMessage ||
         err?.errors?.[0]?.message ||
         err?.message ||
-        'Invalid or expired verification code.';
+        t('passenger.authLogin.codeInvalid');
       setErrorMessage(msg);
     } finally {
       setLoading(false);
@@ -157,12 +158,12 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
       <View style={authStyles.form}>
         <AuthNotice message={statusMessage} />
         <AuthNotice message={errorMessage} error />
-        <AuthField label="Verification code" style={authStyles.code} keyboardType="number-pad"
+        <AuthField label={t('passenger.authLogin.code')} style={authStyles.code} keyboardType="number-pad"
           autoComplete="one-time-code" maxLength={6} autoFocus value={code}
           onSubmitEditing={loading ? undefined : handleVerifySignInCode}
           onChangeText={value => { setCode(value); if (errorMessage) setErrorMessage(''); }} />
-        <AuthAction label="Verify & sign in" onPress={handleVerifySignInCode} loading={loading} />
-        <AuthLink label="Back to sign in" onPress={() => {
+        <AuthAction label={t('passenger.authLogin.verify')} onPress={handleVerifySignInCode} loading={loading} />
+        <AuthLink label={t('passenger.authLogin.back')} onPress={() => {
           setPendingFactor(null);
           setCode('');
           setErrorMessage('');
@@ -177,7 +178,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
       {!isLoaded && (
         <View style={styles.connecting} accessibilityLiveRegion="polite">
           <ActivityIndicator size="small" color={Colors.action} />
-          <Text style={authStyles.body}>Connecting to secure sign-in…</Text>
+          <Text style={authStyles.body}>{t('passenger.authLogin.connecting')}</Text>
         </View>
       )}
       <Credentials email={email} password={password} loading={loading}
@@ -207,14 +208,14 @@ function SupabaseSignInForm({ navigation }: { navigation: any }) {
       if (error) {
         const message = error.message.toLowerCase();
         const guidance = message.includes('email not confirmed')
-          ? 'Confirm your email using the link we sent, then try again.'
+          ? t('passenger.authLogin.confirmEmail')
           : message.includes('invalid login credentials')
-            ? 'Check your email and password. If you have not registered yet, create an account first.'
+            ? t('passenger.authLogin.checkCredentials')
             : error.message;
         setErrorMessage(guidance);
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Check your connection and try again.');
+      setErrorMessage(error instanceof Error ? error.message : t('passenger.authLogin.connection'));
     } finally {
       setLoading(false);
     }
@@ -230,18 +231,19 @@ function SupabaseSignInForm({ navigation }: { navigation: any }) {
 }
 
 export default function LoginScreen({ navigation }: any) {
+  const { t } = useTranslation();
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   return (
-    <AuthPage title="Welcome back" subtitle="Sign in to your eSAKAY account.">
+    <AuthPage title={t('passenger.authLogin.welcome')} subtitle={t('passenger.authLogin.subtitle')}>
       {isClerkConfigured ? <ClerkSignInForm navigation={navigation} /> : <SupabaseSignInForm navigation={navigation} />}
       <View style={authStyles.footer}>
         <View style={authStyles.links}>
-          <Text style={authStyles.body}>New to eSAKAY?</Text>
-          <AuthLink label="Create account" onPress={() => navigation.navigate('Register')} />
+          <Text style={authStyles.body}>{t('passenger.authLogin.newHere')}</Text>
+          <AuthLink label={t('passenger.authLogin.create')} onPress={() => navigation.navigate('Register')} />
         </View>
         <TouchableOpacity accessibilityRole="button" onPress={() => setDownloadModalVisible(true)} style={styles.install}>
           <Ionicons aria-hidden name="phone-portrait-outline" size={20} color={Colors.ink} />
-          <Text style={styles.installText}>Install eSAKAY on your phone</Text>
+          <Text style={styles.installText}>{t('passenger.authLogin.install')}</Text>
           <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
         </TouchableOpacity>
       </View>

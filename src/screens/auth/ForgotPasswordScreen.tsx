@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSignIn } from '@clerk/clerk-expo';
@@ -6,6 +7,7 @@ import { isClerkConfigured } from '../../lib/clerk';
 import { AuthAction, AuthField, AuthLink, AuthNotice, AuthPage, authStyles } from './AuthUI';
 
 function ClerkForgotPasswordContent() {
+  const { t } = useTranslation();
   const { isLoaded, signIn, setActive } = useSignIn();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -20,11 +22,11 @@ function ClerkForgotPasswordContent() {
     setInfoMessage('');
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) {
-      setErrorMessage('Please enter your registered email address.');
+      setErrorMessage(t('passenger.authReset.registeredEmail'));
       return;
     }
     if (!isLoaded || !signIn) {
-      setErrorMessage('Authentication service is still initializing. Please try again in a moment.');
+      setErrorMessage(t('passenger.authLogin.initializing'));
       return;
     }
 
@@ -35,9 +37,9 @@ function ClerkForgotPasswordContent() {
         identifier: trimmedEmail,
       });
       setStep('verify');
-      setInfoMessage(`Sent a 6-digit password reset code to ${trimmedEmail}.`);
+      setInfoMessage(t('passenger.authReset.sent', { email: trimmedEmail }));
     } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage || err?.message || 'Unable to send reset code.';
+      const msg = err?.errors?.[0]?.longMessage || err?.message || t('passenger.authReset.failed');
       setErrorMessage(msg);
     } finally {
       setLoading(false);
@@ -48,11 +50,11 @@ function ClerkForgotPasswordContent() {
     setErrorMessage('');
     setInfoMessage('');
     if (!code.trim() || !newPassword) {
-      setErrorMessage('Please enter both the 6-digit verification code and your new password.');
+      setErrorMessage(t('passenger.authReset.bothRequired'));
       return;
     }
     if (newPassword.length < 15) {
-      setErrorMessage(`Please choose a password with at least 15 characters (currently ${newPassword.length}/15).`);
+      setErrorMessage(t('passenger.authReset.length', { length: newPassword.length }));
       return;
     }
     if (!isLoaded || !signIn) return;
@@ -67,10 +69,10 @@ function ClerkForgotPasswordContent() {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
       } else {
-        setErrorMessage('Additional verification step required. Check your email and try again.');
+        setErrorMessage(t('passenger.authReset.moreVerification'));
       }
     } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage || err?.message || 'Invalid code or password.';
+      const msg = err?.errors?.[0]?.longMessage || err?.message || t('passenger.authReset.invalid');
       setErrorMessage(msg);
     } finally {
       setLoading(false);
@@ -83,22 +85,22 @@ function ClerkForgotPasswordContent() {
       <AuthNotice message={infoMessage} />
       {step === 'request' ? (
         <>
-          <Text style={authStyles.body}>Enter your account email to receive a six-digit reset code.</Text>
-          <AuthField label="Email address" placeholder="you@example.com" value={email} onChangeText={setEmail}
+          <Text style={authStyles.body}>{t('passenger.authReset.requestCode')}</Text>
+          <AuthField label={t('passenger.authLogin.email')} placeholder="you@example.com" value={email} onChangeText={setEmail}
             autoCapitalize="none" autoComplete="email" keyboardType="email-address"
             onSubmitEditing={loading ? undefined : handleRequestReset} />
-          <AuthAction label="Send reset code" onPress={handleRequestReset} loading={loading} />
+          <AuthAction label={t('passenger.authReset.sendCode')} onPress={handleRequestReset} loading={loading} />
         </>
       ) : (
         <>
-          {!infoMessage && <Text style={authStyles.body}>Enter the code sent to {email.trim().toLowerCase()}.</Text>}
-          <AuthField key="reset-code" label="Verification code" style={authStyles.code} value={code}
+          {!infoMessage && <Text style={authStyles.body}>{t('passenger.authSignup.enterCode', { email: email.trim().toLowerCase() })}</Text>}
+          <AuthField key="reset-code" label={t('passenger.authLogin.code')} style={authStyles.code} value={code}
             onChangeText={setCode} autoComplete="one-time-code" keyboardType="number-pad" autoFocus />
-          <AuthField label="New password" value={newPassword} onChangeText={setNewPassword}
-            passwordToggle autoComplete="new-password" autoCapitalize="none" placeholder="At least 15 characters"
+          <AuthField label={t('passenger.authReset.newPassword')} value={newPassword} onChangeText={setNewPassword}
+            passwordToggle autoComplete="new-password" autoCapitalize="none" placeholder={t('passenger.authReset.minimum')}
             onSubmitEditing={loading ? undefined : handleVerifyReset} />
-          <AuthAction label="Verify & reset password" loading={loading} onPress={handleVerifyReset} />
-          <AuthLink label="Resend code or change email" onPress={() => {
+          <AuthAction label={t('passenger.authReset.verify')} loading={loading} onPress={handleVerifyReset} />
+          <AuthLink label={t('passenger.authReset.retryEmail')} onPress={() => {
             setStep('request');
             setErrorMessage('');
             setInfoMessage('');
@@ -110,6 +112,7 @@ function ClerkForgotPasswordContent() {
 }
 
 function SupabaseForgotPasswordContent() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -120,7 +123,7 @@ function SupabaseForgotPasswordContent() {
     setInfoMessage('');
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setErrorMessage('Please enter your registered email address.');
+      setErrorMessage(t('passenger.authReset.registeredEmail'));
       return;
     }
     setLoading(true);
@@ -129,10 +132,10 @@ function SupabaseForgotPasswordContent() {
       if (error) {
         setErrorMessage(error.message);
       } else {
-        setInfoMessage(`Check ${trimmedEmail} for a password recovery link.`);
+        setInfoMessage(t('passenger.authReset.checkEmail', { email: trimmedEmail }));
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Unable to send password reset email.');
+      setErrorMessage(err?.message || t('passenger.authReset.unable'));
     } finally {
       setLoading(false);
     }
@@ -142,17 +145,18 @@ function SupabaseForgotPasswordContent() {
     <View style={authStyles.form}>
       <AuthNotice message={errorMessage} error />
       <AuthNotice message={infoMessage} />
-      <Text style={authStyles.body}>Enter your account email to receive a password reset link.</Text>
-      <AuthField label="Email address" placeholder="you@example.com" value={email} onChangeText={setEmail}
+      <Text style={authStyles.body}>{t('passenger.authReset.requestLink')}</Text>
+      <AuthField label={t('passenger.authLogin.email')} placeholder="you@example.com" value={email} onChangeText={setEmail}
         autoCapitalize="none" keyboardType="email-address" autoComplete="email" onSubmitEditing={loading ? undefined : handleReset} />
-      <AuthAction label="Send password reset email" onPress={handleReset} loading={loading} />
+      <AuthAction label={t('passenger.authReset.sendLink')} onPress={handleReset} loading={loading} />
     </View>
   );
 }
 
 export default function ForgotPasswordScreen({ navigation }: any) {
+  const { t } = useTranslation();
   return (
-    <AuthPage title="Reset your password" onBack={() => navigation.goBack()}>
+    <AuthPage title={t('passenger.authReset.title')} onBack={() => navigation.goBack()}>
       {isClerkConfigured ? <ClerkForgotPasswordContent /> : <SupabaseForgotPasswordContent />}
     </AuthPage>
   );

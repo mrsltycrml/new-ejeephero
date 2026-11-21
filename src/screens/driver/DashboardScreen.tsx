@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Platform,
@@ -14,7 +15,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from '../../contexts/LocationContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { locationDescription, locationQuality, type MeasuredFix } from '../../services/locationQuality';
+import { driverSpeed, LIVE_FIX_MS, locationQuality, type MeasuredFix } from '../../services/locationQuality';
 import { startAnomalyDetection, stopAnomalyDetection } from '../../services/anomalyDetector';
 import {
   offlineTransit,
@@ -33,6 +34,7 @@ import { loadActiveFleetUnits } from '../../services/fleetRegistryService';
 type ShiftUnit = { bodyNumber: string; plateNumber: string; busyElsewhere?: boolean };
 
 export default function DashboardScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();
   const { fix, now, foreground, errorMsg: locationError, enableLocation } = location;
@@ -67,7 +69,7 @@ export default function DashboardScreen() {
   const [shiftError, setShiftError] = useState('');
   const [starting, setStarting] = useState(false);
   const [closingUnconfirmed, setClosingUnconfirmed] = useState(false);
-  const [currentPosition, setCurrentPosition] = useState<MeasuredFix | null>(null);
+  const trail = useRef<{ vehicleId: string; points: MeasuredFix[] } | null>(null);
   const [publishedAt, setPublishedAt] = useState<number | null>(null);
   const [passengerCount, setPassengerCount] = useState<number | null>(null);
   const [savingPassengerCount, setSavingPassengerCount] = useState(false);
@@ -133,8 +135,15 @@ export default function DashboardScreen() {
     return () => { activeVehicle.current = null; };
   }, [isActive, vehicleId]);
   useEffect(() => {
+    if (!isActive || !vehicleId || !foreground || locationError || !fix || locationQuality(fix, now) !== 'live') {
+      trail.current = null;
+      return;
+    }
+    const points = trail.current?.vehicleId === vehicleId ? trail.current.points : [];
+    trail.current = { vehicleId, points: [...points.filter(point => point.timestamp < fix.timestamp && fix.timestamp - point.timestamp <= LIVE_FIX_MS), fix] };
+  }, [isActive, vehicleId, foreground, locationError, fix?.timestamp, fix?.accuracy, now]);
+  useEffect(() => {
     if (!isActive || !vehicleId || !fix || !foreground) return;
-    setCurrentPosition(previous => !previous || fix.timestamp > previous.timestamp ? fix : previous);
     if (!selectedRoute || !canSharePosition || locationError || !isConnected || locationQuality(fix, now) !== 'live' || (publishedAt != null && publishedAt >= fix.timestamp) || publishing.current) return;
     publishing.current = true;
     void checkService().then(async ids => {
@@ -145,7 +154,7 @@ export default function DashboardScreen() {
       await offlineTransit.publishPosition(vehicleId, measured);
       if (activeVehicle.current === vehicleId) { setPublishedAt(measured.timestamp); setTelemetryError(''); }
     }).catch(() => {
-      if (activeVehicle.current === vehicleId) setTelemetryError('Position was not published. Check connection and telemetry schema; retrying with fresh GPS.');
+      if (activeVehicle.current === vehicleId) setTelemetryError('shareFailed');
     }).finally(() => { publishing.current = false; });
   }, [isActive, vehicleId, selectedRoute, canSharePosition, fix?.timestamp, now, foreground, isConnected, locationError, publishedAt, checkService]);
 
@@ -252,8 +261,8 @@ export default function DashboardScreen() {
       startAnomalyDetection(data.id);
       try {
         await checkTrackingAccess('Allow location access to monitor this active shift.');
-      } catch (error) {
-        setTelemetryError(error instanceof Error ? error.message : 'GPS monitoring is paused.');
+      } catch {
+        setTelemetryError('locationHelp');
       }
     })();
     return () => {
@@ -296,7 +305,6 @@ export default function DashboardScreen() {
         if (error) throw new Error(error.message);
         stopAnomalyDetection();
         setVehicleId(null);
-        setCurrentPosition(null);
         setPublishedAt(null);
         setPassengerCount(0);
         setTelemetryError('');
@@ -357,7 +365,6 @@ export default function DashboardScreen() {
       const first = latestLocation.current;
       if (!first.foreground || first.errorMsg || !first.fix || locationQuality(first.fix) !== 'live') throw new Error('A fresh foreground GPS reading is required to start the shift.');
       await offlineTransit.publishPosition(newVehicleId, first.fix);
-      setCurrentPosition(first.fix);
       setPublishedAt(first.fix.timestamp);
       setVehicleId(newVehicleId);
       setPassengerCount(0);
@@ -390,8 +397,13 @@ export default function DashboardScreen() {
   };
 
   const currentRouteName = routes.find((r) => r.id === selectedRoute)?.name || 'Route unavailable';
-  const gpsUsable = foreground && !locationError && locationQuality(currentPosition, now) === 'live';
-  const currentSpeedKph = gpsUsable && currentPosition?.speed != null ? Math.round(currentPosition.speed) : null;
+  const currentPosition = isActive && foreground && !locationError ? fix : null;
+  const gpsUsable = locationQuality(currentPosition, now) === 'live';
+  const previous = trail.current?.vehicleId === vehicleId && currentPosition
+    ? trail.current?.points.find(point => point.timestamp < currentPosition.timestamp && locationQuality(point, now) === 'live') : null;
+  const speed = driverSpeed(previous ?? null, currentPosition, now);
+  const overLimit = speed && !speed.estimated && speed.kph > ESAKAY_OPERATIONS.operatorSpeedCapKph;
+  const speedText = speed ? `${Number(speed.kph.toFixed(1))} km/h` : t('passenger.driverSpeed.unavailable');
   const seatStatus = maxCapacity == null || passengerCount == null ? null :
     passengerCount >= maxCapacity
       ? 'Puno'
@@ -409,7 +421,7 @@ export default function DashboardScreen() {
           route_id: selectedRoute || '',
           latitude: currentPosition.latitude,
           longitude: currentPosition.longitude,
-          speed: currentSpeedKph,
+          speed: currentPosition.speed,
           heading: currentPosition.heading != null && currentPosition.heading >= 0 ? currentPosition.heading : null,
           accuracy: currentPosition.accuracy,
           recorded_at: new Date(currentPosition.timestamp).toISOString(),
@@ -610,6 +622,21 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           <View style={styles.trackingPanel}>
+            <View style={styles.telemetryGrid}>
+              <View style={styles.telemetryCol}>
+                <Text style={styles.telemetryLabel}>{t(speed?.estimated ? 'passenger.driverSpeed.estimate' : 'passenger.driverSpeed.speed')}</Text>
+                <Text style={[speed ? styles.telemetryValue : styles.telemetryUnit, overLimit && { color: Colors.primaryRed }]}>
+                  {speed ? speedText : t(gpsUsable ? 'passenger.driverSpeed.missing' : 'passenger.driverSpeed.waiting')}
+                </Text>
+              </View>
+              <View style={styles.telemetryDivider} />
+              <View style={styles.telemetryCol}>
+                <Text style={styles.telemetryLabel}>{t('passenger.driverSpeed.limit')}</Text>
+                <Text style={styles.telemetryValue}>{ESAKAY_OPERATIONS.operatorSpeedCapKph} <Text style={styles.telemetryUnit}>km/h</Text></Text>
+              </View>
+            </View>
+            {overLimit && <Text accessibilityRole="alert" style={styles.shiftError}>{t('passenger.driverSpeed.high')}</Text>}
+            {speed?.estimated && <Text style={styles.fieldHelper}>{t('passenger.driverSpeed.estimated')}</Text>}
             <View style={styles.mapFrame}>
               <LeafletMap
                 routes={routes}
@@ -623,44 +650,20 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.gpsCaption}>
               <Ionicons name="locate-outline" size={16} color={gpsUsable ? Colors.success : Colors.subtleGray} />
-              <Text style={styles.gpsText}>{locationDescription(currentPosition, now)}</Text>
+              <Text style={styles.gpsText}>{gpsUsable && currentPosition ? t('passenger.driverSpeed.precision', { meters: Math.round(currentPosition.accuracy!) }) : t('passenger.driverSpeed.waiting')}</Text>
             </View>
 
-            <Text style={styles.fieldHelper}>Foreground only. Background or a locked screen can pause tracking.</Text>
-            <Text style={styles.fieldHelper}>{!isConnected ? 'Offline — position is not shared.' : publishedAt ? `Last shared measurement: ${new Date(publishedAt).toLocaleTimeString()} (${Math.max(0, Math.floor((now - publishedAt) / 1000))}s ago)` : 'No position published yet.'}</Text>
+            <Text style={styles.fieldHelper}>{t('passenger.driverSpeed.keepOpen')}</Text>
+            <Text style={styles.fieldHelper}>{!isConnected ? t('passenger.driverSpeed.offline') : publishedAt ? t('passenger.driverSpeed.shared', { time: new Date(publishedAt).toLocaleTimeString() }) : t('passenger.driverSpeed.notShared')}</Text>
             {(!!telemetryError || !!locationError) && (
               <Text accessibilityRole="alert" style={styles.shiftError}>
-                {locationError || telemetryError}
+                {t('passenger.driverSpeed.' + (locationError ? 'locationHelp' : telemetryError))}
               </Text>
             )}
             {!routeInService && <Text accessibilityRole="alert" style={styles.shiftError}>{selectedRoute && serviceIds && !serviceIds.has(selectedRoute)
-              ? 'This shift’s route is out of service. GPS sharing is paused. You can end the shift.'
-              : 'Route service is unconfirmed. GPS sharing is paused. You can end the shift.'}</Text>}
-            {(!!locationError || (foreground && locationQuality(fix, now) !== 'live')) && <TouchableOpacity accessibilityRole="button" onPress={requestLocationPerm} style={styles.keepActiveBtn}><Text style={styles.keepActiveText}>Enable location / retry</Text></TouchableOpacity>}
+              ? t('passenger.driverSpeed.routeClosed') : t('passenger.driverSpeed.routeUnknown')}</Text>}
+            {(!!locationError || (foreground && locationQuality(fix, now) !== 'live')) && <TouchableOpacity accessibilityRole="button" onPress={requestLocationPerm} style={styles.keepActiveBtn}><Text style={styles.keepActiveText}>{t('passenger.driverSpeed.retry')}</Text></TouchableOpacity>}
 
-            {/* 2-Column Telemetry */}
-            <View style={styles.telemetryGrid}>
-              <View style={styles.telemetryCol}>
-                <Text style={styles.telemetryLabel}>Current speed</Text>
-                <Text
-                  style={[
-                    styles.telemetryValue,
-                    currentSpeedKph != null && currentSpeedKph > ESAKAY_OPERATIONS.operatorSpeedCapKph && { color: Colors.primaryRed },
-                  ]}
-                >
-                  {currentSpeedKph == null ? <Text style={styles.telemetryUnit}>Unavailable</Text> : <>{currentSpeedKph} <Text style={styles.telemetryUnit}>km/h</Text></>}
-                </Text>
-              </View>
-              <View style={styles.telemetryDivider} />
-              <View style={styles.telemetryCol}>
-                <Text style={styles.telemetryLabel}>Operator cap</Text>
-                <Text style={styles.telemetryValue}>
-                  {ESAKAY_OPERATIONS.operatorSpeedCapKph} <Text style={styles.telemetryUnit}>km/h</Text>
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.fieldHelper}>Route adherence unverified</Text>
           </View>
 
           {!!shiftError && (
@@ -776,8 +779,8 @@ export default function DashboardScreen() {
             <Text style={styles.summaryValue}>{shiftStartedAt}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Current speed</Text>
-            <Text style={styles.summaryValue}>{currentSpeedKph == null ? 'Unavailable' : `${currentSpeedKph} km/h`}</Text>
+            <Text style={styles.summaryLabel}>{t(speed?.estimated ? 'passenger.driverSpeed.estimate' : 'passenger.driverSpeed.speed')}</Text>
+            <Text style={styles.summaryValue}>{speedText}</Text>
           </View>
         </View>
 

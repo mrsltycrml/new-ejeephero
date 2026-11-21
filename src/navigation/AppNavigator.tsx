@@ -1,6 +1,8 @@
 import { loadAdminOperations } from '../services/adminOperationsService';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Keyboard, Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitch from '../components/LanguageSwitch';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenSkeleton } from '../components/AppUI';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -101,6 +103,8 @@ function HeaderButton({ label, icon, expanded, onPress, count = 0 }: {
 }
 
 const PassengerTabs = ({ navigation: stackNavigation }: any) => {
+  const { t } = useTranslation();
+  const { width } = useWindowDimensions();
   const tabOptions = useTabOptions();
   const [accountOpen, setAccountOpen] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
@@ -108,18 +112,20 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
     <View style={{ flex: 1, backgroundColor: Colors.paper }}>
       <Tab.Navigator
         safeAreaInsets={tabInsets}
+        screenListeners={{ tabPress: () => Keyboard.dismiss() }}
         screenOptions={({ navigation }) => ({
           ...tabOptions,
           headerTitle: () => (
-            <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}>
-              <ESakayLogo compact roleLabel="Passenger" color={Colors.onDark} />
+            <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel={t('passenger.nav.goMap')} onPress={() => navigation.navigate('Map')}>
+              <ESakayLogo compact roleLabel={width >= 395 ? t('passenger.nav.passenger') : undefined} color={Colors.onDark} />
             </TouchableOpacity>
           ),
           headerRight: () => (
             <View style={styles.headerActions}>
-              <HeaderButton label="Boarding notices" icon="notifications-outline" expanded={noticesOpen}
+              <LanguageSwitch />
+              <HeaderButton label={t('passenger.notice.title')} icon="notifications-outline" expanded={noticesOpen}
                 onPress={() => { setAccountOpen(false); setNoticesOpen(value => !value); }} />
-              <HeaderButton label="Open account menu" icon="person-outline" expanded={accountOpen}
+              <HeaderButton label={t('passenger.nav.accountMenu')} icon="person-outline" expanded={accountOpen}
                 onPress={() => { setNoticesOpen(false); setAccountOpen(value => !value); }} />
             </View>
           ),
@@ -129,7 +135,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           name="Map"
           component={PassengerHomeScreen}
           options={{
-            title: 'Map',
+            title: t('passenger.nav.map'),
             tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'location' : 'location-outline'} size={21} color={color} />,
           }}
         />
@@ -137,7 +143,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           name="Fares"
           component={FareScreen}
           options={{
-            title: 'Fare',
+            title: t('passenger.nav.fare'),
             tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'ticket' : 'ticket-outline'} size={21} color={color} />,
           }}
         />
@@ -145,7 +151,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           name="Safety"
           component={SafetyScreen}
           options={{
-            title: 'Safety',
+            title: t('passenger.nav.safety'),
             tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={21} color={color} />,
           }}
         />
@@ -153,7 +159,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           name="More"
           component={MoreScreen}
           options={{
-            title: 'More',
+            title: t('passenger.nav.more'),
             tabBarIcon: ({ color }) => <Ionicons name="ellipsis-horizontal" size={21} color={color} />,
           }}
         />
@@ -233,18 +239,21 @@ const stackScreenOptions = {
   headerTitleStyle: { fontWeight: '700' as const, fontSize: 18, color: Colors.onDark },
 };
 
-const PassengerStack = () => (
+const PassengerStack = () => {
+  const { t } = useTranslation();
+  return (
   <PassengerJourneyProvider>
     <Stack.Navigator screenOptions={stackScreenOptions}>
       <Stack.Screen name="PassengerTabs" component={PassengerTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="PassengerProfile" component={ProfileScreen} options={{ title: 'Profile' }} />
-      <Stack.Screen name="PassengerDirectory" component={DirectoryScreen} options={{ title: 'Route directory' }} />
-      <Stack.Screen name="PassengerAbout" component={AboutScreen} options={{ title: 'About eSAKAY' }} />
-      <Stack.Screen name="PassengerWeather" component={WeatherScreen} options={{ title: 'Makati weather' }} />
-      <Stack.Screen name="PassengerAssistant" component={HeroBotScreen} options={{ title: 'Commuter assistant' }} />
+      <Stack.Screen name="PassengerProfile" component={ProfileScreen} options={{ title: t('passenger.nav.profile') }} />
+      <Stack.Screen name="PassengerDirectory" component={DirectoryScreen} options={{ title: t('passenger.nav.directory') }} />
+      <Stack.Screen name="PassengerAbout" component={AboutScreen} options={{ title: t('passenger.nav.about') }} />
+      <Stack.Screen name="PassengerWeather" component={WeatherScreen} options={{ title: t('passenger.nav.weather') }} />
+      <Stack.Screen name="PassengerAssistant" component={HeroBotScreen} options={{ title: t('passenger.nav.assistant') }} />
     </Stack.Navigator>
   </PassengerJourneyProvider>
-);
+  );
+};
 
 const DriverStack = () => (
   <RouteWarningsProvider driverOnly>

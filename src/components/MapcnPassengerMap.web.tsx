@@ -1,4 +1,4 @@
-import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type * as MapLibre from 'maplibre-gl';
 import type { Feature, LineString } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -33,6 +33,8 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
   const select = useRef(onSelect);
   select.current = onSelect;
   const vehicleFocus = useRef<{ key: string | null; pending: boolean }>({ key: null, pending: false });
+  const { canMove = false, labels, zoomIn = 'Zoom in', zoomOut = 'Zoom out' } = data;
+  const label = useCallback((english: string) => labels?.[english] || english, [labels]);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +49,8 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
         center: [121.035, 14.575],
         zoom: 13, maxZoom: 19,
         attributionControl: { compact: true },
-        cooperativeGestures: false,
+        dragPan: false, scrollZoom: false, touchZoomRotate: false,
+        doubleClickZoom: false, boxZoom: false, touchPitch: false,
         dragRotate: false, pitchWithRotate: false,
       });
       map = instance;
@@ -66,6 +69,27 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
       map?.remove();
     };
   }, [onFailure]);
+
+  useEffect(() => {
+    if (!view) return;
+    const { map } = view;
+    if (!canMove && map.dragPan.isEnabled()) map.stop();
+    for (const handler of [map.dragPan, map.scrollZoom, map.touchZoomRotate, map.doubleClickZoom, map.boxZoom]) {
+      if (canMove) handler.enable();
+      else handler.disable();
+    }
+  }, [view, canMove]);
+
+  useEffect(() => {
+    if (!view) return;
+    for (const [selector, label] of [['.maplibregl-ctrl-zoom-in', zoomIn], ['.maplibregl-ctrl-zoom-out', zoomOut]]) {
+      const button = view.map.getContainer().querySelector<HTMLButtonElement>(selector);
+      if (button) {
+        button.title = label;
+        button.setAttribute('aria-label', label);
+      }
+    }
+  }, [view, zoomIn, zoomOut]);
 
   useEffect(() => {
     if (!view || !onPickCurb) return;
@@ -155,20 +179,21 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
     const markers = terminals.map(stop => {
       const color = stop.role === 'Landmark' || stop.role === 'Alight' ? '#a45600'
         : stop.role === 'Curb' || stop.role === 'Board' ? '#12734a' : '#225ca0';
-      return addPin(view, stop, `${stop.role}: ${stop.name}`, color, stop.role === 'Landmark' ? 'L' : stop.role === 'Passenger use unconfirmed' ? 'S' : stop.role[0],
+      const name = stop.id === 'draft-curb' ? label(stop.name) : stop.name;
+      return addPin(view, stop, `${label(stop.role)}: ${name}`, color, stop.role === 'Landmark' ? 'L' : stop.role === 'Passenger use unconfirmed' ? 'S' : stop.role[0],
         () => select.current({ type: 'SELECT_TERMINAL', id: stop.id }), stop.isSelected ? 15 : stop.role === 'Landmark' ? 2 : 5, true);
     });
     if (destinationPlace) markers.push(addPin(view, destinationPlace, destinationPlace.name, '#b22e39', 'D', undefined, 20));
     return () => { markers.forEach(marker => marker.remove()); };
-  }, [view, terminals, destinationPlace]);
+  }, [view, terminals, destinationPlace, label]);
 
   useEffect(() => {
     if (!view) return;
-    const markers = vehicles.map(vehicle => addPin(view, vehicle, `${vehicle.body_number || 'Vehicle'} · ${vehicle.quality === 'weak' ? 'Weak GPS' : 'Current GPS'}`,
+    const markers = vehicles.map(vehicle => addPin(view, vehicle, `${vehicle.body_number || label('Vehicle')} · ${label(vehicle.quality === 'weak' ? 'Weak GPS' : 'Current GPS')}`,
       '#244765', vehicle.body_number || 'E-jeep', () => select.current({ type: 'SELECT_VEHICLE', id: vehicle.id }), vehicle.isSelected ? 18 : 10));
-    if (userLocation) markers.push(addPin(view, userLocation, 'Your location', '#175dcc', '●', undefined, 30));
+    if (userLocation) markers.push(addPin(view, userLocation, label('Your location'), '#175dcc', '●', undefined, 30));
     return () => { markers.forEach(marker => marker.remove()); };
-  }, [view, vehicles, userLocation]);
+  }, [view, vehicles, userLocation, label]);
 
   useEffect(() => {
     if (!view || !fitPoints.length) return;
@@ -189,8 +214,8 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
   }, [view, vehicles, selectedVehicleId, vehicleSelectionKey, vehicleFocusRequestId]);
 
   return <div style={{ position: 'absolute', inset: 0, background: '#edf1f3' }}>
-    <div ref={containerRef} role="region" aria-label="eSAKAY street map" style={{ width: '100%', height: '100%' }} />
-    {!view && <span role="status" style={{ position: 'absolute', top: 12, left: 12 }}>Loading street map…</span>}
+    <div ref={containerRef} role="region" aria-label={label('eSAKAY street map')} style={{ width: '100%', height: '100%' }} />
+    {!view && <span role="status" style={{ position: 'absolute', bottom: 12, left: 12 }}>{label('Loading street map…')}</span>}
   </div>;
 }
 

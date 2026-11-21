@@ -57,6 +57,17 @@ test('equal sourced fares explicitly mean no saving among evaluated paths', () =
   assert.equal(result.status, 'no-saving');
   assert.equal(result.suggestions.length, 0);
 });
+
+test('walking limits, step-free evidence and missing directions give different next steps', () => {
+  assert.match(findVerifiedSavings({ ...input, maxWalkMeters: 100 }).reason, /longer limit/);
+  assert.match(findVerifiedSavings({ ...input, stepFreeOnly: true }).reason, /step-free/);
+  assert.match(findVerifiedSavings({ ...input, walks: [] }).reason, /walking directions/);
+  assert.match(findVerifiedSavings({ ...input, destinationId: 'b' }).reason, /another stop pair/);
+  const quicker = { ...walk, duration_seconds: 90, steps: [{ ...walk.steps[0], duration_seconds: 90 }] };
+  const choices = findVerifiedSavings({ ...input, walks: [walk, quicker] }).suggestions;
+  assert.equal(choices.length, 1);
+  assert.equal(choices[0].walk.duration_seconds, 90);
+});
 test('a cheaper branch outside the baseline ride path is not a recommendation', () => {
   const branch = { ...walk, to_stop_id: 'branch', coordinates: [walk.coordinates[0], stops[3]], distance_meters: 323, steps: [{ ...walk.steps[0], distance_meters: 323 }] };
   const result = findVerifiedSavings({ ...input, walks: [branch], segments: [...segments, { ...segments[0], from_stop_id: 'branch', to_stop_id: 'c', distance_meters: 1000 }] });

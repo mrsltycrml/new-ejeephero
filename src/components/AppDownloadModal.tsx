@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +12,7 @@ interface AppDownloadModalProps {
 }
 
 export default function AppDownloadModal({ visible, onClose }: AppDownloadModalProps) {
+  const { t } = useTranslation();
   const [downloadError, setDownloadError] = useState('');
   const close = () => {
     setDownloadError('');
@@ -21,7 +23,7 @@ export default function AppDownloadModal({ visible, onClose }: AppDownloadModalP
     try {
       await Linking.openURL(APK_DOWNLOAD_URL);
     } catch {
-      setDownloadError('The download could not open. Check your connection and try again.');
+      setDownloadError(t('passenger.install.failed'));
     }
   };
 
@@ -29,8 +31,8 @@ export default function AppDownloadModal({ visible, onClose }: AppDownloadModalP
     <BottomSheetModal visible={visible} onClose={close} maxWidth={520}
       sheetStyle={styles.sheet} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>Install eSAKAY</Text>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close installation guide" onPress={close} style={styles.close}>
+        <Text accessibilityRole="header" style={styles.title}>{t('passenger.install.title')}</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.install.close')} onPress={close} style={styles.close}>
           <Ionicons name="close" color={Colors.onDark} size={24} />
         </TouchableOpacity>
       </View>
@@ -40,11 +42,9 @@ export default function AppDownloadModal({ visible, onClose }: AppDownloadModalP
             <Ionicons aria-hidden name="logo-android" size={22} color={Colors.ink} />
             <Text accessibilityRole="header" style={styles.sectionTitle}>Android</Text>
           </View>
-          <Text style={styles.description}>
-            Open the downloaded APK on your phone. If Android prompts you, allow installation from this source.
-          </Text>
+          <Text style={styles.description}>{t('passenger.install.androidHelp')}</Text>
           <TouchableOpacity accessibilityRole="button" onPress={handleDownloadApk} style={styles.download}>
-            <Text style={styles.downloadText}>Download Android app</Text>
+            <Text style={styles.downloadText}>{t('passenger.install.download')}</Text>
             <Ionicons aria-hidden name="download-outline" size={20} color={Colors.onDark} />
           </TouchableOpacity>
           {!!downloadError && <Text accessibilityRole="alert" style={styles.error}>{downloadError}</Text>}

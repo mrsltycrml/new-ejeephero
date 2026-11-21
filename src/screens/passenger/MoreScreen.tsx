@@ -1,66 +1,64 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s } from '../../components/PassengerUI';
 import { Colors } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 
-const rideTools = [
-  { screen: 'PassengerAssistant', name: 'Commuter assistant', detail: 'Ask about stops, fares and boarding.', icon: 'chatbubble-outline' },
-  { screen: 'PassengerWeather', name: 'Makati weather', detail: 'Forecast and travel advisory', icon: 'cloud-outline' },
-  { screen: 'PassengerAbout', name: 'About eSAKAY', detail: 'Service information and boarding guidance', icon: 'information-circle-outline' },
-] as const;
-
 export default function MoreScreen({ navigation }: any) {
+  const [signOutFailed, setSignOutFailed] = useState(false);
   const { signOut } = useAuth();
-  const open = (screen: string) => navigation.getParent()?.navigate(screen);
+  const { t } = useTranslation();
+  const groups = [
+    { title: 'trip', items: [
+      { name: 'passenger.nav.directory', screen: 'PassengerDirectory', icon: 'git-branch-outline' },
+      { name: 'passenger.nav.weather', screen: 'PassengerWeather', icon: 'cloud-outline' },
+      { name: 'passenger.nav.assistant', screen: 'PassengerAssistant', icon: 'chatbubble-outline' },
+    ] },
+    { title: 'help', items: [
+      { name: 'passenger.more.contacts', screen: 'Safety', icon: 'people-outline' },
+      { name: 'passenger.nav.about', screen: 'PassengerAbout', icon: 'information-circle-outline' },
+    ] },
+  ] as const;
   return (
-    <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}>
-      <Text accessibilityRole="header" style={s.title}>More</Text>
-      <TouchableOpacity accessibilityRole="button" onPress={() => open('PassengerDirectory')} style={[s.heroBanner, styles.directory]}>
-        <Ionicons aria-hidden name="git-branch-outline" size={28} color={Colors.signal} />
-        <View style={styles.details}>
-          <Text style={[s.sectionTitle, styles.light]}>Route directory</Text>
-          <Text style={s.heroSubtitle}>Browse routes and stops in travel order.</Text>
-        </View>
-        <Ionicons aria-hidden name="arrow-forward" size={22} color={Colors.signal} />
-      </TouchableOpacity>
-
-      <View style={[s.section, styles.list]}>
-        {rideTools.map((item, index) => (
-          <TouchableOpacity key={item.screen} accessibilityRole="button" onPress={() => open(item.screen)}
+    <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]} keyboardShouldPersistTaps="always">
+      <Text accessibilityRole="header" style={s.title}>{t('passenger.nav.more')}</Text>
+      {groups.map(group => <View key={group.title} style={styles.group}>
+        <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.more.' + group.title)}</Text>
+        <View style={[s.section, styles.list]}>
+          {group.items.map((item, index) => <TouchableOpacity key={item.screen} accessibilityRole="button"
+            onPress={() => item.screen === 'Safety' ? navigation.navigate('Safety', { section: 'contacts' }) : navigation.navigate(item.screen)}
             style={[styles.row, index > 0 && styles.rule]}>
             <Ionicons aria-hidden name={item.icon} size={22} color={Colors.brandGreen} />
-            <View style={styles.details}>
-              <Text style={s.label}>{item.name}</Text>
-              <Text style={s.muted}>{item.detail}</Text>
-            </View>
+            <Text style={[s.label, styles.details]}>{t(item.name)}</Text>
+            <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
+          </TouchableOpacity>)}
+        </View>
+      </View>)}
+      <View style={styles.group}>
+        <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.more.account')}</Text>
+        <View style={[s.section, styles.list]}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('PassengerProfile')} style={styles.row}>
+            <Ionicons aria-hidden name="person-outline" size={22} color={Colors.brandGreen} />
+            <Text style={[s.label, styles.details]}>{t('passenger.nav.profile')}</Text>
             <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
           </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text accessibilityRole="header" style={s.sectionTitle}>Account</Text>
-      <View style={[s.section, styles.list]}>
-        <TouchableOpacity accessibilityRole="button" onPress={() => open('PassengerProfile')} style={styles.row}>
-          <Ionicons aria-hidden name="person-outline" size={22} color={Colors.brandGreen} />
-          <Text style={[s.label, styles.details]}>Profile</Text>
-          <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
-        </TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" onPress={() => void signOut().catch(() => Alert.alert('Could not sign out', 'Please try again.'))} style={[styles.row, styles.rule]}>
-          <Ionicons aria-hidden name="log-out-outline" size={22} color={Colors.ink} />
-          <Text style={s.label}>Sign out</Text>
-        </TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" onPress={() => { setSignOutFailed(false); void signOut().catch(() => setSignOutFailed(true)); }} style={[styles.row, styles.rule]}>
+            <Ionicons aria-hidden name="log-out-outline" size={22} color={Colors.ink} />
+            <Text style={s.label}>{t('passenger.more.signOut')}</Text>
+          </TouchableOpacity>
+        </View>
+        {signOutFailed && <Text accessibilityRole="alert" style={s.muted}>{t('passenger.more.signOutError')}</Text>}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  directory: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  group: { gap: 8 },
   list: { paddingVertical: 0, gap: 0 },
   details: { flex: 1, minWidth: 0, gap: 3 },
-  light: { color: Colors.onDark },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: 12, paddingVertical: 12 },
   rule: { borderTopWidth: 1, borderTopColor: Colors.border },
 });

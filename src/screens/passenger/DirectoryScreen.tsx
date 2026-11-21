@@ -1,56 +1,65 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { passengerStyles as s, PassengerSelect } from '../../components/PassengerUI';
+import { passengerStyles as s } from '../../components/PassengerUI';
 import PassengerRouteRow from '../../components/PassengerRouteRow';
-import { ScreenSkeleton } from '../../components/AppUI';
 import { Colors } from '../../constants/theme';
-import { offlineTransit, type TransitResult } from '../../services/offlineTransitService';
-import { confirmedPassengerUse, passengerUseLabel } from '../../services/routeMap';
+import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
+import { confirmedPassengerUse, verifiedStop } from '../../services/routeMap';
+import { passengerMapOverview } from '../../services/passengerMapOverview';
 
-export default function DirectoryScreen({ driverMode }: { navigation?: any; driverMode?: boolean }) {
-  const [data, setData] = useState<TransitResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedRoute, setSelectedRoute] = useState('');
+export default function DirectoryScreen() {
+  const { transit, refreshTransit, selectedRouteId } = usePassengerJourney();
+  const { t, i18n } = useTranslation();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const route = transit.routes.find(r => r.id === (selected ?? selectedRouteId)) ?? transit.routes[0];
+  const stops = transit.terminals.filter(stop => stop.route_id === route?.id && verifiedStop(stop))
+    .sort((a, b) => a.sequence_order - b.sequence_order);
+  const overview = route && !stops.length ? passengerMapOverview(transit.routes, transit.terminals, route.id) : null;
   const refresh = async () => {
-    setLoading(true);
-    try { setData(await offlineTransit.getTransitData()); }
-    finally { setLoading(false); }
+    setRefreshing(true);
+    setFailed(false);
+    try { await refreshTransit(); } catch { setFailed(true); } finally { setRefreshing(false); }
   };
-  useEffect(() => { void refresh(); }, []);
-  if (loading && !data) return <ScreenSkeleton preset="cards" />;
-  const route = data?.routes.find(item => item.id === selectedRoute) ?? data?.routes[0];
-  const stops = (data?.terminals ?? []).filter(stop => stop.route_id === route?.id && (driverMode || confirmedPassengerUse(stop))).sort((a, b) => a.sequence_order - b.sequence_order);
   return (
-    <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}>
-      {data && data.routes.length > 1 && <PassengerSelect label="Select route" value={route?.id || ''} onSelect={setSelectedRoute}
-        options={data.routes.map(item => ({ value: item.id, label: item.name }))} />}
+    <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]} keyboardShouldPersistTaps="always"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+      {transit.routes.length > 1 && <View style={styles.choices}>
+        <Text accessibilityRole="header" style={s.label}>{t('passenger.directory.routes')}</Text>
+        {transit.routes.map(item => <TouchableOpacity key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === route?.id }}
+          onPress={() => setSelected(item.id)} style={[styles.choice, item.id === route?.id && styles.selected]}>
+          <Text style={[s.label, { flex: 1 }]}>{item.name}</Text>
+          {item.id === route?.id && <Ionicons aria-hidden name="checkmark" size={20} color={Colors.ink} />}
+        </TouchableOpacity>)}
+      </View>}
       <View style={styles.directory}>
         <View style={[s.heroBanner, styles.routeHeader]}>
-          <Ionicons aria-hidden name="git-branch-outline" color={Colors.signal} size={26} />
-          <Text accessibilityRole="header" style={s.heroTitle}>{route?.name || 'Route directory'}</Text>
-          {route && <Text style={s.heroSubtitle}>{route.description || 'Route description unavailable.'}</Text>}
-          {data?.status === 'ready' && !data.routes.length && <Text style={s.heroSubtitle}>No published active routes.</Text>}
+          <Text accessibilityRole="header" style={s.heroTitle}>{route?.name || t('passenger.nav.directory')}</Text>
+          {!!route?.description && <Text style={s.heroSubtitle}>{route.description}</Text>}
+          {transit.status === 'ready' && !route && <Text style={s.heroSubtitle}>{t('passenger.directory.empty')}</Text>}
         </View>
-        {data?.status !== 'ready' && <Text accessibilityRole="alert" style={styles.notice}>{data?.syncedAt
-          ? `Cached at ${new Date(data.syncedAt).toLocaleString()}. Refresh unavailable.`
-          : 'Route data unavailable. Refresh to try again.'}</Text>}
+        {(failed || transit.status !== 'ready') && <Text accessibilityRole="alert" style={styles.notice}>{transit.syncedAt
+          ? t('passenger.directory.cached', { date: new Date(transit.syncedAt).toLocaleString(i18n.language) })
+          : t('passenger.directory.unavailable')}</Text>}
         {route && <View style={styles.itinerary}>
-          <Text accessibilityRole="header" style={s.sectionTitle}>Stops in travel order</Text>
-          {!stops.length && <Text style={s.muted}>{driverMode ? 'Verified stop locations unavailable.' : 'Confirmed passenger stops unavailable.'}</Text>}
-          <View>
-            {stops.map((stop, index) => (
-              <PassengerRouteRow key={stop.id} first={index === 0} last={index === stops.length - 1}>
-                <Text style={styles.stopName}>{stop.name}</Text>
-                {!driverMode && <Text style={s.muted}>{passengerUseLabel(stop)}</Text>}
-              </PassengerRouteRow>
-            ))}
-          </View>
+          <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.directory.stops')}</Text>
+          {!stops.length && <Text style={s.muted}>{t('passenger.directory.none')}</Text>}
+          <View>{stops.map((stop, index) => <PassengerRouteRow key={stop.id} first={index === 0} last={index === stops.length - 1}>
+            <Text style={styles.stopName}>{stop.name}</Text>
+            <Text style={s.muted}>{t('passenger.directory.' + (confirmedPassengerUse(stop) || 'unknown'))}</Text>
+          </PassengerRouteRow>)}</View>
+          {!!overview?.landmarks.length && <>
+            <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.directory.reference')}</Text>
+            <Text style={s.muted}>{t('passenger.directory.referenceHint', { source: overview.variant.label })}</Text>
+            {overview.landmarks.map(pin => <Text key={pin.id} style={s.body}>{pin.name}</Text>)}
+          </>}
         </View>}
-        <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: loading }} disabled={loading} onPress={refresh} style={styles.refresh}>
+        <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: refreshing }} disabled={refreshing} onPress={refresh} style={styles.refresh}>
           <Ionicons aria-hidden name="refresh-outline" color={Colors.brandGreen} size={18} />
-          <Text style={s.link}>{loading ? 'Refreshing…' : 'Refresh routes'}</Text>
+          <Text style={s.link}>{t(refreshing ? 'passenger.directory.refreshing' : 'passenger.directory.refresh')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -58,6 +67,9 @@ export default function DirectoryScreen({ driverMode }: { navigation?: any; driv
 }
 
 const styles = StyleSheet.create({
+  choices: { gap: 6 },
+  choice: { minHeight: 48, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, backgroundColor: Colors.paper },
+  selected: { backgroundColor: Colors.signal },
   directory: { backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, overflow: 'hidden' },
   routeHeader: { borderRadius: 0 },
   notice: { ...s.body, color: Colors.ink, backgroundColor: Colors.warningBg, padding: 16 },

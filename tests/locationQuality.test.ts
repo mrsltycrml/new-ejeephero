@@ -5,6 +5,21 @@ import { pickLatestFreshPositions } from '../src/utils/operationsSummary.ts';
 
 const now = Date.parse('2026-11-18T08:00:00Z');
 const fix = { latitude: 14.6, longitude: 121, accuracy: 5, timestamp: now, speed: 0, heading: null };
+test('driver speed uses a device reading first and only estimates from distinct, recent, precise movement', async () => {
+  const { driverSpeed } = await import('../src/services/locationQuality.ts');
+  const previous = { ...fix, timestamp: now - 10000 };
+  const moved = { ...fix, latitude: fix.latitude + 0.0005, speed: null };
+  assert.deepEqual(driverSpeed(previous, fix, now), { kph: 0, estimated: false });
+  assert.deepEqual(driverSpeed(previous, { ...moved, speed: 20.4 }, now), { kph: 20.4, estimated: false });
+  const estimate = driverSpeed(previous, moved, now);
+  assert.ok(estimate?.estimated && Math.abs(estimate.kph - 20) < 0.1);
+  assert.equal(positionPayload('v', moved, now).speed, null);
+  for (const prior of [null, moved, { ...previous, accuracy: 31 }, { ...previous, timestamp: now - 31000 },
+    { ...previous, latitude: moved.latitude - 0.00001 }, { ...previous, latitude: 16 }]) {
+    assert.equal(driverSpeed(prior, moved, now), null);
+  }
+  assert.equal(driverSpeed(previous, { ...fix, accuracy: null }, now), null);
+});
 test('the vehicle readout shows measured zero and withholds speed from weak or expired GPS', () => {
   const position = { ...fix, recorded_at: new Date(now - 2000).toISOString() };
   assert.deepEqual(vehicleTelemetryReadout(position, now), { gps: 'GPS live · measured 2s ago · ±5 m', speed: 0 });

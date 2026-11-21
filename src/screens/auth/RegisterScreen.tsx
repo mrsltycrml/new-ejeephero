@@ -13,8 +13,9 @@ type Role = 'passenger' | 'driver';
 function RoleChoice({ option, checked, group, onPress }: {
   option: Role; checked: boolean; group: string; onPress: () => void;
 }) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
-  const label = option === 'passenger' ? 'Passenger' : 'Driver';
+  const label = option === 'passenger' ? t('passenger.nav.passenger') : t('passenger.authSignup.driver');
   const style = [styles.choice, checked && styles.selected, focused && styles.choiceFocus];
   const content = (
     <>
@@ -53,29 +54,30 @@ type RegistrationFieldsProps = {
 };
 
 function RegistrationFields({ fullName, email, password, role, onName, onEmail, onPassword, onRole }: RegistrationFieldsProps) {
+  const { t } = useTranslation();
   const group = useId();
   return (
     <>
-      <AuthField label="Full name" value={fullName} onChangeText={onName} autoCapitalize="words" autoComplete="name" />
-      <AuthField label="Email address" placeholder="you@example.com" value={email} onChangeText={onEmail}
+      <AuthField label={t('passenger.authSignup.fullName')} value={fullName} onChangeText={onName} autoCapitalize="words" autoComplete="name" />
+      <AuthField label={t('passenger.authLogin.email')} placeholder="you@example.com" value={email} onChangeText={onEmail}
         autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
-      <AuthField label="Password" passwordToggle value={password} onChangeText={onPassword}
+      <AuthField label={t('passenger.authLogin.password')} passwordToggle value={password} onChangeText={onPassword}
         autoCapitalize="none" autoComplete="new-password" />
       {isClerkConfigured && (
         <Text style={[styles.hint, password.length >= 15 && styles.met]}>
-          {password.length >= 15 ? `Length requirement met (${password.length} characters)` : `At least 15 characters (${password.length}/15)`}
+          {password.length >= 15 ? t('passenger.authSignup.lengthMet', { length: password.length }) : t('passenger.authSignup.lengthHint', { length: password.length })}
         </Text>
       )}
       <View style={styles.roles}>
-        <Text style={authStyles.label}>Account type</Text>
-        <View accessibilityRole="radiogroup" accessibilityLabel="Account type" style={styles.choices}>
+        <Text style={authStyles.label}>{t('passenger.authSignup.accountType')}</Text>
+        <View accessibilityRole="radiogroup" accessibilityLabel={t('passenger.authSignup.accountType')} style={styles.choices}>
           {(['passenger', 'driver'] as const).map(option => (
             <RoleChoice key={option} option={option} group={group} checked={role === option} onPress={() => onRole(option)} />
           ))}
         </View>
         <Text style={styles.roleNote} accessibilityLiveRegion="polite">
-          {role === 'driver' ? 'A supervisor must approve your account before you can start a shift.'
-            : 'You can use your passenger account after you confirm your email.'}
+          {role === 'driver' ? t('passenger.authSignup.approval')
+            : t('passenger.authSignup.verifyFirst')}
         </Text>
       </View>
     </>
@@ -121,15 +123,15 @@ function ClerkRegisterForm() {
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setErrorMessage('Please enter a valid email address.');
+      setErrorMessage(t('passenger.authSignup.invalidEmail'));
       return;
     }
     if (password.length < 15) {
-      setErrorMessage(`Password must be at least 15 characters long (currently ${password.length}/15).`);
+      setErrorMessage(t('passenger.authSignup.passwordLength', { length: password.length }));
       return;
     }
     if (!isLoaded || !signUp) {
-      setErrorMessage('Authentication service is still initializing. Please wait a moment and tap Create account again.');
+      setErrorMessage(t('passenger.authSignup.initializing'));
       return;
     }
 
@@ -151,13 +153,13 @@ function ClerkRegisterForm() {
 
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
-      setInfoMessage(`We sent a 6-digit verification code to ${trimmedEmail}. Check your inbox (and spam folder).`);
+      setInfoMessage(t('passenger.authSignup.checkInbox', { email: trimmedEmail }));
     } catch (err: any) {
       const msg =
         err?.errors?.[0]?.longMessage ||
         err?.errors?.[0]?.message ||
         err?.message ||
-        'Unable to register. Please try a stronger password or a different email.';
+        t('passenger.authSignup.failed');
       setErrorMessage(msg);
     } finally {
       setLoading(false);
@@ -171,9 +173,9 @@ function ClerkRegisterForm() {
     setResending(true);
     try {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      setInfoMessage(`Sent a fresh 6-digit verification code to ${email.trim().toLowerCase()}.`);
+      setInfoMessage(t('passenger.authSignup.resent', { email: email.trim().toLowerCase() }));
     } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage || err?.message || 'Could not resend code. Please wait a moment.';
+      const msg = err?.errors?.[0]?.longMessage || err?.message || t('passenger.authSignup.resendFailed');
       setErrorMessage(msg);
     } finally {
       setResending(false);
@@ -185,11 +187,11 @@ function ClerkRegisterForm() {
     setInfoMessage('');
     const cleanCode = code.replace(/\s+/g, '');
     if (!cleanCode) {
-      setErrorMessage('Please enter the 6-digit verification code sent to your email.');
+      setErrorMessage(t('passenger.authSignup.codeRequired'));
       return;
     }
     if (!isLoaded || !signUp) {
-      setErrorMessage('Authentication service is still loading. Please try again in a second.');
+      setErrorMessage(t('passenger.authSignup.loading'));
       return;
     }
 
@@ -200,11 +202,11 @@ function ClerkRegisterForm() {
         await finalizeClerkUser(attempt.createdUserId, attempt.createdSessionId);
       } else {
         setErrorMessage(
-          `Verification incomplete (status: ${attempt.status}). Missing: ${(attempt.missingFields || []).join(', ') || 'none'}. Please double-check the 6-digit code.`
+          t('passenger.authSignup.missing', { status: attempt.status, missing: (attempt.missingFields || []).join(', ') || 'none' })
         );
       }
     } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || err?.message || 'Verification failed.';
+      const msg = err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || err?.message || t('passenger.authSignup.verifyFailed');
       setErrorMessage(msg);
     } finally {
       setLoading(false);
@@ -215,14 +217,14 @@ function ClerkRegisterForm() {
     return (
       <View style={authStyles.form}>
         <AuthNotice message={errorMessage} error />
-        <AuthNotice message={infoMessage || `Enter the code sent to ${email.trim().toLowerCase()}.`} />
-        <AuthField label="Verification code" style={authStyles.code} value={code} keyboardType="number-pad"
+        <AuthNotice message={infoMessage || t('passenger.authSignup.enterCode', { email: email.trim().toLowerCase() })} />
+        <AuthField label={t('passenger.authLogin.code')} style={authStyles.code} value={code} keyboardType="number-pad"
           maxLength={8} autoComplete="one-time-code" autoFocus onSubmitEditing={loading ? undefined : handleVerifyEmail}
           onChangeText={value => { setCode(value); if (errorMessage) setErrorMessage(''); }} />
-        <AuthAction label="Verify email & continue" loading={loading} onPress={handleVerifyEmail} />
+        <AuthAction label={t('passenger.authSignup.verify')} loading={loading} onPress={handleVerifyEmail} />
         <View style={authStyles.links}>
-          <AuthLink label={resending ? 'Sending…' : 'Resend code'} onPress={handleResendCode} disabled={resending} />
-          <AuthLink label="Change email" onPress={() => {
+          <AuthLink label={resending ? t('passenger.authSignup.sending') : t('passenger.authSignup.resend')} onPress={handleResendCode} disabled={resending} />
+          <AuthLink label={t('passenger.authSignup.changeEmail')} onPress={() => {
             setPendingVerification(false);
             setCode('');
             setErrorMessage('');
@@ -239,14 +241,14 @@ function ClerkRegisterForm() {
       {!isLoaded && (
         <View style={styles.connecting} accessibilityLiveRegion="polite">
           <ActivityIndicator size="small" color={Colors.action} />
-          <Text style={authStyles.body}>Connecting to secure sign-up…</Text>
+          <Text style={authStyles.body}>{t('passenger.authSignup.connecting')}</Text>
         </View>
       )}
       <RegistrationFields fullName={fullName} email={email} password={password} role={role} onRole={setLocalRole}
         onName={value => { setFullName(value); if (errorMessage) setErrorMessage(''); }}
         onEmail={value => { setEmail(value); if (errorMessage) setErrorMessage(''); }}
         onPassword={value => { setPassword(value); if (errorMessage) setErrorMessage(''); }} />
-      <AuthAction label="Create account" onPress={handleStartSignUp} loading={loading} />
+      <AuthAction label={t('passenger.authLogin.create')} onPress={handleStartSignUp} loading={loading} />
     </View>
   );
 }
@@ -281,13 +283,13 @@ function SupabaseRegisterForm() {
         setErrorMessage(error.message);
       } else {
         Alert.alert(
-          'Registration submitted',
-          'Check your inbox and confirm your email to start using your account.',
+          t('passenger.authSignup.submitted'),
+          t('passenger.authSignup.checkMail'),
           [{ text: 'OK' }]
         );
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to register. Check your connection and try again.');
+      setErrorMessage(error instanceof Error ? error.message : t('passenger.authSignup.connection'));
     } finally {
       setLoading(false);
     }
@@ -298,18 +300,19 @@ function SupabaseRegisterForm() {
       <AuthNotice message={errorMessage} error />
       <RegistrationFields fullName={fullName} email={email} password={password} role={role}
         onName={setFullName} onEmail={setEmail} onPassword={setPassword} onRole={setLocalRole} />
-      <AuthAction label="Create account" onPress={handleRegister} loading={loading} />
+      <AuthAction label={t('passenger.authLogin.create')} onPress={handleRegister} loading={loading} />
     </View>
   );
 }
 
 export default function RegisterScreen({ navigation }: any) {
+  const { t } = useTranslation();
   return (
-    <AuthPage title="Create an account" onBack={() => navigation.goBack()}>
+    <AuthPage title={t('passenger.authSignup.title')} onBack={() => navigation.goBack()}>
       {isClerkConfigured ? <ClerkRegisterForm /> : <SupabaseRegisterForm />}
       <View style={[authStyles.footer, authStyles.links]}>
-        <Text style={authStyles.body}>Already have an account?</Text>
-        <AuthLink label="Sign in" onPress={() => navigation.goBack()} />
+        <Text style={authStyles.body}>{t('passenger.authSignup.alreadyRegistered')}</Text>
+        <AuthLink label={t('passenger.authLogin.signIn')} onPress={() => navigation.goBack()} />
       </View>
     </AuthPage>
   );

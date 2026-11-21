@@ -3,10 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { setImmediate } from 'node:timers/promises';
 import ts from 'typescript';
+import i18next from 'i18next';
+import english from '../src/locales/en.json' with { type: 'json' };
 import * as quality from '../src/services/locationQuality.ts';
 import * as safety from '../src/services/passengerSafety.ts';
 
 const now = Date.UTC(2026, 10, 21);
+const i18n = i18next.createInstance();
+await i18n.init({ lng: 'en', resources: { en: { translation: english } } });
 const position = { coords: { latitude: 14.6, longitude: 121, accuracy: 12 }, timestamp: now };
 const { outputText } = ts.transpileModule(readFileSync(new URL('../src/components/SOSButton.tsx', import.meta.url), 'utf8'), {
   compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -31,6 +35,7 @@ function mount(os: string, reading: typeof position | Error, permission: string)
     return reading;
   };
   const modules: Record<string, any> = {
+    'react-i18next': { useTranslation: () => ({ t: i18n.t }) },
     react: { default: react, ...react },
     'react-native': { Platform: { OS: os }, StyleSheet: { create: (s: any) => s } },
     'expo-location': { Accuracy: { Highest: 'highest' },
@@ -39,7 +44,10 @@ function mount(os: string, reading: typeof position | Error, permission: string)
     '../services/browserLocation': { getBrowserPosition: () => read('browser position') },
     '../services/locationQuality': quality, '../services/passengerSafety': safety,
     '../contexts/AuthContext': { useAuth: () => ({ user: { id: 'user' }, getAccessToken: async () => 'token' }) },
-    '../services/emergencyService': { loadEmergencyContacts: async () => [{ phone_number: 'test' }],
+    '../services/emergencyService': { loadEmergencyContacts: async (...args: unknown[]) => {
+      assert.deepEqual(args, ['user']);
+      return [{ phone_number: 'test' }];
+    },
       callEmergencyService: async (_token: string, body: any) => { dispatches.push(body); return { accepted: 1, total: 1 }; } },
     'expo-crypto': { randomUUID: () => 'test-request' }, '../constants/theme': { Colors: {} },
     './PassengerUI': { passengerStyles: {} }, './AppUI': { triggerHaptic() {} },

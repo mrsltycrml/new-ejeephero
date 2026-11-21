@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export default function PassengerDestinationSearch({ scope, online, selectedName, onSelect }: Props) {
+  const { t } = useTranslation();
   const input = useRef<React.ElementRef<typeof TextInput>>(null);
   const [draft, setDraft] = useState<string | null>(null);
   const query = draft?.trim() ?? '';
@@ -36,21 +38,25 @@ export default function PassengerDestinationSearch({ scope, online, selectedName
   const results = current && !current.error ? current.places : local;
   const close = () => { setDraft(null); setReply(null); input.current?.blur(); Keyboard.dismiss(); };
   const choose = (place: PassengerPlace) => { close(); onSelect(place); };
-  const status = !query ? 'Type a stop, landmark or street along the route.'
-    : current?.error ? 'Address search is unavailable. Try a route stop or landmark.'
-    : !results.length && online && query.length >= 3 && !current ? 'Looking along the route…'
-    : !results.length ? (online ? 'No matching places along this route.' : 'No matching stops or landmarks offline.') : '';
+  const status = !query ? t('passenger.search.hint')
+    : current?.error ? t('passenger.search.addressUnavailable')
+    : !results.length && online && query.length >= 3 && !current ? t('passenger.search.searching')
+    : !results.length ? (online ? t('passenger.search.noMatches') : t('passenger.search.offlineEmpty')) : '';
 
   return <View style={styles.panel}>
-    <Text accessibilityRole="header" style={styles.title}>Where to?</Text>
+    <Text accessibilityRole="header" style={styles.title}>{t('passenger.search.heading')}</Text>
     <View style={styles.field}>
-      <Ionicons name="search" size={22} color={Colors.ink} />
-      <TextInput ref={input} accessibilityLabel="Search destination" style={styles.input}
-        value={draft ?? selectedName} placeholder="Search along your route" placeholderTextColor={Colors.subtleGray}
+      <View pointerEvents="none" style={styles.searchIcon}><Ionicons name="search" size={22} color={Colors.ink} /></View>
+      <TextInput ref={input} accessibilityLabel={t('passenger.search.destination')} style={styles.input}
+        value={draft ?? selectedName} placeholder={t('passenger.search.placeholder')} placeholderTextColor={Colors.subtleGray}
         selectTextOnFocus returnKeyType="search" enterKeyHint="search"
         onFocus={() => setDraft(previous => previous ?? selectedName)} onChangeText={setDraft}
-        onSubmitEditing={() => { if (results.length === 1) choose(results[0]); }} />
-      {draft !== null && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close destination search" style={styles.close} onPress={close}>
+        onSubmitEditing={() => {
+          const match = results.find(place => place.name.toLocaleLowerCase() === query.toLocaleLowerCase());
+          if (match || results.length === 1) choose(match ?? results[0]);
+          else Keyboard.dismiss();
+        }} />
+      {draft !== null && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.search.close')} style={styles.close} onPress={close}>
         <Ionicons name="close" size={22} color={Colors.ink} />
       </TouchableOpacity>}
     </View>
@@ -64,7 +70,7 @@ export default function PassengerDestinationSearch({ scope, online, selectedName
         <Ionicons name="chevron-forward" size={16} color={Colors.subtleGray} />
       </TouchableOpacity>)}
       {results.some(p => !p.id.startsWith('stop:') && !p.id.startsWith('landmark:')) && <Text accessibilityRole="link"
-        style={styles.note} onPress={() => void Linking.openURL('https://www.openstreetmap.org/copyright')}>Place data © OpenStreetMap contributors · Photon</Text>}
+        style={styles.note} onPress={() => void Linking.openURL('https://www.openstreetmap.org/copyright')}>{t('passenger.search.attribution')}</Text>}
     </View>}
   </View>;
 }
@@ -72,8 +78,9 @@ export default function PassengerDestinationSearch({ scope, online, selectedName
 const styles = StyleSheet.create({
   panel: { paddingHorizontal: 18, paddingVertical: 16, gap: 10, backgroundColor: Colors.ink },
   title: { fontSize: 27, fontWeight: '800', letterSpacing: -0.7, color: Colors.onDark },
-  field: { minHeight: 50, borderRadius: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white },
-  input: { minWidth: 0, flex: 1, fontSize: 16, color: Colors.ink, paddingVertical: 12 },
+  field: { minHeight: 50, borderRadius: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white },
+  searchIcon: { position: 'absolute', left: 14 },
+  input: { minWidth: 0, minHeight: 50, flex: 1, fontSize: 16, color: Colors.ink, paddingVertical: 12, paddingLeft: 46, paddingRight: 12 },
   close: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   list: { backgroundColor: Colors.paper, paddingHorizontal: 12, borderRadius: 10 },
   note: { fontSize: 14, lineHeight: 20, color: Colors.subtleGray, paddingVertical: 12 },

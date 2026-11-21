@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useMemo, useState } from 'react';
-import { StyleSheet, View, Platform } from 'react-native';
+import { StyleSheet, View, Platform, Pressable, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { scriptJson } from '../utils/scriptJson';
 import { RouteData, TerminalData, VehicleData } from '../services/offlineTransitService';
@@ -9,6 +10,12 @@ import { locationQuality, validPoint, type Point } from '../services/locationQua
 import MapcnPassengerMap from './MapcnPassengerMap';
 import type { PassengerMapOverview } from '../services/passengerMapOverview';
 import type { Route1FieldPin } from '../services/route1FieldMap';
+
+const mapText = ['eSAKAY street map', 'Loading street map…', 'Offline — map tiles may be unavailable',
+  'Field reference points', 'Stops and landmarks', 'Board', 'Alight', 'Stop', 'Landmark', 'Curb', 'Platform',
+  'Boarding only', 'Alighting only', 'Boarding and alighting', 'Passenger use unconfirmed', 'Walk', 'Vehicle',
+  'Weak GPS', 'Current GPS', 'Your location', 'Destination', 'GPS position', 'Weak GPS · accuracy unknown or poor',
+  'SPEEDING', 'Occupancy unavailable', 'Measured', 'accuracy unknown', 'Curb being edited'];
 
 export interface LeafletMapRef {
   fitPoints?: (points: Point[]) => void;
@@ -80,6 +87,13 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   const webViewRef = useRef<any>(null);
   const NativeWebView = WebView as React.ComponentType<any>;
   const isWeb = Platform.OS === 'web';
+  const { t } = useTranslation();
+  const labels = useMemo(() => Object.fromEntries(mapText.map(key => [key, t('passenger.map.labels.' + key, key)])), [t]);
+  const zoomIn = t('passenger.map.zoomIn', 'Zoom in');
+  const zoomOut = t('passenger.map.zoomOut', 'Zoom out');
+  const [moveMap, setMoveMap] = useState(false);
+  const canMove = !!fieldReview || moveMap;
+  const [listOnly, setListOnly] = useState(false);
   const mapcnControls = useRef<LeafletMapRef>(null);
   const [mapcnFailed, setMapcnFailed] = useState(false);
   const showMapcn = isWeb && preferMapcn && !isOffline && !mapcnFailed;
@@ -147,6 +161,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     }))],
     [fieldReview, mapTerminals, passengerOverview]);
   const mapData = useMemo(() => ({
+    canMove, labels, zoomIn, zoomOut,
     routes: displayRoutes,
     terminals: displayPins,
     fieldReview: !!fieldReview,
@@ -180,7 +195,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     hideOccupancy,
     isOffline: Boolean(isOffline),
   }), [
-    fieldReview, passengerOverview, displayRoutes, displayPins,
+    fieldReview, passengerOverview, displayRoutes, displayPins, canMove, labels, zoomIn, zoomOut,
     vehicles,
     userLocation,
     destinationPlace,
@@ -225,7 +240,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #map { width: 100%; height: 100%; overflow: hidden; background-color: #edf1f3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    #map.leaflet-container { touch-action: none; }
+    #map.leaflet-container { touch-action: pan-y; }
+    #map.leaflet-touch-drag { touch-action: none; }
     
     /* Terminal Marker */
     .terminal-marker {
@@ -388,35 +404,44 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
 <body>
   <div id="map"></div>
   <div id="offline-badge" class="offline-badge" style="display: none;">
-    <span class="offline-dot"></span> Offline — map tiles may be unavailable
+    <span class="offline-dot"></span><span id="offline-label"></span>
   </div>
   <script>
+    var initialData = ${scriptJson(initialDataRef.current)};
     function escapedMapText(value) { return String(value).replace(/[&<>"']/g, function(c) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
     if (typeof L === 'undefined') {
+      sendEvent('LIST_ONLY', {});
       document.getElementById('offline-badge').style.display = 'flex';
       window.renderMapData = function(data) {
         var mapEl = document.getElementById('map');
-        if (!mapEl) return;
-        var terms = (data && data.terminals) || [];
+        if (!mapEl || !data) return;
+        var labels = data.labels || initialData.labels;
+        var terms = data.terminals || [];
         var listHtml = terms.map(function(t) {
-          return '<div style="padding:8px 12px;margin:4px 0;background:#fff;border-radius:8px;border:1px solid #dce2e8;font-size:12px;color:#1f2d3a;font-weight:600;">' +
-            escapedMapText(t.name) + ' <span style="color:#52606d;font-weight:400;">' + escapedMapText(t.role) + ' (' + Number(t.latitude).toFixed(4) + ', ' + Number(t.longitude).toFixed(4) + ')</span></div>';
+          return '<button type="button" data-id="' + escapedMapText(t.id) + '" style="display:block;padding:8px 12px;margin:4px 0;background:#fff;border-radius:8px;border:1px solid #dce2e8;font-size:12px;color:#1f2d3a;font-weight:600;">' +
+            escapedMapText(t.id === 'draft-curb' ? labels[t.name] || t.name : t.name) + ' <span style="color:#52606d;font-weight:400;">' + escapedMapText(labels[t.role] || t.role) + ' (' + Number(t.latitude).toFixed(4) + ', ' + Number(t.longitude).toFixed(4) + ')</span></button>';
         }).join('');
         mapEl.innerHTML = '<div style="padding:16px;padding-top:48px;height:100%;overflow-y:auto;background:#f4f1ea;">' +
-          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">' + (data.fieldReview ? 'Field reference points' : 'Stops and landmarks') + '</div>' +
+          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">' + escapedMapText(labels[data.fieldReview ? 'Field reference points' : 'Stops and landmarks']) + '</div>' +
           listHtml + '</div>';
+        document.getElementById('offline-label').textContent = labels['Offline — map tiles may be unavailable'];
+        mapEl.onclick = function(event) {
+          var button = event.target.closest('button[data-id]');
+          if (button) sendEvent('SELECT_TERMINAL', { id: button.dataset.id });
+        };
       };
-      window.renderMapData(${scriptJson(initialDataRef.current)});
     } else {
     // Regional overview only; this center is never a user or vehicle fix.
     var map = L.map('map', {
-      zoomControl: false,
+      zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false,
       attributionControl: true,
       minZoom: 3,
       maxZoom: 19,
       bounceAtZoomLimits: true
     }).setView([14.567, 121.033], 13);
     window.leafletMap = map;
+    sendEvent('MAP_READY', {});
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
     // 2. IDEA 3: OFFLINE TILE CACHING & FALLBACK
     // Cache tiles in CacheStorage when online; serve offline instantly; fallback gracefully to SVG pattern.
@@ -505,15 +530,6 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       if (Array.isArray(points) && points.length) map.fitBounds(points.map(function(p) { return [p.latitude,p.longitude]; }), {padding:[30,30],maxZoom:16});
     };
 
-    function sendEvent(type, data) {
-      var msg = JSON.stringify({ type: type, ...data });
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(msg);
-      } else if (window.parent) {
-        window.parent.postMessage(msg, '*');
-      }
-    }
-
     map.on('click', function(e) {
       if (window.canPickCurb) sendEvent('PICK_CURB', { latitude: e.latlng.lat, longitude: e.latlng.lng });
     });
@@ -525,8 +541,23 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     }
 
     window.renderMapData = function(data) {
-      window.canPickCurb = data.canPickCurb;
       if (!data) return;
+      window.canPickCurb = data.canPickCurb;
+      var labels = data.labels || initialData.labels;
+      if (window.canMoveMap !== data.canMove) {
+        if (window.canMoveMap && !data.canMove) map.stop();
+        window.canMoveMap = data.canMove;
+        [map.dragging, map.touchZoom, map.scrollWheelZoom, map.doubleClickZoom, map.boxZoom].forEach(function(handler) {
+          if (data.canMove) handler.enable(); else handler.disable();
+        });
+      }
+      ['in', 'out'].forEach(function(direction) {
+        var button = document.querySelector('.leaflet-control-zoom-' + direction);
+        var label = direction === 'in' ? data.zoomIn || initialData.zoomIn : data.zoomOut || initialData.zoomOut;
+        button.title = label;
+        button.setAttribute('aria-label', label);
+      });
+      document.getElementById('offline-label').textContent = labels['Offline — map tiles may be unavailable'];
 
       // Update offline badge
       var offlineBadge = document.getElementById('offline-badge');
@@ -558,7 +589,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       }
       (data.walkingRoutes || []).forEach(function(walk) {
         var line = L.polyline(walk.coordinates.map(function(p) { return [p.latitude,p.longitude]; }), {color:'#203B53',weight:4,dashArray:'7 7'}).addTo(routesLayer);
-        var label = document.createElement('span'); label.textContent = 'Walk · ' + walk.source; line.bindTooltip(label);
+        var label = document.createElement('span'); label.textContent = labels.Walk + ' · ' + walk.source; line.bindTooltip(label);
       });
       var selectedRoute = data.routes.find(function(r) { return r.isSelected; });
       var directed = data.rideCoordinates.length > 1 ? data.rideCoordinates : (selectedRoute ? selectedRoute.coordinates : []);
@@ -603,8 +634,9 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
             iconAnchor: [17, 36]
           });
 
-          var marker = L.marker([term.latitude, term.longitude], { icon: markerIcon, title: term.name, zIndexOffset: term.role === 'Landmark' ? 0 : 100 }).addTo(terminalsLayer);
-          var stopLabel = document.createElement('span'); stopLabel.textContent = term.role + ': ' + term.name; marker.bindTooltip(stopLabel);
+          var name = term.id === 'draft-curb' ? labels[term.name] : term.name;
+          var marker = L.marker([term.latitude, term.longitude], { icon: markerIcon, title: name, zIndexOffset: term.role === 'Landmark' ? 0 : 100 }).addTo(terminalsLayer);
+          var stopLabel = document.createElement('span'); stopLabel.textContent = (labels[term.role] || term.role) + ': ' + name; marker.bindTooltip(stopLabel);
           marker.on('click', function() {
             sendEvent('SELECT_TERMINAL', { id: term.id });
           });
@@ -618,13 +650,13 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           var isPuno = veh.status === 'Puno';
           var isSakto = veh.status === 'Sakto';
           var statusColor = veh.isSpeeding ? '#D32F2F' : (isPuno ? '#F44336' : (isSakto ? '#FF9800' : '#4CAF50'));
-          var vehicleStatusText = veh.quality === 'weak' ? 'Weak GPS · accuracy unknown or poor' : (data.hideOccupancy ? 'GPS position' : (veh.isSpeeding ? 'SPEEDING' : (veh.status || 'Occupancy unavailable')));
+          var vehicleStatusText = veh.quality === 'weak' ? labels['Weak GPS · accuracy unknown or poor'] : (data.hideOccupancy ? labels['GPS position'] : (veh.isSpeeding ? labels.SPEEDING : (veh.status || labels['Occupancy unavailable'])));
           if (data.hideOccupancy) statusColor = '#B63D32';
 
           var vHtml = '<div class="vehicle-marker-wrapper">' +
             '<div class="vehicle-pill" style="border-color:' + statusColor + '; color:' + statusColor + ';">' +
             '<span class="dot" style="background-color:' + statusColor + ';"></span>' +
-            escapeHtml(veh.body_number || veh.plate_number || 'Vehicle') + ' • ' + escapeHtml(vehicleStatusText) +
+            escapeHtml(veh.body_number || veh.plate_number || labels.Vehicle) + ' • ' + escapeHtml(vehicleStatusText) +
             '</div>' +
             '<div class="vehicle-icon-circle' + (veh.isSelected ? ' selected' : '') + '" style="border-color:' + statusColor + ';">' +
             'EJ' +
@@ -639,7 +671,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           });
 
           var vMarker = L.marker([veh.latitude, veh.longitude], { icon: vIcon }).addTo(vehiclesLayer);
-          var gpsLabel = document.createElement('span'); gpsLabel.textContent = 'Measured ' + veh.measuredAt + ' · ' + (veh.accuracy == null ? 'accuracy unknown' : '±' + veh.accuracy + ' m'); vMarker.bindTooltip(gpsLabel);
+          var gpsLabel = document.createElement('span'); gpsLabel.textContent = labels.Measured + ' ' + veh.measuredAt + ' · ' + (veh.accuracy == null ? labels['accuracy unknown'] : '±' + veh.accuracy + ' m'); vMarker.bindTooltip(gpsLabel);
           vMarker.on('click', function() {
             sendEvent('SELECT_VEHICLE', { id: veh.id });
           });
@@ -650,8 +682,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       userLayer.clearLayers();
       if (data.destinationPlace) {
         var placeLabel = document.createElement('span');
-        placeLabel.textContent = 'Destination: ' + data.destinationPlace.name;
-        L.marker([data.destinationPlace.latitude, data.destinationPlace.longitude], { title: 'Destination: ' + data.destinationPlace.name, zIndexOffset: -200 }).bindPopup(placeLabel).addTo(userLayer);
+        placeLabel.textContent = labels.Destination + ': ' + data.destinationPlace.name;
+        L.marker([data.destinationPlace.latitude, data.destinationPlace.longitude], { title: placeLabel.textContent, zIndexOffset: -200 }).bindPopup(placeLabel).addTo(userLayer);
       }
       if (data.userLocation) {
         var uHtml = '<div class="user-pulse-container">' +
@@ -668,8 +700,13 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       }
     };
 
-    // Initial render
-    window.renderMapData(${scriptJson(initialDataRef.current)});
+    }
+    window.renderMapData(initialData);
+
+    function sendEvent(type, data) {
+      var msg = JSON.stringify({ type: type, ...data });
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
+      else window.parent.postMessage(msg, '*');
     }
 
     // Handle iframe messages on web
@@ -695,6 +732,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!data || typeof data !== 'object') return;
         const payload = data as { type?: string; id?: string; latitude?: number; longitude?: number };
+        if (payload.type === 'MAP_READY' || payload.type === 'LIST_ONLY') { setListOnly(payload.type === 'LIST_ONLY'); return; }
         if (fieldReview && payload.type === 'PICK_CURB' && typeof payload.latitude === 'number' && typeof payload.longitude === 'number') {
           const point = { latitude: payload.latitude, longitude: payload.longitude };
           if (validPoint(point)) fieldReview.onPickCurb?.(point);
@@ -735,12 +773,11 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     handleRawMessage(event.nativeEvent.data);
   };
 
-  if (isWeb) {
-    if (showMapcn) {
-      return <MapcnPassengerMap data={mapData} controls={mapcnControls} onFailure={onMapcnFailure} onSelect={handleRawMessage} onPickCurb={fieldReview?.onPickCurb} />;
-    }
-    return (
-      <View style={styles.container}>
+  return (
+    <View style={styles.container}>
+      {showMapcn ? (
+        <MapcnPassengerMap data={mapData} controls={mapcnControls} onFailure={onMapcnFailure} onSelect={handleRawMessage} onPickCurb={fieldReview?.onPickCurb} />
+      ) : isWeb ? (
         <iframe
           ref={iframeRef as any}
           srcDoc={htmlContent}
@@ -748,26 +785,29 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           referrerPolicy="strict-origin-when-cross-origin"
           onLoad={pushLatestData}
           style={{ width: '100%', height: '100%', border: 'none' }}
-          title="Leaflet Map"
+          title={labels['eSAKAY street map']}
         />
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <NativeWebView
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={{ html: htmlContent }}
-        style={styles.map}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        onLoadEnd={pushLatestData}
-        onMessage={handleMessage}
-        scrollEnabled={false}
-        overScrollMode="never"
-      />
+      ) : (
+        <NativeWebView
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={{ html: htmlContent }}
+          style={styles.map}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          onLoadEnd={pushLatestData}
+          onMessage={handleMessage}
+          scrollEnabled={canMove || listOnly}
+          nestedScrollEnabled={canMove || listOnly}
+          bounces={false}
+          overScrollMode="never"
+        />
+      )}
+      {!fieldReview && (showMapcn || !listOnly) && (
+        <Pressable accessibilityRole="button" style={styles.moveButton} onPress={() => setMoveMap(value => !value)}>
+          <Text style={styles.moveLabel}>{moveMap ? t('passenger.map.lock', 'Lock map') : t('passenger.map.move', 'Move map')}</Text>
+        </Pressable>
+      )}
     </View>
   );
 });
@@ -787,4 +827,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f4f1ea',
   },
+  moveButton: {
+    position: 'absolute', top: 8, left: 8, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center',
+    borderWidth: 1, borderColor: '#52606d', borderRadius: 8, backgroundColor: '#fff',
+  },
+  moveLabel: { color: '#203b53', fontSize: 14, fontWeight: '700' },
 });

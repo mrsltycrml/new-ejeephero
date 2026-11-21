@@ -44,9 +44,9 @@ export default function ProfileScreen() {
     try {
       await signOut();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Please try again.';
-      if (Platform.OS === 'web') window.alert(`Could not log out: ${message}`);
-      else Alert.alert(t('common.error'), `Could not log out: ${message}`);
+      const message = error instanceof Error ? error.message : t('passenger.menu.retry');
+      if (Platform.OS === 'web') window.alert(t('passenger.profile.logoutError', { message }));
+      else Alert.alert(t('common.error'), t('passenger.profile.logoutError', { message }));
     }
   };
 
@@ -78,13 +78,13 @@ export default function ProfileScreen() {
       setShowLanguageSelector(false);
       Alert.alert(t('common.success'), `${lang === 'en' ? 'English' : 'Tagalog'} selected!`);
     } catch (err) {
-      Alert.alert(t('common.error'), 'Failed to change language');
+      Alert.alert(t('common.error'), t('passenger.profile.languageError'));
     }
   };
 
   const handleSaveName = async () => {
     if (!newName.trim()) {
-      Alert.alert('Validation Error', 'Full Name cannot be empty.');
+      Alert.alert(t('passenger.profile.validation'), t('passenger.profile.nameRequired'));
       return;
     }
 
@@ -96,14 +96,14 @@ export default function ProfileScreen() {
         .eq('id', user?.id);
 
       if (error) {
-        Alert.alert('Error', error.message);
+        Alert.alert(t('common.error'), error.message);
       } else {
         await refreshProfile();
         setIsEditingName(false);
-        Alert.alert('Success', 'Profile name updated successfully!');
+        Alert.alert(t('common.success'), t('passenger.profile.nameUpdated'));
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update profile name.');
+      Alert.alert(t('common.error'), err.message || t('passenger.profile.nameError'));
     } finally {
       setUpdatingName(false);
     }
@@ -111,20 +111,20 @@ export default function ProfileScreen() {
 
   const handleUpdatePassword = async () => {
     if (!newPassword || !confirmPassword) {
-      Alert.alert('Required Fields', 'Please fill in both password fields.');
+      Alert.alert(t('common.requiredFields'), t('passenger.profile.bothPasswords'));
       return;
     }
     const minLen = authProvider === 'clerk' ? 15 : 6;
     if (newPassword.length < minLen) {
-      Alert.alert('Validation Error', `Password must be at least ${minLen} characters.`);
+      Alert.alert(t('passenger.profile.validation'), t('passenger.profile.minLength', { length: minLen }));
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Validation Error', 'Passwords do not match.');
+      Alert.alert(t('passenger.profile.validation'), t('passenger.profile.mismatch'));
       return;
     }
     if (authProvider === 'clerk' && !currentPassword) {
-      Alert.alert('Current Password Required', 'Enter your current password to verify this change.');
+      Alert.alert(t('passenger.profile.currentRequired'), t('passenger.profile.verifyCurrent'));
       return;
     }
 
@@ -139,21 +139,21 @@ export default function ProfileScreen() {
         setNewPassword('');
         setConfirmPassword('');
         setShowPasswordSection(false);
-        Alert.alert('Success', 'Password updated successfully!');
+        Alert.alert(t('common.success'), t('passenger.profile.updated'));
       } else {
         const { error } = await supabaseAuth.auth.updateUser({ password: newPassword });
         if (error) {
-          Alert.alert('Error', error.message);
+          Alert.alert(t('common.error'), error.message);
         } else {
           setNewPassword('');
           setConfirmPassword('');
           setShowPasswordSection(false);
-          Alert.alert('Success', 'Password updated successfully!');
+          Alert.alert(t('common.success'), t('passenger.profile.updated'));
         }
       }
     } catch (err: any) {
-      const msg = err?.errors?.[0]?.longMessage || err?.message || 'Failed to update password.';
-      Alert.alert('Error', msg);
+      const msg = err?.errors?.[0]?.longMessage || err?.message || t('passenger.profile.passwordError');
+      Alert.alert(t('common.error'), msg);
     } finally {
       setUpdatingPassword(false);
     }
@@ -166,13 +166,13 @@ export default function ProfileScreen() {
       <View style={styles.identityCard}>
         <View style={styles.masthead}>
           <View style={styles.heroIdentity}>
-            <Text accessibilityRole="header" style={styles.nameHeader}>{fullName || (isAdmin ? 'Admin' : 'No name set')}</Text>
-            <Text style={styles.emailHeader}>{user?.email || 'Email unavailable'}</Text>
+            <Text accessibilityRole="header" style={styles.nameHeader}>{fullName || (isAdmin ? 'Admin' : t('passenger.profile.noName'))}</Text>
+            <Text style={styles.emailHeader}>{user?.email || t('passenger.profile.noEmail')}</Text>
           </View>
           {!isEditingName && (
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Edit full name"
+              accessibilityLabel={t('passenger.profile.editName')}
               onPress={() => { setIsEditingName(true); setNewName(fullName); }}
               style={styles.editButton}
             >
@@ -184,19 +184,19 @@ export default function ProfileScreen() {
 
         {isEditingName && (
           <View style={styles.form}>
-            <Text style={styles.fieldLabel}>Full name</Text>
+            <Text style={styles.fieldLabel}>{t('passenger.authSignup.fullName')}</Text>
             <TextInput
-              accessibilityLabel="Full name"
+              accessibilityLabel={t('passenger.authSignup.fullName')}
               style={styles.input}
               value={newName}
               onChangeText={setNewName}
               autoFocus
-              placeholder="Enter full name"
+              placeholder={t('passenger.profile.enterName')}
               placeholderTextColor={Colors.subtleGray}
             />
             <View style={styles.editActions}>
               <TouchableOpacity
-                accessibilityRole="button" accessibilityLabel="Save full name"
+                accessibilityRole="button" accessibilityLabel={t('passenger.profile.saveName')}
                 onPress={handleSaveName} disabled={updatingName}
                 accessibilityState={{ disabled: updatingName, busy: updatingName }}
                 style={styles.primaryButton}
@@ -217,14 +217,14 @@ export default function ProfileScreen() {
 
         {role !== 'driver' && (
           <View style={styles.detailRow}>
-            <Text style={styles.secondaryText}>Account status</Text>
-            <Text style={[styles.status, { color: statusColor }]}>{status || 'Unknown'}</Text>
+            <Text style={styles.secondaryText}>{t('passenger.profile.status')}</Text>
+            <Text style={[styles.status, { color: statusColor }]}>{status || t('passenger.profile.unknown')}</Text>
           </View>
         )}
         {role === 'passenger' && !isAdmin && (
           <View style={styles.detailRow}>
-            <Text style={styles.secondaryText}>Role</Text>
-            <Text style={styles.fieldLabel}>Passenger</Text>
+            <Text style={styles.secondaryText}>{t('passenger.profile.role')}</Text>
+            <Text style={styles.fieldLabel}>{t('passenger.nav.passenger')}</Text>
           </View>
         )}
       </View>
@@ -233,12 +233,12 @@ export default function ProfileScreen() {
         <TouchableOpacity
           style={styles.settingsRow}
           accessibilityRole="button"
-          accessibilityLabel="Password and security settings"
+          accessibilityLabel={t('passenger.profile.securitySettings')}
           accessibilityState={{ expanded: showPasswordSection }}
           onPress={() => setShowPasswordSection(!showPasswordSection)}
         >
           <Ionicons name="lock-closed-outline" size={21} color={Colors.brandGreen} />
-          <Text style={styles.rowTitle}>Password &amp; security</Text>
+          <Text style={styles.rowTitle}>{t('passenger.profile.security')}</Text>
           <Ionicons
             name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
             size={20}
@@ -252,8 +252,8 @@ export default function ProfileScreen() {
             {authProvider === 'clerk' && (
               <TextInput
                 style={styles.input}
-                placeholder="Current Password"
-                accessibilityLabel="Current password"
+                placeholder={t('passenger.profile.currentTitle')}
+                accessibilityLabel={t('passenger.profile.current')}
                 placeholderTextColor={Colors.subtleGray}
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
@@ -263,8 +263,8 @@ export default function ProfileScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder={authProvider === 'clerk' ? 'New Password (min 15 characters)' : 'New Password (min 6 characters)'}
-              accessibilityLabel="New password"
+              placeholder={authProvider === 'clerk' ? t('passenger.profile.minFifteen') : t('passenger.profile.minSix')}
+              accessibilityLabel={t('passenger.authReset.newPassword')}
               placeholderTextColor={Colors.subtleGray}
               value={newPassword}
               onChangeText={setNewPassword}
@@ -273,8 +273,8 @@ export default function ProfileScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Confirm New Password"
-              accessibilityLabel="Confirm new password"
+              placeholder={t('passenger.profile.confirmNew')}
+              accessibilityLabel={t('passenger.profile.confirmPlaceholder')}
               placeholderTextColor={Colors.subtleGray}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
@@ -291,7 +291,7 @@ export default function ProfileScreen() {
               {updatingPassword ? (
                 <ActivityIndicator color={Colors.white} size="small" />
               ) : (
-                <Text style={styles.primaryText}>Update password</Text>
+                <Text style={styles.primaryText}>{t('passenger.profile.update')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -319,8 +319,8 @@ export default function ProfileScreen() {
         >
           <Ionicons name="phone-portrait-outline" size={21} color={Colors.brandGreen} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>Install eSAKAY</Text>
-            <Text style={styles.secondaryText}>Android APK and iOS installation guide</Text>
+            <Text style={styles.rowTitle}>{t('passenger.install.title')}</Text>
+            <Text style={styles.secondaryText}>{t('passenger.profile.installationGuide')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={Colors.subtleGray} />
         </TouchableOpacity>

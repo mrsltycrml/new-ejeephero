@@ -9,6 +9,13 @@ test('asset gateway returns R2 JSON and genuine missing-file errors, never the a
   assert.deepEqual(await found.json(),{ok:true});
   const missing=await worker.fetch(new Request('https://app.example/releases/missing.apk'),env);
   assert.equal(missing.status,404);
+  const published = { ...env, ANDROID_RELEASE_TAG: 'android-v1.0.0-6' };
+  for (const method of ['GET', 'HEAD']) {
+    const download = await worker.fetch(new Request('https://app.example/releases/ejeephero-latest.apk', { method }), published);
+    assert.equal(download.status, 302);
+    assert.equal(download.headers.get('location'), 'https://github.com/mrsltycrml/new-ejeephero/releases/download/android-v1.0.0-6/eSAKAY.apk');
+    assert.equal(download.headers.get('cache-control'), 'no-store');
+  }
   const method=await worker.fetch(new Request('https://app.example/transit/test.json',{method:'POST'}),env);
   assert.equal(method.status,405);
   const page=await worker.fetch(new Request('https://app.example/'),env);

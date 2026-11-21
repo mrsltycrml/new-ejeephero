@@ -6,6 +6,7 @@ import './stopLandmarks.test.ts';
 import './reportingPeriod.test.ts';
 import './simplePdf.test.ts';
 import './passengerSafety.test.ts';
+import './emergencyContacts.test.ts';
 import './passengerJourney.test.ts';
 import './passengerPlaces.test.ts';
 import './placeSearchService.test.ts';

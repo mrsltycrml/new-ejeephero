@@ -4,13 +4,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import en from './en.json';
 import fil from './fil.json';
+import { passengerSections } from './passengerSections';
 
 const resources = {
-  en: { translation: en },
-  fil: { translation: fil },
+  en: { translation: { ...en, passenger: { ...en.passenger, ...passengerSections.en } } },
+  fil: { translation: { ...fil, passenger: { ...fil.passenger, ...passengerSections.fil } } },
 };
 
-// Initialize i18next
+i18next.on('languageChanged', language => {
+  if (typeof document !== 'undefined') document.documentElement.lang = language;
+});
+
 i18next
   .use(initReactI18next)
   .init({
@@ -39,6 +43,7 @@ export const initializeLanguage = async () => {
 
 // Function to change language and persist it
 export const changeLanguage = async (lang: string) => {
+  if (lang !== 'en' && lang !== 'fil') return;
   try {
     await i18next.changeLanguage(lang);
     await AsyncStorage.setItem('app_language', lang);

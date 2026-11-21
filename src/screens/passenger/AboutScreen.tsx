@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,27 +8,28 @@ import { Colors } from '../../constants/theme';
 import { BOARDING_EDUCATION } from '../../services/passengerSafety';
 
 export default function AboutScreen() {
+  const { t } = useTranslation();
   return (
     <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}>
       <View style={s.heroBanner}>
         <ESakayLogo />
-        <Text accessibilityRole="header" style={s.heroTitle}>Electric jeepney service</Text>
-        <Text style={s.heroSubtitle}>MRT Buendia to Mandaluyong City Hall</Text>
+        <Text accessibilityRole="header" style={s.heroTitle}>{t('passenger.about.service')}</Text>
+        <Text style={s.heroSubtitle}>{t('passenger.about.route')}</Text>
       </View>
 
       <View style={s.section}>
-        <Text accessibilityRole="header" style={s.sectionTitle}>Boarding at a stop</Text>
-        <Text style={s.body}>{BOARDING_EDUCATION}</Text>
-        <Text style={s.body}>Wait on the sidewalk until the vehicle stops fully. Confirm your destination with the driver before boarding.</Text>
+        <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.about.boarding')}</Text>
+        <Text style={s.body}>{t('passenger.guide.education', BOARDING_EDUCATION)}</Text>
+        <Text style={s.body}>{t('passenger.about.wait')}</Text>
       </View>
 
       <View style={s.section}>
-        <Text accessibilityRole="header" style={s.sectionTitle}>Passenger guide</Text>
+        <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.about.guide')}</Text>
         {([
-          { icon: 'location-outline', label: 'Map', detail: 'Find a place, inspect a stop and check available units.' },
-          { icon: 'ticket-outline', label: 'Fare', detail: 'Check sourced regular, student, senior and PWD fares.' },
-          { icon: 'shield-outline', label: 'Safety', detail: 'Manage trusted contacts and prepare an SOS with your location and ride details.' },
-          { icon: 'chatbubble-outline', label: 'Commuter assistant', detail: 'Ask about routes, stops and using the service.' },
+          { icon: 'location-outline', label: t('passenger.nav.map'), detail: t('passenger.about.mapDetail') },
+          { icon: 'ticket-outline', label: t('passenger.nav.fare'), detail: t('passenger.about.fareDetail') },
+          { icon: 'shield-outline', label: t('passenger.nav.safety'), detail: t('passenger.about.safetyDetail') },
+          { icon: 'chatbubble-outline', label: t('passenger.nav.assistant'), detail: t('passenger.about.assistantDetail') },
         ] as const).map(item => (
           <View key={item.label} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12 }}>
             <Ionicons aria-hidden name={item.icon} size={21} color={Colors.ink} />
@@ -42,7 +44,7 @@ export default function AboutScreen() {
       <TouchableOpacity accessibilityRole="link"
         onPress={() => Linking.openURL('https://meralcomain.s3.ap-southeast-1.amazonaws.com/2020-04/mer_sustainabilityreport2019_final.pdf')}
         style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text style={[s.link, { flexShrink: 1 }]}>Meralco sustainability report (PDF)</Text>
+        <Text style={[s.link, { flexShrink: 1 }]}>{t('passenger.about.report')}</Text>
         <Ionicons aria-hidden name="open-outline" size={16} color={Colors.brandGreen} />
       </TouchableOpacity>
     </ScrollView>

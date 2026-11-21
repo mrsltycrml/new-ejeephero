@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +7,7 @@ import { Colors } from '../../constants/theme';
 import { AuthAction, AuthLink, AuthPage, authStyles } from './AuthUI';
 
 export default function PendingApprovalScreen() {
+  const { t } = useTranslation();
   const { user, status, role, isAdmin, signOut, refreshProfile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -19,20 +21,20 @@ export default function PendingApprovalScreen() {
   };
 
   const isBlocked = status === 'rejected' || status === 'suspended';
-  const heading = status === 'rejected' ? 'Registration rejected' : status === 'suspended' ? 'Account suspended'
-    : status === 'pending' ? 'Awaiting approval' : 'Status unavailable';
+  const heading = status === 'rejected' ? t('passenger.pending.rejected') : status === 'suspended' ? t('passenger.pending.suspended')
+    : status === 'pending' ? t('passenger.pending.waiting') : t('passenger.pending.unknown');
   const description = status === 'rejected'
-    ? 'Your registration was declined. Contact your supervisor if you believe this is an error.'
+    ? t('passenger.pending.rejectedDetail')
     : status === 'suspended'
-      ? 'Your account has been suspended after review. Contact your supervisor for assistance.'
+      ? t('passenger.pending.suspendedDetail')
       : status === 'pending'
         ? role === 'driver'
-          ? 'A supervisor is reviewing your driver registration. You can start a shift once your account is approved.'
-          : 'Your account is waiting for supervisor approval.'
-        : 'Check again to retrieve your account status.';
+          ? t('passenger.pending.driverReview')
+          : t('passenger.pending.passengerReview')
+        : t('passenger.pending.retry');
 
   return (
-    <AuthPage title={isAdmin ? 'Supervisor account' : role === 'driver' ? 'Driver account' : 'Account access'}>
+    <AuthPage title={isAdmin ? t('passenger.pending.supervisor') : role === 'driver' ? t('passenger.pending.driver') : t('passenger.pending.access')}>
       <View style={authStyles.form}>
         <View style={[styles.status, isBlocked && styles.blocked]} accessibilityLiveRegion="polite">
           <Ionicons aria-hidden name={isBlocked ? 'close-circle-outline' : 'time-outline'}
@@ -42,12 +44,12 @@ export default function PendingApprovalScreen() {
         <Text style={authStyles.body}>{description}</Text>
         {!!user?.email && (
           <View style={styles.identity}>
-            <Text style={authStyles.label}>Email address</Text>
+            <Text style={authStyles.label}>{t('passenger.authLogin.email')}</Text>
             <Text selectable style={styles.email}>{user.email}</Text>
           </View>
         )}
-        {!isBlocked && <AuthAction label="Check approval status" loading={refreshing} onPress={handleRefresh} icon="refresh-outline" />}
-        <AuthLink label="Sign out" onPress={signOut} />
+        {!isBlocked && <AuthAction label={t('passenger.pending.check')} loading={refreshing} onPress={handleRefresh} icon="refresh-outline" />}
+        <AuthLink label={t('passenger.menu.signOut')} onPress={signOut} />
       </View>
     </AuthPage>
   );

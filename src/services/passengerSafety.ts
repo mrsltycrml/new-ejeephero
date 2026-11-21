@@ -1,5 +1,6 @@
 import { permitsPassengerUse } from '../../supabase/functions/_shared/passengerStopUse.ts';
 import type { TerminalData } from './offlineTransitService';
+import type { TFunction } from 'i18next';
 
 // An absent stop is never proof that loading is illegal.
 export type LoadingZone = {
@@ -26,7 +27,17 @@ export function distanceMeters(a: { latitude: number; longitude: number }, b: { 
   return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export function evaluateBoardingLocation(fix: PassengerFix | null, zones: LoadingZone[], now = Date.now(), stops: TerminalData[] = []): BoardingStatus {
+export function evaluateBoardingLocation(fix: PassengerFix | null, zones: LoadingZone[], now = Date.now(), stops: TerminalData[] = [], t?: TFunction): BoardingStatus {
+  const status = boardingAt(fix, zones, now, stops);
+  if (!t) return status;
+  let detail = status.detail;
+  if (status.kind === 'prohibited') detail = t('passenger.boarding.prohibited', { zone: status.zone!.name });
+  else if (status.kind === 'outside') detail = t('passenger.boarding.outside', { zone: status.zone!.name, distance: Math.round(distanceMeters(fix!, status.zone!)) });
+  else if (status.kind !== 'allowed') detail = t('passenger.boarding.labels.' + detail, detail);
+  return { ...status, title: t('passenger.boarding.labels.' + status.title, status.title), detail };
+}
+
+function boardingAt(fix: PassengerFix | null, zones: LoadingZone[], now: number, stops: TerminalData[]): BoardingStatus {
   if (!fix || !Number.isFinite(fix.timestamp) || now - fix.timestamp > 30_000 || fix.timestamp > now + 5000) return { kind: 'unavailable', title: 'Fresh location needed', detail: 'Enable location and wait for a fresh fix to check your waiting area.' };
   if (!Number.isFinite(fix.latitude) || !Number.isFinite(fix.longitude) || Math.abs(fix.latitude) > 90 || Math.abs(fix.longitude) > 180 || fix.accuracy == null || !Number.isFinite(fix.accuracy) || fix.accuracy < 0 || fix.accuracy > 30) {
     return { kind: 'uncertain', title: 'Checking your location', detail: 'The GPS signal is not precise enough yet. Follow the signs at your stop.' };

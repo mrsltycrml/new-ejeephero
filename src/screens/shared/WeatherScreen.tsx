@@ -149,7 +149,7 @@ export default function WeatherScreen() {
 
       <View style={styles.measurements}>
         {[
-          { label: 'Feels like', value: reading(weather.main.feels_like, '°C', true) },
+          { label: t('passenger.weather.feelsLike'), value: reading(weather.main.feels_like, '°C', true) },
           { label: t('weather.windSpeed'), value: reading(weather.wind?.speed, ' m/s') },
           { label: t('weather.humidity'), value: reading(weather.main.humidity, '%') },
           { label: t('weather.pressure'), value: reading(weather.main.pressure, ' hPa') },

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { Image, Linking, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
   onSelectStop: (stop: TerminalData) => void; onWalk: (stop: TerminalData) => void; walkingBusy: boolean;
   onRefresh: () => void; loading: boolean; loadError: boolean; openRequest?: number;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
@@ -25,60 +27,60 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
   const boardingColor = boarding.kind === 'prohibited' ? Colors.primaryRed : boarding.kind === 'allowed' ? Colors.success : Colors.warning;
   return (
     <View style={s.section}>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Stop landmarks" accessibilityState={{ expanded: open }}
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.guide.title')} accessibilityState={{ expanded: open }}
         onPress={() => setOpen(!open)} style={styles.disclosure}>
         <Ionicons aria-hidden name="location-outline" size={22} color={Colors.action} />
-        <Text style={[s.sectionTitle, styles.grow]}>Stop landmarks</Text>
+        <Text style={[s.sectionTitle, styles.grow]}>{t('passenger.guide.title')}</Text>
         <Ionicons aria-hidden name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.action} />
       </TouchableOpacity>
       {open && <>
         <View style={[styles.boarding, { borderLeftColor: boardingColor }]}>
-          <Text style={s.muted}>Your current waiting area</Text>
+          <Text style={s.muted}>{t('passenger.guide.waitingArea')}</Text>
           <Text accessibilityRole={boarding.kind === 'prohibited' ? 'alert' : undefined} style={s.label}>{boarding.title}</Text>
           <Text style={s.body}>{boarding.detail}</Text>
         </View>
-        <PassengerSelect label="Inspect a stop" value={active?.id || ''} disabled={!stops.length}
-          options={stops.map(stop => ({ value: stop.id, label: `${stop.name} · ${passengerUseLabel(stop)}` }))}
+        <PassengerSelect label={t('passenger.guide.inspect')} value={active?.id || ''} disabled={!stops.length}
+          options={stops.map(stop => ({ value: stop.id, label: `${stop.name} · ${t('passenger.map.labels.' + passengerUseLabel(stop))}` }))}
           onSelect={id => { const stop = stops.find(item => item.id === id); if (stop) onSelectStop(stop); }} />
-        {!stops.length && <Text style={s.muted}>Confirmed passenger stops are unavailable. The historical landmark reference is available below.</Text>}
+        {!stops.length && <Text style={s.muted}>{t('passenger.guide.missing')}</Text>}
         {active && <>
           {permitsPassengerUse(active, 'board') && <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} accessibilityState={{ disabled: walkingBusy }}
             onPress={() => onWalk(active)} style={[s.button, walkingBusy && { opacity: 0.6 }]}>
-            <Text style={s.buttonText}>{walkingBusy ? 'Finding a walking route…' : 'Walk to this stop'}</Text>
+            <Text style={s.buttonText}>{walkingBusy ? t('passenger.guide.findingWalk') : t('passenger.guide.walkHere')}</Text>
           </TouchableOpacity>}
           {details?.photo && failedPhoto !== details.photo ? <>
-            <Image source={{ uri: details.photo }} accessibilityLabel={`Recorded landmark at ${active.name}`} resizeMode="contain"
+            <Image source={{ uri: details.photo }} accessibilityLabel={t('passenger.guide.photoLabel', { stop: active.name })} resizeMode="contain"
               style={styles.photo} onError={() => setFailedPhoto(details.photo)} />
-            <TouchableOpacity accessibilityRole="link" style={styles.link} onPress={() => void Linking.openURL(details.photoSource!)}><Text style={s.link}>Photo source</Text></TouchableOpacity>
-          </> : <Text style={s.muted}>Stop photo unavailable.</Text>}
-          <Text style={s.body}>{details?.description || 'Landmark description unavailable.'}</Text>
+            <TouchableOpacity accessibilityRole="link" style={styles.link} onPress={() => void Linking.openURL(details.photoSource!)}><Text style={s.link}>{t('passenger.guide.photoSource')}</Text></TouchableOpacity>
+          </> : <Text style={s.muted}>{t('passenger.guide.noPhoto')}</Text>}
+          <Text style={s.body}>{details?.description || t('passenger.guide.noDescription')}</Text>
           <View>
             {[
-              ...(permitsPassengerUse(active, 'board') ? [['Boarding side', details?.boardingSide]] : []),
-              ['Travel direction', details?.direction],
-              ['Entrance', details?.entrance],
+              ...(permitsPassengerUse(active, 'board') ? [[t('passenger.guide.boardingSide'), details?.boardingSide]] : []),
+              [t('passenger.guide.direction'), details?.direction],
+              [t('passenger.guide.entrance'), details?.entrance],
             ].map(([label, value]) => <View key={label} style={styles.detail}>
-              <Text style={s.muted}>{label}</Text><Text style={s.label}>{value || 'Unavailable'}</Text>
+              <Text style={s.muted}>{label}</Text><Text style={s.label}>{value || t('passenger.home.unavailable')}</Text>
             </View>)}
           </View>
           {details && <TouchableOpacity accessibilityRole="link" style={styles.link} onPress={() => void Linking.openURL(details.source)}>
-            <Text style={s.link}>Stop details source · verified {new Date(details.verifiedAt).toLocaleDateString()}</Text>
+            <Text style={s.link}>{t('passenger.guide.detailsSource', { date: new Date(details.verifiedAt).toLocaleDateString() })}</Text>
           </TouchableOpacity>}
         </>}
-        <Text style={s.muted}>{BOARDING_EDUCATION}</Text>
+        <Text style={s.muted}>{t('passenger.guide.education', BOARDING_EDUCATION)}</Text>
         <TouchableOpacity accessibilityRole="button" disabled={loading} accessibilityState={{ disabled: loading }} onPress={onRefresh} style={[s.button, s.secondary]}>
-          <Text style={s.link}>{loading ? 'Refreshing…' : loadError ? 'Retry stops and routes' : 'Refresh stops and routes'}</Text>
+          <Text style={s.link}>{loading ? t('passenger.guide.refreshing') : loadError ? t('passenger.guide.retry') : t('passenger.guide.refresh')}</Text>
         </TouchableOpacity>
       </>}
       <View style={s.divider} />
       <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: referenceOpen }} onPress={() => setReferenceOpen(!referenceOpen)} style={styles.disclosure}>
         <View style={styles.grow}>
-          <Text style={s.link}>Historical landmark reference</Text><Text style={s.muted}>{LANDMARK_REFERENCE.date}</Text>
+          <Text style={s.link}>{t('passenger.guide.reference')}</Text><Text style={s.muted}>{LANDMARK_REFERENCE.date}</Text>
         </View>
         <Ionicons aria-hidden name={referenceOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.action} />
       </TouchableOpacity>
       {referenceOpen && <>
-        <Text style={s.muted}>Distances are printed labels from the photographed sheet. Current travel distances, coordinates, boarding sides and entrances require separate verification.</Text>
+        <Text style={s.muted}>{t('passenger.guide.referenceNote')}</Text>
         <View>
           {LANDMARK_REFERENCE.stops.map(stop => <View key={stop.printedKm} style={styles.referenceRow}>
             <Text style={styles.km}>{stop.printedKm} km</Text><Text style={[s.body, styles.grow]}>{stop.name}</Text>

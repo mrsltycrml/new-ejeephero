@@ -21,38 +21,101 @@ export async function callEmergencyService(token: string | null, body: Record<st
 async function localContacts(userId: string): Promise<EmergencyContact[]> {
   try {
     const saved = await AsyncStorage.getItem(key(userId));
-    if (saved) return JSON.parse(saved).filter((c: EmergencyContact) => c.user_id === userId);
-    // Migrate only contacts explicitly belonging to this account.
-    const legacy = JSON.parse(await AsyncStorage.getItem('@ejeephero_emergency_contact') || '[]');
-    return (Array.isArray(legacy) ? legacy : [legacy]).filter((c: EmergencyContact) => c.user_id === userId);
+    const source = saved ?? await AsyncStorage.getItem('@ejeephero_emergency_contact');
+    if (!source) return [];
+    const parsed = JSON.parse(source);
+    return (Array.isArray(parsed) ? parsed : [parsed]).filter(contact => contact?.user_id === userId
+      && typeof contact.contact_name === 'string' && typeof contact.phone_number === 'string')
+      .map(contact => ({ ...contact, preset_message: typeof contact.preset_message === 'string' ? contact.preset_message : '' }));
   } catch { return []; }
 }
-export async function loadEmergencyContacts(userId: string, token: string | null): Promise<EmergencyContact[]> {
+
+const columns = 'id,user_id,contact_name,phone_number,preset_message';
+
+async function contactRequest<T>(run: (signal: AbortSignal) => PromiseLike<T>): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([run(controller.signal), new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new Error('Contacts timed out.')); }, 8000);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
+// A refresh and an edit share one device cache. Finish each read/merge/write before the next.
+let pending = Promise.resolve();
+function inOrder<T>(operation: () => Promise<T>): Promise<T> {
+  const result = pending.then(operation);
+  pending = result.then(() => {}, () => {});
+  return result;
+}
+
+async function readContacts(userId: string) {
   const local = await localContacts(userId);
   try {
-    const result = await callEmergencyService(token, { action: 'contacts:list' });
-    if (!Array.isArray(result.contacts)) return local;
-    const map = new Map<string, EmergencyContact>();
-    for (const c of [...result.contacts, ...local.filter(c => c.localOnly)]) map.set(c.phone_number, c);
-    const contacts = [...map.values()].slice(0, 5);
-    await AsyncStorage.setItem(key(userId), JSON.stringify(contacts));
-    return contacts;
-  } catch { return local; }
+    const { data, error } = await contactRequest(signal => supabase.from('emergency_contacts')
+      .select(columns).eq('user_id', userId).order('created_at').limit(5).abortSignal(signal));
+    if (error || !Array.isArray(data)) throw new Error('Contacts unavailable.');
+    const merged = new Map<string, EmergencyContact>();
+    for (const contact of data) {
+      if (contact.user_id === userId) merged.set(contact.phone_number, contact);
+    }
+    for (const contact of local) {
+      if (contact.localOnly && !merged.has(contact.phone_number)) merged.set(contact.phone_number, contact);
+    }
+    const contacts = [...merged.values()];
+    await AsyncStorage.setItem(key(userId), JSON.stringify(contacts)).catch(() => {});
+    return { contacts, synced: true };
+  } catch { return { contacts: local, synced: false }; }
 }
-export async function saveEmergencyContact(userId: string, token: string | null, contact: EmergencyContact) {
-  const phone = normalizeEmergencyPhone(contact.phone_number);
-  if (!phone || !contact.contact_name.trim()) throw new Error('Enter a name and a valid Philippine mobile number.');
-  const current = await loadEmergencyContacts(userId, token);
-  if (current.length >= 5 && !current.some(c => c.phone_number === phone)) throw new Error('You can save up to five emergency contacts.');
-  let saved: EmergencyContact = { ...contact, user_id: userId, contact_name: contact.contact_name.trim().slice(0, 80), phone_number: phone, localOnly: true };
-  try { const result = await callEmergencyService(token, { action: 'contacts:save', contact: saved }); if (result.contact) saved = result.contact; }
-  catch { if (current.some(c => c.phone_number === phone && !c.localOnly)) throw new Error('Could not update this contact. Check your connection and try again.'); }
-  await AsyncStorage.setItem(key(userId), JSON.stringify([...current.filter(c => c.phone_number !== phone), saved]));
-  return saved;
+
+export function readEmergencyContacts(userId: string) {
+  return inOrder(() => readContacts(userId));
 }
-export async function removeEmergencyContact(userId: string, token: string | null, contact: EmergencyContact) {
-  if (!contact.localOnly) await callEmergencyService(token, { action: 'contacts:delete', phone: contact.phone_number });
-  const next = (await localContacts(userId)).filter(c => c.phone_number !== contact.phone_number);
-  await AsyncStorage.setItem(key(userId), JSON.stringify(next));
-  return next;
+
+export async function loadEmergencyContacts(userId: string): Promise<EmergencyContact[]> {
+  return (await readEmergencyContacts(userId)).contacts;
+}
+
+export function saveEmergencyContact(userId: string, contact: EmergencyContact) {
+  return inOrder(async () => {
+    const phone = normalizeEmergencyPhone(contact.phone_number);
+    if (!phone || !contact.contact_name.trim()) throw new Error('invalid');
+    const { contacts, synced } = await readContacts(userId);
+    const existing = contacts.find(c => c.phone_number === phone);
+    if (!existing && contacts.length >= 5) throw new Error('limit');
+    const row = { user_id: userId, phone_number: phone, contact_name: contact.contact_name.trim().slice(0, 80),
+      preset_message: contact.preset_message.trim().slice(0, 300) };
+    let saved: EmergencyContact = { ...row, localOnly: true };
+    if (synced) {
+      const query = existing && !existing.localOnly
+        ? supabase.from('emergency_contacts').update({ contact_name: row.contact_name, preset_message: row.preset_message })
+          .eq('user_id', userId).eq('phone_number', phone)
+        : supabase.from('emergency_contacts').upsert(row, { onConflict: 'user_id,phone_number' });
+      const { data, error } = await contactRequest(signal => query.select(columns).abortSignal(signal).single());
+      if (error || !data || data.user_id !== userId) throw new Error('save');
+      saved = data;
+    } else if (existing && !existing.localOnly) {
+      throw new Error('save');
+    }
+    const next = [...contacts.filter(c => c.phone_number !== phone), saved];
+    const write = AsyncStorage.setItem(key(userId), JSON.stringify(next));
+    if (saved.localOnly) await write;
+    else await write.catch(() => {});
+    return saved;
+  });
+}
+
+export function removeEmergencyContact(userId: string, contact: EmergencyContact) {
+  return inOrder(async () => {
+    if (contact.user_id !== userId) throw new Error('remove');
+    if (!contact.localOnly) {
+      const { error } = await contactRequest(signal => supabase.from('emergency_contacts')
+        .delete().eq('user_id', userId).eq('phone_number', contact.phone_number).abortSignal(signal));
+      if (error) throw new Error('remove');
+    }
+    const next = (await localContacts(userId)).filter(c => c.phone_number !== contact.phone_number);
+    await AsyncStorage.setItem(key(userId), JSON.stringify(next));
+    return next;
+  });
 }

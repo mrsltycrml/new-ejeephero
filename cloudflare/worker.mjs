@@ -7,6 +7,14 @@ export default {
     if (prefixes.some(prefix => url.pathname.startsWith(prefix))) {
       if (request.method === 'OPTIONS') return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET, HEAD, OPTIONS'}});
       if (!['GET','HEAD'].includes(request.method)) return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
+      if (url.pathname === '/releases/ejeephero-latest.apk' && env.ANDROID_RELEASE_TAG) {
+        const tag = encodeURIComponent(env.ANDROID_RELEASE_TAG);
+        return new Response(null, { status: 302, headers: {
+          Location: `https://github.com/mrsltycrml/new-ejeephero/releases/download/${tag}/eSAKAY.apk`,
+          'Cache-Control': 'no-store',
+          'Access-Control-Allow-Origin': '*',
+        } });
+      }
       let key;
       try { key=decodeURIComponent(url.pathname.slice(1)); } catch { return new Response('Invalid path',{status:400}); }
       if (key.includes('..') || key.includes('\\') || !/^[A-Za-z0-9/_.,-]+$/.test(key)) return new Response('Invalid path',{status:400});

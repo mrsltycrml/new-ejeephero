@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,21 +11,22 @@ import { Ionicons } from '@expo/vector-icons';
 type Message = { role: 'user' | 'assistant'; content: string };
 
 export default function HeroBotScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const chat = useRef<React.ElementRef<typeof ScrollView>>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const SUGGESTIONS = [
-    'Where do I board at MRT Buendia?',
-    'Where can I check operating hours?',
-    'How do I check the student fare?',
-    'How do I find stops on a route?',
-    'How does Emergency SOS work?',
+    t('passenger.assistant.board'),
+    t('passenger.assistant.hours'),
+    t('passenger.assistant.student'),
+    t('passenger.assistant.stops'),
+    t('passenger.assistant.sos'),
   ];
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Ask me about using eSAKAY. Check Map for available stops and current vehicle locations, and Fare for a sourced fare quote. Missing information will be shown as unavailable.',
+      content: t('passenger.assistant.intro'),
     },
   ]);
   const [input, setInput] = useState('');
@@ -55,7 +57,7 @@ export default function HeroBotScreen() {
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: 'The commuter assistant is unavailable. Please try again shortly.' },
+        { role: 'assistant', content: t('passenger.assistant.unavailable') },
       ]);
     } finally {
       setLoading(false);
@@ -65,23 +67,23 @@ export default function HeroBotScreen() {
   return (
     <KeyboardAvoidingView style={s.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       <ScrollView ref={chat} style={{ flex: 1 }} contentContainerStyle={[s.content, styles.column]}
-        keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="always" automaticallyAdjustKeyboardInsets
         onContentSizeChange={() => { if (messages.length > 1 && !showSuggestions) chat.current?.scrollToEnd({ animated: false }); }}>
         {messages.map((msg, index) => {
           const outgoing = msg.role === 'user';
           return (
             <View key={index} style={[styles.bubble, outgoing ? styles.outgoing : styles.incoming]}>
-              <Text style={[s.label, outgoing ? styles.light : styles.sender]}>{outgoing ? 'You' : 'Commuter assistant'}</Text>
+              <Text style={[s.label, outgoing ? styles.light : styles.sender]}>{outgoing ? t('passenger.assistant.you') : t('passenger.nav.assistant')}</Text>
               <Text selectable style={[s.body, outgoing && styles.light]}>{msg.content}</Text>
             </View>
           );
         })}
         {loading && <View style={styles.status}>
           <ActivityIndicator size="small" color={Colors.brandGreen} />
-          <Text accessibilityLiveRegion="polite" style={s.muted}>Waiting for a reply…</Text>
+          <Text accessibilityLiveRegion="polite" style={s.muted}>{t('passenger.assistant.waiting')}</Text>
         </View>}
         {showSuggestions && <View style={s.section}>
-          <Text accessibilityRole="header" style={s.sectionTitle}>Suggested questions</Text>
+          <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.assistant.suggestions')}</Text>
           {SUGGESTIONS.map(question => (
             <TouchableOpacity key={question} accessibilityRole="button" onPress={() => void sendMessage(question)} disabled={loading} style={styles.question}>
               <Text style={[s.link, { flex: 1 }]}>{question}</Text>
@@ -93,14 +95,14 @@ export default function HeroBotScreen() {
 
       <View style={[styles.composer, { paddingBottom: Math.max(12, insets.bottom + 8) }]}>
         <View style={styles.controls}>
-          {messages.length > 1 && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Suggested questions"
+          {messages.length > 1 && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.assistant.suggestions')}
             accessibilityState={{ expanded: showSuggestions, disabled: loading }} disabled={loading} style={styles.iconButton}
             onPress={() => { setShowSuggestions(!showSuggestions); if (!showSuggestions) requestAnimationFrame(() => chat.current?.scrollToEnd({ animated: false })); }}>
             <Ionicons aria-hidden name="help-circle-outline" size={24} color={Colors.brandGreen} />
           </TouchableOpacity>}
-          <TextInput style={[s.input, { flex: 1, minWidth: 0 }]} value={input} onChangeText={setInput} placeholder="Ask a question" placeholderTextColor={Colors.subtleGray}
-            onSubmitEditing={() => void sendMessage()} returnKeyType="send" accessibilityLabel="Message the commuter assistant" maxLength={2000} />
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send message" accessibilityState={{ disabled: loading || !input.trim() }}
+          <TextInput style={[s.input, { flex: 1, minWidth: 0 }]} value={input} onChangeText={setInput} placeholder={t('passenger.assistant.ask')} placeholderTextColor={Colors.subtleGray}
+            onSubmitEditing={() => void sendMessage()} returnKeyType="send" accessibilityLabel={t('passenger.assistant.message')} maxLength={2000} />
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.assistant.send')} accessibilityState={{ disabled: loading || !input.trim() }}
             style={[styles.iconButton, styles.send, (loading || !input.trim()) && { opacity: 0.5 }]} onPress={() => void sendMessage()} disabled={loading || !input.trim()}>
             <Ionicons aria-hidden name="arrow-up" size={22} color={Colors.white} />
           </TouchableOpacity>

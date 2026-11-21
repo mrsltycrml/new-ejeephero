@@ -5,6 +5,7 @@ import { registerHooks } from 'node:module';
 import { setImmediate } from 'node:timers/promises';
 import ts from 'typescript';
 import { acceptFix, positionPayload } from '../src/services/locationQuality.ts';
+import { passengerSections } from '../src/locales/passengerSections.ts';
 
 // Render the real screen handler; replace only hooks, UI, device and I/O boundaries.
 let states: any[] = [], refs: any[] = [], index = 0, refIndex = 0, effects: Array<() => any> = [];
@@ -64,6 +65,7 @@ Object.assign(globalThis, { __shiftReact: react, __shiftDb: database, __shiftTra
     getCurrentPositionAsync: async () => { deviceCalls.push('position'); return rejectedDeviceReading; },
   } });
 const fixtures: Record<string, string> = {
+  'react-i18next': 'const labels=' + JSON.stringify(passengerSections.en.driverSpeed) + '; export const useTranslation=()=>({t:key=>labels[key.split(".").pop()] || key});',
   react: 'const r=globalThis.__shiftReact; export default r; export const {useState,useEffect,useRef,useCallback}=r;',
   'react-native': 'export const Platform=globalThis.__shiftPlatform,ActivityIndicator="Spinner",View="View",Text="Text",TouchableOpacity="Button",ScrollView="Scroll"; export const StyleSheet={create:s=>s};',
   'expo-location': 'export const {Accuracy,getForegroundPermissionsAsync,hasServicesEnabledAsync,getCurrentPositionAsync}=globalThis.__shiftDevice;',
@@ -293,7 +295,7 @@ test('on-duty status refresh, foreground resume and weak or stale GPS do not sha
     assert.equal(published.length,2);assert.match(textOf(render()),/out of service/);
     for (const fix of [{...accepted,accuracy:80,timestamp:Date.now()},{...accepted,timestamp:Date.now()-31000}]) {
       locationState={...locationState,fix};await settle();
-      const retry=findNode(render(),n=>n?.type==='Button' && textOf(n)==='Enable location / retry');
+      const retry=findNode(render(),n=>n?.type==='Button' && textOf(n)===passengerSections.en.driverSpeed.retry);
       await retry.props.onPress();
     }
     assert.equal(retries,2);
@@ -305,6 +307,32 @@ async function mountCount() {
   render(); flushEffects(); await setImmediate(); render(); flushEffects(); await setImmediate();
   return render();
 }
+
+test('dashboard labels estimates, publishes only measured speeds and drops a weak reading', async () => {
+  await mountCount();
+  const now = Date.now();
+  async function show(fix: Omit<typeof accepted, 'speed'> & { speed: number | null }) {
+    locationState = { ...locationState, fix, now };
+    render(); flushEffects(); await setImmediate();
+    return textOf(render());
+  }
+  const first = { ...accepted, speed: null, timestamp: now - 10000 };
+  const second = { ...first, latitude: first.latitude + 0.0005, timestamp: now };
+  try {
+    assert.match(await show(first), /Waiting for a speed reading/);
+    assert.match(await show(second), /Estimated speed20 km\/h/);
+    assert.equal(published.at(-1)?.speed, null);
+    assert.match(await show({ ...second, speed: 20.4, timestamp: now + 1 }), /Above the company limit/);
+    assert.equal(published.at(-1)?.speed, 20.4);
+    const stopped = await show({ ...second, speed: 0, timestamp: now + 2 });
+    assert.match(stopped, /Your speed0 km\/h/);
+    assert.doesNotMatch(stopped, /Above the company limit/);
+    const weak = await show({ ...second, accuracy: 60, speed: 30, timestamp: now + 3 });
+    assert.match(weak, /Waiting for GPS/);
+    assert.doesNotMatch(weak, /30 km\/h|Above the company limit/);
+    assert.equal(published.at(-1)?.speed, 0);
+  } finally { cleanupEffects(); }
+});
 
 test('actual passenger count handler blocks same-frame taps and disables controls until persistence', async () => {
   let tree = await mountCount();

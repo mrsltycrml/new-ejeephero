@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormScrollView } from '../../components/AppUI';
 import ESakayLogo from '../../components/ESakayLogo';
+import LanguageSwitch from '../../components/LanguageSwitch';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../../constants/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -19,6 +21,7 @@ type AuthPageProps = {
 };
 
 export function AuthPage({ title, subtitle, onBack, children }: AuthPageProps) {
+  const { t } = useTranslation();
   const { width, fontScale } = useWindowDimensions();
   const wide = width >= 800 && width / Math.max(fontScale, 1) >= 660;
   const phoneWeb = Platform.OS === 'web' && !wide;
@@ -38,13 +41,15 @@ export function AuthPage({ title, subtitle, onBack, children }: AuthPageProps) {
         <View style={[styles.masthead, wide && styles.wideMasthead]}>
           <View style={styles.mastheadTop}>
             <ESakayLogo width={134} />
-            {onBack && (
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to sign in"
-                onPress={onBack} style={styles.back}>
-                <Ionicons name="arrow-back" size={22} color={Colors.onDark} />
-              </TouchableOpacity>
-            )}
+            <LanguageSwitch />
           </View>
+          {onBack && (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.authLogin.back')}
+              onPress={onBack} style={styles.back}>
+              <Ionicons aria-hidden name="arrow-back" size={18} color={Colors.onDark} />
+              <Text style={styles.backLabel}>{t('passenger.authLogin.back')}</Text>
+            </TouchableOpacity>
+          )}
           <View style={[styles.heading, wide && styles.wideHeading]}>
             <View style={styles.marker} />
             <Text accessibilityRole="header" style={[styles.title, wide && styles.wideTitle]}>{title}</Text>
@@ -73,6 +78,7 @@ export function AuthPage({ title, subtitle, onBack, children }: AuthPageProps) {
 type FieldProps = TextInputProps & { label: string; passwordToggle?: boolean };
 
 export function AuthField({ label, passwordToggle, secureTextEntry, style, onFocus, onBlur, ...input }: FieldProps) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
   return (
@@ -85,7 +91,7 @@ export function AuthField({ label, passwordToggle, secureTextEntry, style, onFoc
           onFocus={event => { setFocused(true); onFocus?.(event); }}
           onBlur={event => { setFocused(false); onBlur?.(event); }} />
         {passwordToggle && (
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={visible ? 'Hide password' : 'Show password'}
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={t(visible ? 'passenger.authLogin.hidePassword' : 'passenger.authLogin.showPassword')}
             onPress={() => setVisible(!visible)} style={styles.eye}>
             <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.subtleGray} />
           </TouchableOpacity>
@@ -150,7 +156,8 @@ const styles = StyleSheet.create({
   masthead: { backgroundColor: Colors.midnight, paddingHorizontal: 24, paddingVertical: 20, gap: 18 },
   wideMasthead: { flex: 4, minWidth: 0, paddingHorizontal: 32, paddingVertical: 32, justifyContent: 'space-between' },
   mastheadTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  back: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  back: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  backLabel: { fontSize: 14, fontWeight: '600', color: Colors.onDark },
   heading: { alignItems: 'flex-start', gap: 6 },
   wideHeading: { paddingVertical: 22, gap: 12 },
   marker: { width: 32, height: 4, borderRadius: 2, backgroundColor: Colors.signal, marginBottom: 4 },

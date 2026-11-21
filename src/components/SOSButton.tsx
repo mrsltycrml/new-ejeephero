@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Platform, Linking, StyleSheet } from 'react-native';
 import * as Location from 'expo-location';
@@ -32,6 +33,7 @@ export default function SOSButton({
   activeVehiclePlate,
   activeVehicleBody,
 }: Props) {
+  const { t } = useTranslation();
   const { user, getAccessToken } = useAuth();
   const [visible, setVisible] = useState(false);
   const [count, setCount] = useState<number | null>(null);
@@ -104,8 +106,7 @@ export default function SOSButton({
     })();
 
     const contactPromise = (async () => {
-      const token = await getAccessToken().catch(() => null);
-      const list = user ? await loadEmergencyContacts(user.id, token) : [];
+      const list = user ? await loadEmergencyContacts(user.id) : [];
       if (run.current === current) {
         setContacts(list);
       }
@@ -118,14 +119,14 @@ export default function SOSButton({
       triggerHaptic('medium');
       setCount(null);
       setPhase('locating');
-      setStatus('Getting your precise location…');
+      setStatus(t('passenger.sos.locating'));
       const [point, list] = await Promise.all([gpsPromise, contactPromise]);
       if (run.current !== current) return;
       if (!point) {
-        setMessage([list[0]?.preset_message || 'EMERGENCY! I need help. Please check on me.',
-          vehicle.body && `Body number: ${vehicle.body}`, vehicle.plate && `Plate number: ${vehicle.plate}`].filter(Boolean).join('\n'));
+        setMessage([list[0]?.preset_message || t('passenger.sos.message'),
+          vehicle.body && t('passenger.sos.body', { unit: vehicle.body }), vehicle.plate && t('passenger.sos.plate', { plate: vehicle.plate })].filter(Boolean).join('\n'));
         setPhase('fallback');
-        setStatus('Your location is unavailable. Add your location in Messages or call a hotline.');
+        setStatus(t('passenger.sos.noLocation'));
         return;
       }
       const text = buildEmergencyMessage({
@@ -137,14 +138,14 @@ export default function SOSButton({
       setMessage(text);
       if (!list.length) {
         setPhase('fallback');
-        setStatus('No trusted contacts are saved yet. Call a hotline below or add a contact in Safety.');
+        setStatus(t('passenger.sos.noContacts'));
         return;
       }
       if (list.every((contact) => contact.localOnly)) {
         await openMessages(list, text, current);
         return;
       }
-      setStatus('Sending emergency alert…');
+      setStatus(t('passenger.sos.sending'));
       try {
         const token = await getAccessToken();
         if (run.current !== current) return;
@@ -158,7 +159,7 @@ export default function SOSButton({
         if (run.current !== current) return;
         if (result.accepted === list.length && result.total === list.length && !list.some((contact) => contact.localOnly)) {
           setPhase('accepted');
-          setStatus('SMS provider accepted the alert for all saved contacts. Call a hotline if you need immediate help.');
+          setStatus(t('passenger.sos.accepted'));
           return;
         }
       } catch (err: any) {
@@ -170,7 +171,7 @@ export default function SOSButton({
       }
       if (run.current !== current) return;
       setPhase('fallback');
-      setStatus("We couldn't confirm your alert. Send an SMS as a backup.");
+      setStatus(t('passenger.sos.unconfirmed'));
     };
 
     timer.current = setInterval(() => {
@@ -183,64 +184,64 @@ export default function SOSButton({
 
   const openMessages = async (recipients = contacts, body = message, current = run.current) => {
     setPhase('opening');
-    setStatus('Opening Messages…');
+    setStatus(t('passenger.sos.opening'));
     try {
       const phones = recipients.map((c) => c.phone_number);
       if (Platform.OS === 'web') {
         const apple = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
         await Linking.openURL(`sms:${phones.join(',')}${apple ? '&' : '?'}body=${encodeURIComponent(body)}`);
         if (run.current === current)
-          setStatus('Messages will open for you to review and send.');
+          setStatus(t('passenger.sos.review'));
       } else if (await SMS.isAvailableAsync()) {
         if (run.current !== current) return;
         const result = await SMS.sendSMSAsync(phones, body);
         if (run.current === current)
           setStatus(
             result.result === 'sent'
-              ? 'Your messaging app reports that the SMS was sent.'
+              ? t('passenger.sos.reportedSent')
               : result.result === 'cancelled'
-                ? 'Message cancelled. No send was confirmed.'
-                : 'Check Messages to confirm your alert was sent.'
+                ? t('passenger.sos.cancelled')
+                : t('passenger.sos.checkSent')
           );
       } else if (run.current === current) {
-        setStatus('Messages is unavailable on this device. Use your phone or call a hotline below.');
+        setStatus(t('passenger.sos.noMessages'));
       }
       if (run.current === current) setPhase('ready');
     } catch {
       if (run.current === current) {
         setPhase('fallback');
-        setStatus("We couldn't confirm your alert. Send an SMS as a backup.");
+        setStatus(t('passenger.sos.unconfirmed'));
       }
     }
   };
 
   const preparing = phase === 'opening' || phase === 'locating';
-  const heading = preparing ? 'Preparing alert…' : phase === 'accepted' ? 'Alert accepted' : phase === 'ready' ? 'SMS status' : 'Dispatch not confirmed';
+  const heading = preparing ? t('passenger.sos.preparing') : phase === 'accepted' ? t('passenger.sos.acceptedTitle') : phase === 'ready' ? t('passenger.sos.smsStatus') : t('passenger.sos.notConfirmed');
 
   return (
     <>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Emergency SOS, starts a five second cancellation timer"
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.sos.startLabel')}
         onPress={activate} style={[s.button, styles.sosTrigger]}>
         <Ionicons aria-hidden name="alert-circle-outline" size={24} color={Colors.white} />
-        <Text style={s.buttonText}>Emergency SOS</Text>
+        <Text style={s.buttonText}>{t('passenger.sos.start')}</Text>
       </TouchableOpacity>
 
       <BottomSheetModal visible={visible} onClose={close} maxWidth={480} contentContainerStyle={{ gap: 14 }}>
         {count !== null ? <>
-          <Text accessibilityRole="header" style={s.title}>Preparing your SOS</Text>
+          <Text accessibilityRole="header" style={s.title}>{t('passenger.sos.title')}</Text>
           <View style={styles.countdown}>
             <Text accessibilityLiveRegion="polite" style={styles.number}>{count}</Text>
-            <Text style={s.label}>seconds to cancel</Text>
+            <Text style={s.label}>{t('passenger.sos.countdown')}</Text>
           </View>
           <TouchableOpacity accessibilityRole="button" onPress={close} style={s.button}>
-            <Text style={s.buttonText}>Cancel SOS</Text>
+            <Text style={s.buttonText}>{t('passenger.sos.cancel')}</Text>
           </TouchableOpacity>
-          <Text style={s.body}>Dispatch starts when the countdown ends. SOS is checking your location.</Text>
+          <Text style={s.body}>{t('passenger.sos.countdownHelp')}</Text>
           <View style={styles.ride}>
             <Ionicons aria-hidden name="bus-outline" size={22} color={Colors.action} />
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>{activeVehicleBody ? `Linked unit ${activeVehicleBody}` : 'No linked unit'}</Text>
-              {activeVehiclePlate && <Text style={s.muted}>Plate {activeVehiclePlate}</Text>}
+              <Text style={s.label}>{activeVehicleBody ? t('passenger.sos.linked', { unit: activeVehicleBody }) : t('passenger.sos.noUnit')}</Text>
+              {activeVehiclePlate && <Text style={s.muted}>{t('passenger.home.plateValue', { plate: activeVehiclePlate })}</Text>}
             </View>
           </View>
         </> : <>
@@ -253,17 +254,17 @@ export default function SOSButton({
           <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.body}>{status}</Text>
           {!preparing && phase !== 'accepted' && <>
             <TouchableOpacity accessibilityRole="button" onPress={() => void openMessages()} style={s.button}>
-              <Ionicons aria-hidden name="chatbubble-outline" size={20} color={Colors.white} /><Text style={s.buttonText}>Open Messages</Text>
+              <Ionicons aria-hidden name="chatbubble-outline" size={20} color={Colors.white} /><Text style={s.buttonText}>{t('passenger.sos.openMessages')}</Text>
             </TouchableOpacity>
-            <Text style={s.muted}>{contacts.length ? `Review the message for ${contacts.length} saved contact${contacts.length === 1 ? '' : 's'} before sending.` : 'Choose a recipient in Messages before sending.'}</Text>
+            <Text style={s.muted}>{contacts.length ? t('passenger.sos.reviewRecipients', { total: contacts.length, suffix: contacts.length === 1 ? '' : 's' }) : t('passenger.sos.chooseRecipient')}</Text>
           </>}
           {!!message && !preparing && phase !== 'accepted' && <View style={styles.preview}>
-            <Text style={s.label}>SMS message</Text>
+            <Text style={s.label}>{t('passenger.sos.sms')}</Text>
             <Text selectable style={s.body}>{message}</Text>
           </View>}
           <EmergencyHotlines />
           <TouchableOpacity accessibilityRole="button" onPress={close} style={[s.button, s.secondary]}>
-            <Text style={s.link}>Back to Safety</Text>
+            <Text style={s.link}>{t('passenger.sos.back')}</Text>
           </TouchableOpacity>
         </>}
       </BottomSheetModal>
