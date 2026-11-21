@@ -39,7 +39,7 @@ function hooks() {
   } };
 }
 
-const native = { StyleSheet: { create: (value: any) => value }, View: 'View', Text: 'Text', ScrollView: 'ScrollView',
+const native = { Platform: { OS: 'android' }, StyleSheet: { create: (value: any) => value }, View: 'View', Text: 'Text', ScrollView: 'ScrollView',
   TouchableOpacity: 'Button', useWindowDimensions: () => ({ width: 400, height: 800 }) };
 const common = { 'react-native': native, '../constants/theme': { Colors: {} } };
 const warning = (id: string, seconds: number, open = true, driver = 'driver') => {

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>%WEB_TITLE%</title>
+    <style>
+      :root { --viewport-height: 100%; }
+      @supports (height: 100dvh) { :root { --viewport-height: 100dvh; } }
+      html, body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #F5F4EF;
+      }
+      /* RN Web renders modal dialogs outside #root. Both follow the visible viewport. */
+      #root, body [aria-modal="true"] {
+        position: fixed;
+        top: var(--viewport-top, 0px);
+        right: 0;
+        bottom: auto;
+        left: 0;
+        height: var(--viewport-height);
+        box-sizing: border-box;
+        padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+      }
+      #root {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: #13263F;
+      }
+      input, textarea { font-size: 16px !important; caret-color: #164BB6; }
+      ::selection { background: #E9F0FF; color: #13263F; }
+      :is(button, [role="button"], [role="tab"], a):focus-visible {
+        outline: 2px solid #164BB6;
+        outline-offset: -2px;
+      }
+      @media (max-width: 1099px) {
+        [role="tab"][aria-selected="true"]:focus-visible { outline-color: white; }
+      }
+      @media (hover: hover) and (pointer: fine) {
+        button, [role="button"] { transition: opacity 120ms cubic-bezier(.23,1,.32,1); }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    </style>
+    <script>
+      const viewport = window.visualViewport;
+      if (viewport) {
+        const style = document.documentElement.style;
+        function fitViewport() {
+          // Leave the layout in place when the user pinch-zooms.
+          if (viewport.scale !== 1 || viewport.height <= 0) {
+            style.removeProperty('--viewport-top');
+            style.removeProperty('--viewport-height');
+            return;
+          }
+          style.setProperty('--viewport-top', Math.max(0, viewport.offsetTop) + 'px');
+          style.setProperty('--viewport-height', viewport.height + 'px');
+        }
+        fitViewport();
+        viewport.addEventListener('resize', fitViewport);
+        viewport.addEventListener('scroll', fitViewport);
+        window.addEventListener('resize', fitViewport);
+        window.addEventListener('pageshow', fitViewport);
+      }
+    </script>
+  </head>
+  <body>
+    <noscript>Enable JavaScript to use eSAKAY.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

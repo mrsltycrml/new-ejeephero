@@ -8,7 +8,7 @@ import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@reac
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
-import { AuthAction, AuthLink, AuthNotice, AuthPage } from '../screens/auth/AuthUI';
+import { AuthAction, AuthLink, AuthNotice, AuthPage, authStyles } from '../screens/auth/AuthUI';
 import ESakayLogo from '../components/ESakayLogo';
 import AdminHeaderPopover, { type AdminPanel } from '../components/AdminHeaderPopover';
 import RouteWarningBanner from '../components/RouteWarningBanner';
@@ -48,12 +48,13 @@ import ProfileScreen from '../screens/shared/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const tabInsets = Platform.OS === 'web' ? undefined : { bottom: 0 };
 
 function useTabOptions(): BottomTabNavigationOptions {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const rail = Platform.OS === 'web' && width >= 1100;
-  const bottom = Platform.OS === 'web' ? 6 : Math.max(8, insets.bottom);
+  const bottom = Math.max(Platform.OS === 'web' ? 6 : 8, insets.bottom);
   return {
     headerTitleAlign: 'left',
     headerStatusBarHeight: Platform.OS === 'web' ? 0 : undefined,
@@ -62,9 +63,9 @@ function useTabOptions(): BottomTabNavigationOptions {
     headerTintColor: Colors.onDark,
     tabBarPosition: rail ? 'left' : 'bottom',
     tabBarLabelPosition: rail ? 'beside-icon' : 'below-icon',
-    tabBarActiveTintColor: rail ? Colors.midnight : Colors.action,
+    tabBarActiveTintColor: rail ? Colors.midnight : Platform.OS === 'web' ? Colors.onDark : Colors.action,
     tabBarInactiveTintColor: rail ? Colors.onDarkMuted : Colors.subtleGray,
-    tabBarActiveBackgroundColor: rail ? Colors.signal : Colors.actionTint,
+    tabBarActiveBackgroundColor: rail ? Colors.signal : Platform.OS === 'web' ? Colors.action : Colors.actionTint,
     tabBarStyle: rail ? styles.rail : [styles.bottomBar, { height: 56 + bottom, paddingBottom: bottom }],
     tabBarItemStyle: rail ? styles.railItem : styles.bottomItem,
     tabBarLabelStyle: rail ? styles.railLabel : styles.bottomLabel,
@@ -82,6 +83,7 @@ const styles = StyleSheet.create({
   bottomIcon: { height: 24, flexGrow: 0, flexShrink: 0 },
   bottomLabel: { fontSize: 12, lineHeight: 16, minHeight: 16, flexShrink: 0, fontWeight: '700' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 12 },
+  headerHome: Platform.OS === 'web' ? { minHeight: 44, justifyContent: 'center' } : {},
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   headerButtonActive: { backgroundColor: Colors.signal },
   count: { position: 'absolute', right: 0, top: 1, borderRadius: 9, minWidth: 18, minHeight: 18, paddingHorizontal: 3, backgroundColor: Colors.primaryRed, alignItems: 'center', justifyContent: 'center' },
@@ -102,15 +104,14 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
   const tabOptions = useTabOptions();
   const [accountOpen, setAccountOpen] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
-  const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
     <View style={{ flex: 1, backgroundColor: Colors.paper }}>
       <Tab.Navigator
-        safeAreaInsets={webSafeInsets}
+        safeAreaInsets={tabInsets}
         screenOptions={({ navigation }) => ({
           ...tabOptions,
           headerTitle: () => (
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}>
+            <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel="Go to map" onPress={() => navigation.navigate('Map')}>
               <ESakayLogo compact roleLabel="Passenger" color={Colors.onDark} />
             </TouchableOpacity>
           ),
@@ -175,15 +176,14 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
 const DriverTabs = ({ navigation: stackNavigation }: any) => {
   const tabOptions = useTabOptions();
   const [accountOpen, setAccountOpen] = useState(false);
-  const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
     <View style={{ flex: 1, backgroundColor: Colors.paper }}>
       <Tab.Navigator
-        safeAreaInsets={webSafeInsets}
+        safeAreaInsets={tabInsets}
         screenOptions={({ navigation }) => ({
           ...tabOptions,
           headerTitle: () => (
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}>
+            <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}>
               <ESakayLogo compact roleLabel="Driver" color={Colors.onDark} />
             </TouchableOpacity>
           ),
@@ -318,11 +318,10 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
     const timer = setTimeout(() => setNotice(''), 6500);
     return () => clearTimeout(timer);
   }, [notice]);
-  const webSafeInsets = Platform.OS === 'web' ? { top: 0, bottom: 0, left: 0, right: 0 } : { bottom: 0 };
   return (
     <View style={{ flex: 1, backgroundColor: Colors.paper }}>
       <Tab.Navigator
-        safeAreaInsets={webSafeInsets}
+        safeAreaInsets={tabInsets}
         screenOptions={({ navigation }) => ({
           ...tabOptions,
           headerRight: () => (
@@ -334,7 +333,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
             />
           ),
           headerTitle: () => (
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go to Fleet" onPress={() => navigation.navigate('Fleet')}>
+            <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel="Go to Fleet" onPress={() => navigation.navigate('Fleet')}>
               <ESakayLogo compact roleLabel="Supervisor" color={Colors.onDark} />
             </TouchableOpacity>
           ),
@@ -422,9 +421,11 @@ export const AppNavigator = () => {
   if (authError) {
     return (
       <AuthPage title="Check your account">
-        <AuthNotice message={authError} error />
-        <AuthAction label="Retry" onPress={() => { void refreshProfile(); }} />
-        <AuthLink label="Return to sign in" onPress={() => { void signOut(); }} />
+        <View style={Platform.OS === 'web' && authStyles.form}>
+          <AuthNotice message={authError} error />
+          <AuthAction label="Retry" onPress={() => { void refreshProfile(); }} />
+          <AuthLink label="Return to sign in" onPress={() => { void signOut(); }} />
+        </View>
       </AuthPage>
     );
   }

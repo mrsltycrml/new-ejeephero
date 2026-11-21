@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View,
   useWindowDimensions, type TextInputProps,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ type AuthPageProps = {
 export function AuthPage({ title, subtitle, onBack, children }: AuthPageProps) {
   const { width, fontScale } = useWindowDimensions();
   const wide = width >= 800 && width / Math.max(fontScale, 1) >= 660;
+  const phoneWeb = Platform.OS === 'web' && !wide;
   const insets = useSafeAreaInsets();
 
   return (
@@ -29,11 +30,11 @@ export function AuthPage({ title, subtitle, onBack, children }: AuthPageProps) {
       keyboardVerticalOffset={0}
       contentContainerStyle={[
         styles.canvas, wide && styles.wideCanvas,
-        { paddingTop: insets.top + (wide ? 32 : 0), paddingBottom: insets.bottom + (wide ? 32 : 16),
+        { paddingTop: insets.top + (wide ? 32 : 0), paddingBottom: phoneWeb ? 0 : insets.bottom + (wide ? 32 : 16),
           paddingLeft: insets.left + (wide ? 32 : 0), paddingRight: insets.right + (wide ? 32 : 0) },
       ]}
     >
-      <View style={[styles.page, wide && styles.widePage]}>
+      <View style={[styles.page, wide && styles.widePage, phoneWeb && styles.phonePage]}>
         <View style={[styles.masthead, wide && styles.wideMasthead]}>
           <View style={styles.mastheadTop}>
             <ESakayLogo width={134} />
@@ -60,7 +61,8 @@ export function AuthPage({ title, subtitle, onBack, children }: AuthPageProps) {
             </View>
           )}
         </View>
-        <View style={[styles.panel, wide && styles.widePanel]}>
+        <View style={[styles.panel, wide && styles.widePanel, phoneWeb && styles.phonePanel,
+          phoneWeb && { paddingBottom: Math.max(24, insets.bottom + 12) }]}>
           {children}
         </View>
       </View>
@@ -142,6 +144,7 @@ const styles = StyleSheet.create({
   canvas: { flexGrow: 1, alignItems: 'center' },
   wideCanvas: { justifyContent: 'center' },
   page: { width: '100%', maxWidth: 600, backgroundColor: Colors.paper },
+  phonePage: { flexGrow: 1 },
   widePage: { flexDirection: 'row', maxWidth: 980, minHeight: 480, borderRadius: 16, overflow: 'hidden',
     borderWidth: 1, borderColor: Colors.border },
   masthead: { backgroundColor: Colors.midnight, paddingHorizontal: 24, paddingVertical: 20, gap: 18 },
@@ -166,6 +169,7 @@ const styles = StyleSheet.create({
   firstStop: { left: '23%', bottom: 18 },
   lastStop: { right: '17%', top: 3 },
   panel: { paddingHorizontal: 24, paddingVertical: 24, minWidth: 0 },
+  phonePanel: { flexGrow: 1, justifyContent: 'space-between' },
   widePanel: { flex: 5, paddingHorizontal: 40, paddingVertical: 36, justifyContent: 'center' },
   field: { gap: 7 },
   inputRow: { minHeight: 50, flexDirection: 'row', alignItems: 'center', borderRadius: 8,
