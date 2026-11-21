@@ -13,7 +13,7 @@ import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { type TerminalData, type VehicleData } from '../../services/offlineTransitService';
 import { loadLoadingZones, loadPassengerFareData } from '../../services/passengerDataService';
 import { quotePassengerFare, validFareMatrix, verifiedRideDistance } from '../../services/passengerFare';
-import { STOP_SEARCH_METERS, passengerPlanRide } from '../../services/passengerTrip';
+import { DESTINATION_RADIUS_METERS, STOP_SEARCH_METERS, atPassengerDestination, passengerPlanRide } from '../../services/passengerTrip';
 import { distanceMeters, evaluateBoardingLocation, type LoadingZone } from '../../services/passengerSafety';
 import { getWalkingDirections, type WalkingRoute } from '../../services/walkingDirections';
 import { searchPassengerPlaces } from '../../services/placeSearchService';
@@ -146,6 +146,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   </View>;
   const locationFresh = foreground && !errorMsg && quality === 'live';
   const origin = locationFresh ? fix : null;
+  const atDestination = !!place && atPassengerDestination(origin, place);
   const trip = useMemo(() => place && transit.status === 'ready'
     ? passengerPlanRide(origin, place, routes, stops, { selectedRouteId, boardingStop, alightingStop }) : null,
   [origin, place, routes, stops, selectedRouteId, boardingStop, alightingStop, transit.status]);
@@ -246,7 +247,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const selectedRoute = routes.find(r => r.id === selectedRouteId);
   const selection = { selectedRouteId, boardingStop, alightingStop };
   const canChooseStop = (role: 'boarding' | 'alighting') => activeStop && selectJourneyStop(selection, activeStop, role, routes, stops) !== selection;
-  const destinationCandidates = place && transit.status === 'ready' ? routeStops.filter(stop => selectJourneyStop(selection, stop, 'alighting', routes, stops) !== selection)
+  const destinationCandidates = place && !atDestination && transit.status === 'ready' ? routeStops.filter(stop => selectJourneyStop(selection, stop, 'alighting', routes, stops) !== selection)
     .map(stop => ({ stop, distance: distanceMeters(stop, place) })).filter(item => item.distance <= STOP_SEARCH_METERS)
     .sort((a, b) => a.distance - b.distance).slice(0, 3) : [];
   const requestWalk = async (stop: TerminalData, toPlace = false) => {
@@ -284,33 +285,36 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   </>;
   const rideStatus = transit.status !== 'ready' || !routeStops.length || !hasPath
     ? 'Verified stops and route paths are unavailable for this trip.'
-    : boardingStop || alightingStop ? 'Choose a boarding stop and a later alighting stop on the same verified route.'
+    : boardingStop || alightingStop ? 'Choose stops on the same verified route with a later alighting stop closer to your destination.'
     : !origin ? 'A current, accurate location is needed to find your boarding stop.'
-    : 'No direct ride has verified stops within 2 km of both ends.';
-  const result = place && !unit && <View style={styles.result}>
-    <Text accessibilityRole="header" style={styles.resultHeading}>Suggested ride</Text>
+    : 'No verified direct ride toward your destination has stops within 2 km of both ends.';
+  const result = place && !unit && (atDestination ? <View style={styles.result}>
+    <Text accessibilityRole="header" style={styles.resultHeading}>Already near your destination</Text>
+    <Text accessibilityLiveRegion="polite" style={s.muted}>Your GPS location is within {DESTINATION_RADIUS_METERS} m of {place.name}.</Text>
+  </View> : <View style={styles.result}>
+    <Text accessibilityRole="header" style={styles.resultHeading}>{trip ? 'Suggested ride' : 'No confirmed ride'}</Text>
     <Text accessibilityLiveRegion="polite" style={s.muted}>{trip?.route.name || rideStatus}</Text>
-    <View style={styles.itinerary}>
-      <View style={styles.itineraryRow}>
+    {(trip || destinationCandidates.length > 0) && <View style={styles.itinerary}>
+      {trip && <View style={styles.itineraryRow}>
         <Ionicons name="radio-button-on" size={19} color={Colors.brandGreen} />
         <View style={styles.itineraryText}>
-          <Text style={s.muted}>Board at</Text><Text style={styles.rowTitle}>{trip?.boarding.name || 'Unavailable'}</Text>
-          {trip?.boardingProximity != null && <Text style={s.muted}>{Math.round(trip.boardingProximity)} m from you in a straight line</Text>}
+          <Text style={s.muted}>Board at</Text><Text style={styles.rowTitle}>{trip.boarding.name}</Text>
+          {trip.boardingProximity != null && <Text style={s.muted}>{Math.round(trip.boardingProximity)} m from you in a straight line</Text>}
         </View>
-      </View>
+      </View>}
       <View style={styles.itineraryRow}>
         <Ionicons name="location-outline" size={20} color={Colors.ink} />
         <View style={styles.itineraryText}>
-          <Text style={s.muted}>{!trip && destinationCandidates.length ? 'Possible alighting stop' : 'Alight at'}</Text>
+          <Text style={s.muted}>{trip ? 'Alight at' : 'Possible alighting stop'}</Text>
           <Text style={styles.rowTitle}>{trip?.alighting.name || destinationCandidates[0]?.stop.name || 'Unavailable'}</Text>
           {!trip && destinationCandidates.length > 0 && <Text style={s.muted}>Near your destination. A connecting ride is unconfirmed.</Text>}
           {trip && <Text style={s.muted}>{Math.round(trip.alightingProximity)} m from your destination in a straight line</Text>}
         </View>
       </View>
-    </View>
-    <View style={styles.fareLine}><Text style={s.label}>Regular fare</Text>
-      <Text style={s.label}>{fareQuote ? `₱${fareQuote.amount.toFixed(2)}` : trip && !fareRead ? 'Checking…' : 'Unavailable'}</Text>
-    </View>
+    </View>}
+    {trip && <View style={styles.fareLine}><Text style={s.label}>Regular fare</Text>
+      <Text style={s.label}>{fareQuote ? `₱${fareQuote.amount.toFixed(2)}` : !fareRead ? 'Checking…' : 'Unavailable'}</Text>
+    </View>}
     {trip && (tripApplied ? <>
       <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} style={s.button} onPress={() => void requestWalk(trip.boarding)}>
         <Ionicons name="walk-outline" size={19} color={Colors.white} /><Text style={s.buttonText}>Walk to boarding stop</Text>
@@ -322,7 +326,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     </> : <TouchableOpacity accessibilityRole="button" style={s.button} onPress={() => {
       if (locationQuality(fix) === 'live') setRideStops(trip.boarding, trip.alighting);
     }}><Text style={s.buttonText}>Use these stops</Text></TouchableOpacity>)}
-  </View>;
+  </View>);
   const locationControl = <TouchableOpacity accessibilityRole="button"
     accessibilityLabel={locationFresh ? 'Center on my location' : 'Enable location'}
     accessibilityHint={errorMsg || locationDescription(fix, now)}
@@ -378,7 +382,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
         }} style={s.button}><Text style={s.buttonText}>Use this alighting stop</Text></TouchableOpacity>}
       </View>)}
     </View>}
-    {alightingStop && place && <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} onPress={() => void requestWalk(alightingStop, true)} style={[s.button, s.secondary]}><Text style={s.label}>Walk from alighting stop to destination</Text></TouchableOpacity>}
+    {alightingStop && place && !atDestination && <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} onPress={() => void requestWalk(alightingStop, true)} style={[s.button, s.secondary]}><Text style={s.label}>Walk from alighting stop to destination</Text></TouchableOpacity>}
     {(!tripApplied || unit) && walkingFeedback}
     <PassengerStopGuide boarding={boarding} landmarks={routeStops} selectedStop={activeStop} onSelectStop={chooseDestination}
       onWalk={stop => void requestWalk(stop)} walkingBusy={walkingBusy} onRefresh={refreshZones} loading={zonesLoading}

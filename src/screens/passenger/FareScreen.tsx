@@ -7,7 +7,8 @@ import { Colors } from '../../constants/theme';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from '../../contexts/LocationContext';
-import { loadPassengerPlanningData } from '../../services/passengerDataService';
+import { loadPassengerFareMatrices, loadPassengerRideSegments, loadPassengerWalkLinks } from '../../services/passengerDataService';
+import type { TransitResult } from '../../services/offlineTransitService';
 import { findVerifiedSavings, quotePassengerFare, validFareMatrix, verifiedRideDistance } from '../../services/passengerFare';
 import type { FarePassengerType } from '../../services/fareCalculator';
 import { manilaDateKey } from '../../utils/reportingPeriod';
@@ -17,13 +18,25 @@ const TYPES: { id: FarePassengerType; name: string }[] = [
 ];
 const peso = (amount: number) => `₱${amount.toFixed(2)}`;
 
+function usePlanningRows<T>(read: () => Promise<T[]>, catalog: TransitResult, owner?: string) {
+  const [result, setResult] = useState<{ catalog: TransitResult; owner?: string; rows: T[] | null }>();
+  useEffect(() => {
+    let active = true;
+    const finish = (rows: T[] | null) => { if (active) setResult({ catalog, owner, rows }); };
+    void read().then(finish, () => finish(null));
+    return () => { active = false; };
+  }, [read, catalog, owner]);
+  return result?.catalog === catalog && result.owner === owner ? result.rows : undefined;
+}
+
 export default function FareScreen({ navigation, route: screenRoute }: any) {
   const { transit, refreshTransit, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setAlightingStop, destinationPlace, showWalk } = usePassengerJourney();
   const { user } = useAuth();
   const { now } = useLocation();
-  const [data, setData] = useState<Awaited<ReturnType<typeof loadPassengerPlanningData>> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const matrices = usePlanningRows(loadPassengerFareMatrices, transit, user?.id);
+  const segments = usePlanningRows(loadPassengerRideSegments, transit, user?.id);
+  const walks = usePlanningRows(loadPassengerWalkLinks, transit, user?.id);
+  const [refreshing, setRefreshing] = useState(false);
   const [mode, setMode] = useState<'distance' | 'stops'>('stops');
   useEffect(() => { if (screenRoute?.params?.showSelectedStops) setMode('stops'); }, [screenRoute?.params?.showSelectedStops]);
   const [type, setType] = useState<FarePassengerType>('regular');
@@ -31,31 +44,28 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
   const [stepFree, setStepFree] = useState(false);
   const [walkExpanded, setWalkExpanded] = useState(false);
   const [maxWalk, setMaxWalk] = useState(500);
-  const [reload, setReload] = useState(0);
-  const request = useRef(0);
   const scroll = useRef<React.ElementRef<typeof FormScrollView>>(null);
-  useEffect(() => {
-    const version = ++request.current;
-    setLoading(true); setError(''); setData(null);
-    void loadPassengerPlanningData(transit).then(value => { if (version === request.current) setData(value); })
-      .catch(() => { if (version === request.current) setError('Fare and walking information could not be refreshed. Try again.'); })
-      .finally(() => { if (version === request.current) setLoading(false); });
-    return () => { request.current++; };
-  }, [transit.syncedAt, transit.status, user?.id, reload]);
-  const planning = !loading && !error && data?.syncedAt === transit.syncedAt ? data : null;
   const route = transit.routes.find(item => item.id === selectedRouteId);
   const stops = transit.terminals.filter(stop => stop.route_id === selectedRouteId).sort((a, b) => a.sequence_order - b.sequence_order);
   const today = manilaDateKey(new Date(now));
-  const matrix = planning?.matrices.find(item => route && validFareMatrix(item, route.id, today));
+  const matrix = matrices?.find(item => route && validFareMatrix(item, route.id, today));
   const km = mode === 'distance' ? (distance.trim() ? Number(distance) : null)
-    : boardingStop && alightingStop && route && boardingStop.sequence_order < alightingStop.sequence_order
-      ? verifiedRideDistance(boardingStop.id, alightingStop.id, route.id, planning?.segments || []) : null;
+    : boardingStop && alightingStop && route && segments && boardingStop.sequence_order < alightingStop.sequence_order
+      ? verifiedRideDistance(boardingStop.id, alightingStop.id, route.id, segments) : null;
   const quote = route && km != null ? quotePassengerFare(km, type, route, matrix, today) : null;
-  const savings = mode === 'stops' && route && boardingStop && alightingStop && planning
+  const savings = !refreshing && mode === 'stops' && route && boardingStop && alightingStop && matrices && segments && walks
     ? findVerifiedSavings({ originId: boardingStop.id, destinationId: alightingStop.id, routeId: route.id, type, stops,
-      segments: planning.segments, walks: planning.walks, matrix, stepFreeOnly: stepFree, maxWalkMeters: maxWalk, date: today }) : null;
+      segments, walks, matrix, stepFreeOnly: stepFree, maxWalkMeters: maxWalk, date: today }) : null;
   const category = TYPES.find(item => item.id === type)!.name;
-  const refresh = async () => { setLoading(true); setError(''); await refreshTransit(); setReload(value => value + 1); };
+  const fareError = matrices === null ? 'Fare information could not be refreshed. Try again.'
+    : mode === 'stops' && segments === null ? 'Ride distances are unavailable. Refresh or enter a known ride distance.' : '';
+  const loading = refreshing || matrices === undefined || (mode === 'stops' && segments === undefined);
+  const walkError = walks === null ? 'Walk & Save unavailable. Refresh to retry walking paths.'
+    : matrices === null || segments === null ? 'Walk & Save unavailable until fares and ride distances can be refreshed.' : '';
+  const refresh = async () => {
+    setRefreshing(true);
+    try { await refreshTransit(); } finally { setRefreshing(false); }
+  };
 
   return (
     <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={[s.content, styles.column]}>
@@ -63,14 +73,14 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
         <View style={styles.headingRow}>
           <Ionicons aria-hidden name="ticket-outline" color={Colors.onDark} size={24} />
           <Text accessibilityRole="header" style={[s.heroTitle, styles.light, styles.grow]}>Fare</Text>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh fares, stops and routes" accessibilityState={{ disabled: loading }}
-            disabled={loading} onPress={() => void refresh()} style={[styles.source, loading && { opacity: 0.6 }]}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh fares, walks, stops and routes" accessibilityState={{ disabled: refreshing }}
+            disabled={refreshing} onPress={() => void refresh()} style={[styles.source, refreshing && { opacity: 0.6 }]}>
             <Ionicons aria-hidden name="refresh-outline" size={18} color={Colors.onDark} />
             <Text style={[s.label, styles.light]}>Refresh</Text>
           </TouchableOpacity>
         </View>
-        {loading ? <Text accessibilityLiveRegion="polite" style={styles.ticketDetail}>Refreshing fare information…</Text>
-          : error ? <Text accessibilityRole="alert" style={styles.ticketDetail}>{error}</Text>
+        {fareError ? <Text accessibilityRole="alert" style={styles.ticketDetail}>{fareError}</Text>
+          : loading ? <Text accessibilityLiveRegion="polite" style={styles.ticketDetail}>Refreshing fare information…</Text>
           : quote ? <>
             <View style={styles.total}>
               <Text style={styles.ticketDetail}>{category} · Payable fare</Text>
@@ -124,7 +134,7 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
         <PassengerSelect label="Passenger category" value={type} options={TYPES.map(item => ({ value: item.id, label: item.name }))}
           onSelect={value => { const selected = TYPES.find(item => item.id === value); if (selected) setType(selected.id); }} />
         {type !== 'regular' && <Text style={s.muted}>{category} fare uses the concession in the current fare source. Bring the required proof of eligibility.</Text>}
-        {!loading && !error && quote && <TouchableOpacity accessibilityRole="button" onPress={() => scroll.current?.scrollTo({ y: 0, animated: false })} style={s.button}>
+        {!loading && quote && <TouchableOpacity accessibilityRole="button" onPress={() => scroll.current?.scrollTo({ y: 0, animated: false })} style={s.button}>
           <Text style={s.buttonText}>View fare · {peso(quote.amount)}</Text>
         </TouchableOpacity>}
       </View>
@@ -132,7 +142,7 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
       <View style={s.section}>
         <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: walkExpanded }} onPress={() => setWalkExpanded(!walkExpanded)} style={styles.disclosure}>
           <Ionicons aria-hidden name="walk-outline" size={24} color={Colors.action} />
-          <View style={styles.grow}><Text style={s.sectionTitle}>Walk &amp; Save</Text><Text style={s.muted}>Compare fares from later boarding stops.</Text></View>
+          <View style={styles.grow}><Text style={s.sectionTitle}>Walk &amp; Save</Text><Text accessibilityLiveRegion="polite" style={s.muted}>{(!walkExpanded && walkError) || 'Compare fares from later boarding stops.'}</Text></View>
           <Ionicons aria-hidden name={walkExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.ink} />
         </TouchableOpacity>
         {walkExpanded && <>
@@ -140,8 +150,8 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
           <Text style={s.muted}>Walk from your selected boarding stop and keep the same alighting stop, destination and passenger category.</Text>
           <PassengerSelect label="Maximum extra walking" value={String(maxWalk)} options={[100, 250, 500, 1000, 2000].map(value => ({ value: String(value), label: `${value} m` }))} onSelect={value => setMaxWalk(Number(value))} />
           <View style={styles.disclosure}><Text style={[s.label, styles.grow]}>Step-free paths only</Text><Switch accessibilityLabel="Step-free walking routes only" value={stepFree} onValueChange={setStepFree} trackColor={{ true: Colors.action }} /></View>
-          {!savings ? <Text style={s.muted}>{loading ? 'Refreshing walking information…' : error || (mode === 'stops' && boardingStop && alightingStop && !planning
-            ? 'Walking information is unavailable. Refresh to try again.' : 'Choose a route, boarding stop and alighting stop in Selected stops mode.')}</Text> : <>
+          {!savings ? <Text accessibilityLiveRegion="polite" style={s.muted}>{walkError || (loading || walks === undefined ? 'Refreshing comparison information…'
+            : 'Choose a route, boarding stop and alighting stop in Selected stops mode.')}</Text> : <>
             <Text style={s.label}>{savings.status === 'available' ? 'Lower fares found' : savings.status === 'no-saving' ? 'No saving on the compared paths' : 'Walking comparison unavailable'}</Text>
             <Text style={s.muted}>{savings.reason}</Text>
             {savings.suggestions.map(item => (

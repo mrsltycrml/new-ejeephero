@@ -8,10 +8,10 @@ import type { RouteData } from '../services/offlineTransitService';
 import { parseVerifiedRouteLine } from '../services/routeLineImport';
 import { verifiedRoute } from '../services/routeMap';
 
-export default function RouteLineEditor({ routes, onPublished, onBack }: {
-  routes: RouteData[]; onPublished: () => Promise<void>; onBack: () => void;
+export default function RouteLineEditor({ routes, onPublished, onBack, initialRouteId = '' }: {
+  routes: RouteData[]; onPublished: () => Promise<void>; onBack: () => void; initialRouteId?: string;
 }) {
-  const [routeId, setRouteId] = useState('');
+  const [routeId, setRouteId] = useState(initialRouteId);
   const [line, setLine] = useState('');
   const [source, setSource] = useState('');
   const [checked, setChecked] = useState(false);

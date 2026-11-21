@@ -444,9 +444,9 @@ export const AppNavigator = () => {
       ) : status !== 'approved' ? (
         <Stack.Screen name="PendingApproval" component={PendingApprovalScreen} />
       ) : isAdmin ? (
-        <Stack.Screen name="AdminApp" component={AdminStack} />
+        <Stack.Screen navigationKey={user.id} name="AdminApp" component={AdminStack} />
       ) : role === 'driver' ? (
-        <Stack.Screen name="DriverApp" component={DriverStack} />
+        <Stack.Screen navigationKey={user.id} name="DriverApp" component={DriverStack} />
       ) : (
         <Stack.Screen name="PassengerApp" component={PassengerStack} />
       )}

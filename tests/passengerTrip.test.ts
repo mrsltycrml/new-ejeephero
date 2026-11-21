@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { passengerPlanRide, suggestPassengerTrip } from '../src/services/passengerTrip.ts';
+import { atPassengerDestination, passengerPlanRide, suggestPassengerTrip } from '../src/services/passengerTrip.ts';
 import type { RouteData, TerminalData } from '../src/services/offlineTransitService.ts';
 
 const point = (longitude: number) => ({ latitude: 14.6, longitude });
@@ -50,4 +50,31 @@ test('a selected place gets a ride when GPS arrives and keeps those stops as the
   assert.equal(passengerPlanRide(null, destination, routes, stops, chosen)?.boardingProximity, null);
   assert.equal(passengerPlanRide(null, destination, routes, stops.slice(1), chosen), null);
   assert.equal(passengerPlanRide(point(121), destination, routes, stops, { ...chosen, alightingStop: null }), null);
+});
+
+test('a one-way ride must end closer than both the boarding stop and the passenger', () => {
+  const routes = [route('one-way')];
+  const [a, b, c] = [121, 121.005, 121.01].map((lng, i) => stop(String(i), 'one-way', lng, i));
+  const stops = [a, b, c];
+  const selected = { selectedRouteId: 'one-way', boardingStop: b, alightingStop: c };
+  assert.equal(suggestPassengerTrip(b, a, routes, stops), null);
+  assert.equal(suggestPassengerTrip(point(121.014), a, routes, [b, c]), null);
+  assert.equal(passengerPlanRide(null, a, routes, stops, selected), null);
+  // Walking past the passenger to board can produce a forward ride that ends back where they started.
+  assert.equal(suggestPassengerTrip(b, c, routes, [a, b]), null);
+  assert.equal(passengerPlanRide(b, c, routes, stops, { ...selected, boardingStop: a, alightingStop: b }), null);
+  assert.equal(suggestPassengerTrip(b, c, routes, stops)?.alighting.id, c.id);
+});
+
+test('a passenger at or within GPS proximity of the destination gets no new or retained ride', () => {
+  const routes = [route('a')], stops = [stop('board', 'a', 121, 1), stop('exit', 'a', 121.005, 2)];
+  const chosen = { selectedRouteId: 'a', boardingStop: stops[0], alightingStop: stops[1] };
+  for (const origin of [stops[1], point(121.0048)]) {
+    assert.equal(atPassengerDestination(origin, stops[1]), true);
+    assert.equal(suggestPassengerTrip(origin, stops[1], routes, stops), null);
+    assert.equal(passengerPlanRide(origin, stops[1], routes, stops, chosen), null);
+  }
+  assert.equal(atPassengerDestination(null, stops[1]), false);
+  assert.equal(atPassengerDestination(point(121.0046), stops[1]), false);
+  assert.equal(passengerPlanRide(null, stops[1], routes, stops, chosen)?.boarding.id, 'board');
 });

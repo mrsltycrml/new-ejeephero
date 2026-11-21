@@ -12,14 +12,13 @@ import { BottomSheetModal, ScreenSkeleton, triggerHaptic } from '../../component
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
 import { operationsStyles as ops } from './operationsStyles';
-import RouteLineEditor from '../../components/RouteLineEditor';
+import SupervisorRouteManager from '../../components/SupervisorRouteManager';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
 import { offlineTransit } from '../../services/offlineTransitService';
 import type { RouteData, TerminalData, VehicleData } from '../../services/offlineTransitService';
 import { useRoute } from '@react-navigation/native';
 import { ESAKAY_OPERATIONS } from '../../constants/esakayOperations';
-import DirectoryScreen from '../passenger/DirectoryScreen';
 import { realRows } from '../../utils/realData';
 import { locationQuality, telemetryFix, type MeasuredFix } from '../../services/locationQuality';
 import {
@@ -158,7 +157,7 @@ export default function SupervisorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [manageMode, setManageMode] = useState<'none' | 'list' | 'line'>('none');
+  const [manageMode, setManageMode] = useState<'none' | 'list'>('none');
   const [dataError, setDataError] = useState('');
   const [transitNotice, setTransitNotice] = useState('');
 
@@ -411,25 +410,15 @@ export default function SupervisorDashboardScreen() {
 
   const gpsIssueCount = currentLiveUnits.filter(unit => unit.stale).length;
 
+  if (manageMode === 'list') return <SupervisorRouteManager onChanged={loadDashboard} onBack={() => setManageMode('none')} />;
   if (loading) return <ScreenSkeleton preset="dashboard" />;
-  if (dataError) return <ScrollView style={ops.page} contentContainerStyle={ops.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}><Text accessibilityRole="alert" style={ops.errorBanner}>{dataError}</Text></ScrollView>;
+  if (dataError) return <ScrollView style={ops.page} contentContainerStyle={ops.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <Text accessibilityRole="alert" style={ops.errorBanner}>{dataError}</Text>
+    <TouchableOpacity accessibilityRole="button" style={styles.backNavRow} onPress={() => setManageMode('list')}>
+      <Text style={styles.rowTitle}>Manage routes and stops</Text>
+    </TouchableOpacity>
+  </ScrollView>;
 
-  if (manageMode === 'line') return <RouteLineEditor routes={routes} onPublished={loadDashboard} onBack={() => setManageMode('list')} />;
-  if (manageMode === 'list') return (
-    <View style={ops.page}>
-      <View style={styles.routeToolbar}>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to fleet monitor" onPress={() => setManageMode('none')} style={styles.backNavRow}>
-          <Ionicons name="chevron-back" size={20} color={Colors.action} />
-          <Text style={styles.routeActionText}>Fleet monitor</Text>
-        </TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" onPress={() => setManageMode('line')} style={styles.backNavRow}>
-          <Ionicons name="git-branch-outline" size={20} color={Colors.action} />
-          <Text style={styles.routeActionText}>Set verified route line</Text>
-        </TouchableOpacity>
-      </View>
-      <DirectoryScreen />
-    </View>
-  );
 
   const activeRouteLabel =
     mapRouteFilter === 'all'
@@ -658,7 +647,7 @@ export default function SupervisorDashboardScreen() {
                     <Ionicons name="git-branch-outline" size={19} color={Colors.action} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle}>View routes</Text>
+                    <Text style={styles.rowTitle}>Manage routes and stops</Text>
                     <Text style={styles.rowSub}>Published routes and verified stops</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
@@ -1014,8 +1003,6 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     fontWeight: '500',
   },
-  routeToolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 16, backgroundColor: Colors.paper },
-  routeActionText: { fontWeight: '700', color: Colors.action },
   rowHeading: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   kpiTile: {

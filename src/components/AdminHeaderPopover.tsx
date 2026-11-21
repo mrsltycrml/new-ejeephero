@@ -10,7 +10,7 @@ import { Colors } from '../constants/theme';
 import { SkeletonBlock } from './AppUI';
 
 export type AdminPanel = 'alerts' | 'profile' | null;
-type AlertRow = { id: string; title: string; detail: string; time: string; kind: 'speed' | 'route' };
+type AlertRow = { id: string; title: string; detail: string; time: string; kind: 'speed' | 'route'; open?: boolean };
 
 export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: { panel: AdminPanel; onClose: () => void; onManageProfile: () => void }) {
   const { user, fullName, status, signOut } = useAuth();
@@ -24,8 +24,8 @@ export default function AdminHeaderPopover({ panel, onClose, onManageProfile }: 
   const displayedAlerts = [...alerts, ...warnings.map((warning): AlertRow => ({
     id: `warning-${warning.id}`, kind: 'route', title: `Possible off-route · ${warning.unit_label}`,
     detail: `${warning.route_name} · ${Math.round(warning.distance_meters)} m from line (±${Math.round(warning.accuracy_meters)} m GPS)`,
-    time: warning.captured_at,
-  }))].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 10);
+    time: warning.captured_at, open: warning.closed_at === null,
+  }))].sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).filter((row, index) => index < 10 || row.open);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);

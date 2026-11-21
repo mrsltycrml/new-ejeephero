@@ -33,7 +33,7 @@ The public [Sakay GTFS repository](https://github.com/sakayph/gtfs/blob/master/R
 | Stop photographs | A real photograph, source attribution and confirmation that it depicts the correct waiting area and direction |
 | Live vehicle position | A fresh device measurement with its original timestamp and reported accuracy; speed and heading may be unknown |
 
-An approved supervisor can publish a verified line for an existing route under **Fleet → View routes → Set verified route line**. The editor takes a single GeoJSON LineString for the route's travel direction and an HTTPS source. The database verifies the supervisor role and validates the geometry before reporting success.
+Approved supervisors can open **Fleet → Manage routes and stops** to add a route for each direction, edit its service details, and retire it while keeping trip history. New routes start as **Coming soon** in the form. **Add stop** and **Edit stop** accept the surveyed curbside location, its HTTPS source, and the stop's position in travel order. Boarding and landmark details have a separate source. **Set verified route line** accepts a GeoJSON LineString for an in-service route and its HTTPS source.
 
 An ordinary pedestrian route may have unconfirmed accessibility, which must be stated. It must never be offered as a step-free option without explicit accessibility evidence.
 
@@ -90,7 +90,7 @@ Publish the verified reference records and refresh the shared route/stop catalog
 
 The local preview at `http://localhost:8091` uses the application's existing sign-in flow and connected data. There is no generated test login. A successful local preview or web export is not a deployment of database migrations, routing functions, or the public application.
 
-The redesigned web app was deployed on 18 November 2026 at [ejeephero.carlosbusuego15.workers.dev](https://ejeephero.carlosbusuego15.workers.dev). The release covered the web app. Production database migrations and the walking-directions function still need deployment.
+The redesigned web app was deployed on 18 November 2026 at [ejeephero.carlosbusuego15.workers.dev](https://ejeephero.carlosbusuego15.workers.dev). On 21 November the production database received the measured GPS, walking evidence, live deviation, capture-window, and supervisor catalog migrations. The deployed route catalog then contained two routes, zero verified lines or stop locations, zero ride segments, and zero fare matrices. Walking directions also require the configured routing function.
 
 Operators can use the [route data workbook](eSAKAY-route-data.xlsx) to submit verified stop pins, route lines, measured distances and fare charts for each direction.
 
