@@ -173,7 +173,7 @@ export default function SupervisorRouteManager({ onBack, onChanged, initialPage 
   }
   const curb = draft?.kind==='stop' && draft.form.latitude.trim() && draft.form.longitude.trim()
     ? {latitude:Number(draft.form.latitude),longitude:Number(draft.form.longitude)} : null;
-  return <ScrollView key={draft?.kind ?? 'list'} style={s.screen} contentContainerStyle={[s.content, { maxWidth: 720 }]} keyboardShouldPersistTaps="handled">
+  return <ScrollView key={draft?.kind ?? 'list'} style={s.screen} contentContainerStyle={[s.content, { maxWidth: 720 }]} keyboardShouldPersistTaps="always">
     {button(inspectCreate ? 'Back and refresh directory' : draft && review ? 'Back to Route 1 review' : draft || retire ? 'Back to route directory' : 'Back to fleet', () => {
       if (!draft && !retire) return onBack();
       edit(null);

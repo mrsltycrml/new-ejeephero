@@ -224,7 +224,7 @@ export function AdminDriversScreen() {
 
   return (
     <>
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="always"
         style={ops.page}
         contentContainerStyle={ops.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
@@ -656,7 +656,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
 
   return (
     <View style={ops.page}>
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="always"
         style={ops.page}
         contentContainerStyle={ops.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
@@ -1105,7 +1105,7 @@ export function AdminReportsScreen() {
 
   return (
     <>
-      <ScrollView style={ops.page} contentContainerStyle={ops.content}>
+      <ScrollView keyboardShouldPersistTaps="always" style={ops.page} contentContainerStyle={ops.content}>
         <View style={ops.masthead}>
           <View>
             <Text accessibilityRole="header" style={ops.mastheadTitle}>Fleet reports</Text>

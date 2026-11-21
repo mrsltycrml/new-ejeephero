@@ -96,7 +96,7 @@ export default function Route1ReviewPanel({ routes, stops, selection, onChange, 
     return <TouchableOpacity accessibilityRole="button" disabled={locked || disabled} accessibilityState={{disabled:locked || disabled}}
       onPress={press} style={[s.button,(locked || disabled) && {opacity:0.55}]}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>;
   }
-  return <ScrollView style={s.screen} contentContainerStyle={[s.content,{maxWidth:800}]} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={s.screen} contentContainerStyle={[s.content,{maxWidth:800}]} keyboardShouldPersistTaps="always">
     {button('Back',onBack)}
     <Text accessibilityRole="header" style={s.title}>Route 1 review</Text>
     <View style={s.section}>

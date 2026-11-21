@@ -51,7 +51,7 @@ export default function RouteLineEditor({ routes, onPublished, onBack, initialRo
     }
   };
 
-  return <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 720 }]} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 720 }]} keyboardShouldPersistTaps="always">
     <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={onBack} style={[s.row, { minHeight: 44, alignSelf: 'flex-start' }]}>
       <Ionicons name="chevron-back" size={18} color={Colors.action} />
       <Text style={s.link}>Back to routes</Text>

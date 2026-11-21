@@ -55,7 +55,7 @@ export const FormScrollView = React.forwardRef<React.ElementRef<typeof ScrollVie
     keyboardVerticalOffset = Platform.OS === 'ios' ? 64 : 0,
     containerStyle,
     style,
-    keyboardShouldPersistTaps = 'handled',
+    keyboardShouldPersistTaps = 'always',
     automaticallyAdjustKeyboardInsets = true,
     ...rest
   },
@@ -125,7 +125,7 @@ export function BottomSheetModal({
             {scrollable ? (
               <ScrollView
                 showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 automaticallyAdjustKeyboardInsets
                 contentContainerStyle={[styles.sheetContent, contentContainerStyle]}
               >
