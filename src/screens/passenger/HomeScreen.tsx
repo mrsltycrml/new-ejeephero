@@ -27,7 +27,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const { fix, quality, errorMsg, foreground, enableLocation } = useLocation();
   const { isConnected } = useNetwork();
   const { user, getAccessToken } = useAuth();
-  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleError, nearby, endRide, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setRideStops, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
+  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleRouteIds, vehicleError, nearby, endRide, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setRideStops, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const map = useRef<LeafletMapRef>(null);
   const destinationInput = useRef<React.ElementRef<typeof TextInput>>(null);
@@ -138,7 +138,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const currentSelected = selected
     ? displayed.find((v) => v.vehicle_id === selected.vehicle_id) || null
     : null;
-  const tracked = unit || selected;
+  const tracked = unit || (selected && vehicleRouteIds.has(selected.route_id) ? selected : null);
   const trackedPosition = tracked ? allModeVehicles.find(vehicle => vehicle.vehicle_id === tracked.vehicle_id) || null : null;
   const telemetry = vehicleTelemetryReadout(trackedPosition, now);
   const trackingCard = tracked && <View style={[s.section, { marginHorizontal: 16, marginTop: 12 }]}>
@@ -242,6 +242,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     triggerHaptic('success');
     setUnit({
       vehicle_id: vehicle.vehicle_id,
+      route_id: vehicle.route_id,
       body_number: vehicle.body_number,
       plate_number: vehicle.plate_number,
       source: 'confirmed',

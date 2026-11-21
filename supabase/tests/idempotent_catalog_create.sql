@@ -62,7 +62,7 @@ update public.profiles set status='suspended' where id=(select supervisor from r
 set local role authenticated;
 select pg_temp.reject('select public.supervisor_create_catalog_item(route_request,''route'',null,route_data) from retry_probe','42501');
 select set_config('request.jwt.claims',jsonb_build_object('sub',second_supervisor)::text,true) from retry_probe;
-update retry_probe set second_route=public.supervisor_create_catalog_item(route_request,'route',null,route_data);
+update retry_probe set second_route=public.supervisor_create_catalog_item(route_request,'route',null,route_data || '{"name":"Second supervisor route"}');
 select pg_temp.expect(second_route <> route,'request ID collided across supervisors') from retry_probe;
 reset role;
 update public.profiles set status='approved' where id=(select supervisor from retry_probe);

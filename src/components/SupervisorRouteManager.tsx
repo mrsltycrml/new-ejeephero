@@ -4,7 +4,7 @@ import { randomUUID } from 'expo-crypto';
 import { supabase } from '../lib/supabase';
 import { realRows } from '../utils/realData';
 import type { RouteData, TerminalData } from '../services/offlineTransitService';
-import { routeChanges, routeForm, stopChanges, stopForm } from '../services/supervisorCatalogForm';
+import { matchingRoute, routeChanges, routeForm, stopChanges, stopForm } from '../services/supervisorCatalogForm';
 import { validPoint } from '../services/locationQuality';
 import { meters } from '../services/passengerJourney';
 import Route1ReviewPanel, { previewVariant, route1Direction, savedCurbPin, variantPins, type FieldPin, type ReviewSelection } from './Route1ReviewPanel';
@@ -20,6 +20,10 @@ type Draft = (DraftTarget<RouteData> & { kind: 'route'; form: ReturnType<typeof 
       expectedVariant?: string | null; referenceId?: string });
 type Retire = { kind: 'route' | 'stop'; id: string; name: string };
 
+function newRouteDraft(): Draft {
+  return { kind: 'route', requestId: randomUUID(), form: routeForm() };
+}
+
 async function currentRows<T>(table: 'routes' | 'terminals') {
   const rows: T[] = [];
   for (let start = 0; ; start += 500) {
@@ -30,11 +34,11 @@ async function currentRows<T>(table: 'routes' | 'terminals') {
   }
 }
 
-export default function SupervisorRouteManager({ onBack, onChanged, openRoute1 = false }: { onBack: () => void; onChanged: () => Promise<void>; openRoute1?: boolean }) {
+export default function SupervisorRouteManager({ onBack, onChanged, initialPage = 'list' }: { onBack: () => void; onChanged: () => Promise<void>; initialPage?: 'list' | 'add' | 'route1' }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [id, setId] = useState('');
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [review, setReview] = useState<ReviewSelection | null>(openRoute1 ? {direction:'outbound',pinId:null} : null);
+  const [draft, setDraft] = useState<Draft | null>(() => initialPage === 'add' ? newRouteDraft() : null);
+  const [review, setReview] = useState<ReviewSelection | null>(initialPage === 'route1' ? {direction:'outbound',pinId:null} : null);
   const [placingCurb,setPlacingCurb] = useState(false);
   const [requiresRefresh,setRequiresRefresh] = useState(false);
   const [retire, setRetire] = useState<Retire | null>(null);
@@ -65,6 +69,8 @@ export default function SupervisorRouteManager({ onBack, onChanged, openRoute1 =
   const stops = catalog?.stops.filter(t => t.route_id === id) ?? [];
   const locked = busy || loading;
   const creating = draft !== null && !draft.original;
+  const duplicate = draft?.kind === 'route' && catalog
+    ? matchingRoute(catalog.routes, draft.form.name, draft.original?.id) : undefined;
   function edit(next: Draft | null) { setDraft(next); setRetire(null); setVerified(false); setPlacingCurb(false); setRequiresRefresh(false); setError(''); setNotice(''); }
   function editStop(stop?: TerminalData, targetRoute=route, pin?: FieldPin) {
     if (!targetRoute) return;
@@ -77,7 +83,7 @@ export default function SupervisorRouteManager({ onBack, onChanged, openRoute1 =
       referenceId:pin?.id, form: !stop && pin ? {...initial,name:pin.name} : initial });
   }
   async function submit() {
-    if (pending.current || locked || requiresRefresh) return;
+    if (pending.current || locked || requiresRefresh || !catalog || duplicate) return;
     pending.current = true; setBusy(true); setError(''); setNotice('');
     try {
       let rpc: string, args: Record<string, unknown>, message: string;
@@ -121,6 +127,11 @@ export default function SupervisorRouteManager({ onBack, onChanged, openRoute1 =
         throw new Error(creating ? 'The save response was lost. Retry this draft or refresh to check.' : 'The save response was lost. Refresh the directory to check.');
       }
       if (result.error || (creating && (typeof result.data !== 'string' || !result.data))) {
+        if (draft?.kind === 'route' && result.error?.code === '23505') {
+          await refresh();
+          if (result.error.message.startsWith('This direction belongs to Route 1.')) throw new Error('This direction belongs to Route 1. Open Route 1 review.');
+          throw new Error('This route already exists. Open it from the route directory.');
+        }
         if (result.error?.code === '40001') { setRequiresRefresh(true); throw new Error('The directory changed. Refresh before editing this stop again.'); }
         if (result.error?.code === '22023' || result.error?.code === '42501') throw new Error(result.error.message);
         if (!creating) setRequiresRefresh(true);
@@ -146,7 +157,7 @@ export default function SupervisorRouteManager({ onBack, onChanged, openRoute1 =
   function confirmRetire(next: Retire) { edit(null); setRetire(next); }
   if (review && catalog && !draft && !retire) return <Route1ReviewPanel routes={catalog.route1} stops={catalog.stops}
     selection={review} onChange={v=>{setReview(v);setNotice('');}} loading={locked} notice={notice}
-    onEdit={(r,t,p)=>editStop(t,r,p)} onBack={()=>{setReview(null);setNotice('');if(openRoute1)onBack();}}
+    onEdit={(r,t,p)=>editStop(t,r,p)} onBack={()=>{setReview(null);setNotice('');if(initialPage==='route1')onBack();}}
     onRefresh={async changed=>{await refresh(id);if(changed)await onChanged();}}/>;
   if (lineOpen && route) return <RouteLineEditor key={route.id} routes={[route]} initialRouteId={route.id}
     onBack={() => setLineOpen(false)} onPublished={async () => { await refresh(id); await onChanged(); }} />;
@@ -175,6 +186,10 @@ export default function SupervisorRouteManager({ onBack, onChanged, openRoute1 =
       <View style={s.row}><Switch accessibilityLabel="Coming soon" disabled={busy} value={draft.form.is_coming_soon}
         onValueChange={v=>setDraft({ ...draft, form: { ...draft.form, is_coming_soon: v } })} /><Text style={s.label}>Coming soon</Text></View>
       <Text style={s.muted}>Keep this on while preparing a route. Switch it off when the route enters service.</Text>
+      {duplicate && <>
+        <Text accessibilityLiveRegion="polite" style={s.body}>Already in the directory · {duplicate.name}</Text>
+        {button('Open existing route', () => { setId(duplicate.id); edit(null); }, false, locked)}
+      </>}
     </View>}
     {draft?.kind === 'stop' && <View style={s.section}>
       <Text style={s.sectionTitle}>{route?.name}</Text>
@@ -209,7 +224,7 @@ export default function SupervisorRouteManager({ onBack, onChanged, openRoute1 =
       <View style={s.row}><Switch accessibilityLabel="Verified against the source" disabled={busy} value={verified} onValueChange={setVerified} />
         <Text style={[s.body,{flex:1}]}>I checked the curb, travel direction and any passenger use decision against their sources.</Text></View>
     </View>}
-    {draft && button(busy ? 'Saving…' : `Save ${draft.kind}`, () => void submit(), true, loading || requiresRefresh)}
+    {draft && button(busy ? 'Saving…' : `Save ${draft.kind}`, () => void submit(), true, !catalog || loading || requiresRefresh || !!duplicate)}
     {retire && <View style={s.section}><Text style={s.sectionTitle}>Retire {retire.name}?</Text>
       <Text style={s.body}>It will disappear from passenger planning. Existing trip records are kept.</Text>
       {button(`Confirm retire ${retire.kind}`, () => void submit(), true, loading)}{button('Cancel', () => edit(null))}</View>}
@@ -218,7 +233,7 @@ export default function SupervisorRouteManager({ onBack, onChanged, openRoute1 =
     {!draft && !retire && <>
       {loading && <Text style={s.muted}>Loading route directory…</Text>}
       {catalog && <View style={s.section}>
-        {button('Add route', () => edit({ kind:'route', requestId:randomUUID(), form:routeForm() }), true, locked)}
+        {button('Add route', () => edit(newRouteDraft()), true, locked)}
         {catalog.routes.length > 0 ? <PassengerSelect label="Route" value={id} disabled={locked}
           options={catalog.routes.map(r=>({ value:r.id,label:r.name + (r.is_coming_soon ? ' · Coming soon' : '') }))}
           onSelect={v=>{ setId(v); setNotice(''); setError(''); }} /> : <Text style={s.muted}>No current routes.</Text>}

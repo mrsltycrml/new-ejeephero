@@ -30,6 +30,8 @@ const platform = { OS: 'android' };
 let permission = 'granted', servicesEnabled = true;
 const deviceCalls: string[] = [];
 let inserted = 0;
+const ended: any[] = [];
+let rollbackError = false;
 const published: any[] = [];
 let restoredShift: any = null, driverId = 'driver';
 const countWrites: Array<{ id: string; count: number; resolve: (value: any) => void; reject: (error: Error) => void }> = [];
@@ -41,9 +43,17 @@ const database = { from() { let row: any, id: string; const query: any = {
   single: async () => ({ data: { id: 'shift', created_at: new Date().toISOString(), max_capacity: 22 }, error: null }),
   then: (resolve: any, reject: any) => row && row.is_active === undefined
     ? new Promise((done, fail) => countWrites.push({ id, count: row.passenger_count, resolve: done, reject: fail })).then(resolve, reject)
-    : Promise.resolve({ data: [], error: null }).then(resolve, reject),
+    : Promise.resolve({ data: [], error: null }).then(result => {
+        if (row?.is_active === false) {
+          ended.push(id);
+          if (rollbackError) return resolve({error:{message:'Response lost'}});
+        }
+        return resolve(result);
+      }, reject),
 }; return query; } };
+let readServiceIds = async (): Promise<Set<string>> => new Set(['route']);
 const service = { getTransitData: async () => ({ routes: [{ id: 'route', name: 'Route' }], terminals: [], status: 'ready' }),
+  getInServiceRouteIds: () => readServiceIds(),
   publishPosition: async (id: string, fix: any) => published.push(positionPayload(id, fix)) };
 Object.assign(globalThis, { __shiftReact: react, __shiftDb: database, __shiftTransit: service, __shiftLocation: () => locationState,
   __shiftUser: () => ({ user: { id: driverId } }),
@@ -86,6 +96,9 @@ const render = () => { index = 0; refIndex = 0; effectIndex = 0; callbackIndex =
 const flushEffects = () => effects.splice(0).forEach(effect => effect());
 const cleanupEffects = () => effectSlots.forEach(effect => effect.cleanup?.());
 const reset = () => {
+  readServiceIds = async () => new Set(['route']);
+  ended.length = 0;
+  rollbackError = false;
   states = []; refs = []; effectSlots = []; callbackSlots = []; countWrites.length = 0; restoredShift = null; driverId = 'driver';
   platform.OS = 'android'; permission = 'granted'; servicesEnabled = true; deviceCalls.length = 0; inserted = 0; published.length = 0;
 };
@@ -196,6 +209,95 @@ test('native shift still requires Expo permission and enabled device services wi
       assert.equal(published.length, 0);
     } finally { cleanupEffects(); }
   }
+});
+
+test('create rechecks service before insert and before the first fix, rolling back a removed route', async () => {
+  for (const removedAfterInsert of [false, true]) {
+    reset(); platform.OS = 'web';
+    locationState = { fix:{...accepted,timestamp:Date.now()}, now:Date.now(), foreground:true, errorMsg:null };
+    render(); flushEffects();
+    try {
+      await setImmediate();
+      const button=findStart(render());
+      assert.equal(button.props.disabled,false);
+      let checks=0;
+      readServiceIds=async () => new Set(removedAfterInsert && ++checks===1 ? ['route'] : []);
+      await button.props.onPress();
+      assert.equal(inserted,removedAfterInsert ? 1 : 0);
+      assert.deepEqual(ended,removedAfterInsert ? ['shift'] : []);
+      assert.equal(published.length,0);
+    } finally { cleanupEffects(); }
+  }
+});
+
+test('an excluded restored shift never publishes; End shift remains usable', async () => {
+  reset(); platform.OS='web'; restore('existing-shift',3); restoredShift.route_id='route2';
+  locationState={fix:{...accepted,timestamp:Date.now()},now:Date.now(),foreground:true,errorMsg:null};
+  render(); flushEffects();
+  try {
+    await setImmediate(); render(); flushEffects(); await setImmediate(); render(); flushEffects(); await setImmediate();
+    assert.equal(published.length,0);
+    const tree=render();
+    assert.match(textOf(tree),/out of service/);
+    const end=findNode(tree,n=>n?.type==='Button' && textOf(n)==='End shift');
+    assert.ok(!end.props.disabled);
+    end.props.onPress();
+    const sheet=findNode(render(),n=>n?.type==='Sheet' && n.props.visible);
+    const confirm=findNode(sheet,n=>n?.type==='Button' && n.props.disabled===false && textOf(n)==='End shift');
+    assert.ok(confirm);
+    await confirm.props.onPress();
+    assert.deepEqual(ended,['existing-shift']);
+  } finally { cleanupEffects(); }
+});
+
+test('an unconfirmed rollback keeps End shift available without sharing the uncertain shift',async()=>{
+  reset();platform.OS='web';rollbackError=true;
+  locationState={fix:{...accepted,timestamp:Date.now()},now:Date.now(),foreground:true,errorMsg:null};
+  render();flushEffects();
+  try {
+    await setImmediate();
+    const start=findStart(render());
+    let checks=0;
+    readServiceIds=async()=>new Set(++checks===2 ? [] : ['route']);
+    await start.props.onPress();
+    render();flushEffects();await setImmediate();render();flushEffects();await setImmediate();
+    assert.equal(published.length,0);assert.match(textOf(render()),/Use End shift to retry/);
+    rollbackError=false;
+    findNode(render(),n=>n?.type==='Button' && textOf(n)==='End shift').props.onPress();
+    const sheet=findNode(render(),n=>n?.type==='Sheet' && n.props.visible);
+    await findNode(sheet,n=>n?.type==='Button' && n.props.disabled===false && textOf(n)==='End shift').props.onPress();
+    assert.deepEqual(ended,['shift','shift']);
+  } finally { cleanupEffects(); }
+});
+
+test('on-duty status refresh, foreground resume and weak or stale GPS do not share an ineligible fix',async t=>{
+  reset(); platform.OS='web'; restore('on-duty',3);
+  const now=Date.now();
+  t.mock.timers.enable({apis:['setInterval','Date'],now});
+  let allowed=true, retries=0;
+  readServiceIds=async()=>new Set(allowed?['route']:[]);
+  locationState={fix:{...accepted,timestamp:now},now,foreground:true,errorMsg:null,enableLocation:async()=>{retries++;}};
+  async function settle() { for(let i=0;i<3;i++){render();flushEffects();await setImmediate();} }
+  try {
+    await settle();
+    assert.equal(published.length,1);
+    allowed=false;
+    t.mock.timers.tick(15000);await setImmediate();await settle();
+    assert.match(textOf(render()),/out of service/);
+    locationState={...locationState,fix:{...accepted,timestamp:Date.now()},now:Date.now()};await settle();
+    assert.equal(published.length,1);
+    allowed=true;t.mock.timers.tick(15000);await setImmediate();await settle();
+    assert.equal(published.length,2);
+    locationState={...locationState,foreground:false};await settle();
+    allowed=false;locationState={...locationState,foreground:true,fix:{...accepted,timestamp:Date.now()},now:Date.now()};await settle();
+    assert.equal(published.length,2);assert.match(textOf(render()),/out of service/);
+    for (const fix of [{...accepted,accuracy:80,timestamp:Date.now()},{...accepted,timestamp:Date.now()-31000}]) {
+      locationState={...locationState,fix};await settle();
+      const retry=findNode(render(),n=>n?.type==='Button' && textOf(n)==='Enable location / retry');
+      await retry.props.onPress();
+    }
+    assert.equal(retries,2);
+  } finally { cleanupEffects();t.mock.timers.reset(); }
 });
 async function mountCount() {
   reset(); restore('shift-a', 3);

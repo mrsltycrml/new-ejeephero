@@ -24,7 +24,8 @@ function errorMessage(error: GeolocationPositionError): string {
 }
 
 // Start directly from the tap. Safari can provide a position even when a permissions query is unavailable.
-export function browserLocationWatch(onPosition: (position: ReturnType<typeof deviceReading>) => void, onStatus: (message: string) => void) {
+export function browserLocationWatch(onPosition: (position: ReturnType<typeof deviceReading>) => void, onStatus: (message: string) => void,
+  requested: { current: boolean }) {
   let watchId: number | undefined;
   let gps: Geolocation | undefined;
   let generation = 0;
@@ -33,7 +34,7 @@ export function browserLocationWatch(onPosition: (position: ReturnType<typeof de
     if (watchId !== undefined) gps?.clearWatch(watchId);
     watchId = undefined;
   }
-  function start() {
+  function startWatch() {
     stop();
     const request = generation;
     try {
@@ -43,21 +44,23 @@ export function browserLocationWatch(onPosition: (position: ReturnType<typeof de
         if (generation === request) onPosition(deviceReading(position));
       }, error => {
         if (generation !== request) return;
-        if (error.code === 1) stop();
+        if (error.code === 1) { requested.current = false; stop(); }
         onStatus(errorMessage(error));
       }, options);
     } catch (error) {
       onStatus(error instanceof Error ? error.message : 'GPS could not start. Try again.');
     }
   }
-  async function resume(previouslyLocated: boolean) {
+  function start() { requested.current = true; startWatch(); }
+  async function resume() {
     const request = generation;
     let permission: PermissionState | undefined;
     try { permission = (await navigator.permissions.query({ name: 'geolocation' })).state; }
     catch { /* An explicit request can still use the device GPS. */ }
     if (request !== generation) return;
-    if (permission === 'granted' || (previouslyLocated && permission === undefined)) start();
-    else onStatus(permission === 'denied' ? blocked : 'Enable location to get a reading from your device.');
+    if (permission === 'denied') { requested.current = false; stop(); onStatus(blocked); }
+    else if (permission === 'granted' || requested.current) startWatch();
+    else onStatus('Enable location to get a reading from your device.');
   }
   return { start, resume, stop };
 }

@@ -38,8 +38,21 @@ export default function DashboardScreen() {
   const latestLocation = useRef(location);
   latestLocation.current = location;
   const { isConnected } = useNetwork();
-  const [routes, setRoutes] = useState<any[]>([]);
-  const [mapRoutes, setMapRoutes] = useState<RouteData[]>([]);
+  const [catalogRoutes, setCatalogRoutes] = useState<RouteData[]>([]);
+  const [serviceIds, setServiceIds] = useState<ReadonlySet<string> | null>(null);
+  const serviceRequest = useRef<Promise<Set<string> | null> | null>(null);
+  const checkService = useCallback(() => {
+    if (serviceRequest.current) return serviceRequest.current;
+    const request = offlineTransit.getInServiceRouteIds().catch(() => null).then(ids => {
+      if (serviceRequest.current !== request) return null;
+      serviceRequest.current = null;
+      setServiceIds(ids);
+      return ids;
+    });
+    serviceRequest.current = request;
+    return request;
+  }, []);
+  const routes = catalogRoutes.filter(route => serviceIds?.has(route.id));
   const [mapTerminals, setMapTerminals] = useState<TerminalData[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(false);
@@ -52,6 +65,7 @@ export default function DashboardScreen() {
   const [telemetryError, setTelemetryError] = useState('');
   const [shiftError, setShiftError] = useState('');
   const [starting, setStarting] = useState(false);
+  const [closingUnconfirmed, setClosingUnconfirmed] = useState(false);
   const [currentPosition, setCurrentPosition] = useState<MeasuredFix | null>(null);
   const [publishedAt, setPublishedAt] = useState<number | null>(null);
   const [passengerCount, setPassengerCount] = useState<number | null>(null);
@@ -67,6 +81,17 @@ export default function DashboardScreen() {
   const publishing = useRef(false);
   const activeVehicle = useRef<string | null>(null);
   const passengerCountPending = useRef(false);
+  const routeInService = !!selectedRoute && routes.some(route => route.id === selectedRoute);
+  const canSharePosition = routeInService && !closingUnconfirmed;
+  const canStartShift = locationReady && routeInService && !starting;
+
+  useEffect(() => {
+    setServiceIds(null);
+    if (!foreground || !isConnected || !user?.id) return;
+    void checkService();
+    const timer = isActive ? setInterval(() => { void checkService(); }, 15_000) : undefined;
+    return () => { clearInterval(timer); serviceRequest.current = null; };
+  }, [foreground, isConnected, user?.id, isActive, vehicleId, checkService]);
 
   const checkNativePermission = useCallback(async () => {
     try {
@@ -109,20 +134,26 @@ export default function DashboardScreen() {
   useEffect(() => {
     if (!isActive || !vehicleId || !fix || !foreground) return;
     setCurrentPosition(previous => !previous || fix.timestamp > previous.timestamp ? fix : previous);
-    if (locationError || !isConnected || locationQuality(fix, now) !== 'live' || (publishedAt != null && publishedAt >= fix.timestamp) || publishing.current) return;
+    if (!selectedRoute || !canSharePosition || locationError || !isConnected || locationQuality(fix, now) !== 'live' || (publishedAt != null && publishedAt >= fix.timestamp) || publishing.current) return;
     publishing.current = true;
-    void offlineTransit.publishPosition(vehicleId, fix).then(() => {
-      if (activeVehicle.current === vehicleId) { setPublishedAt(fix.timestamp); setTelemetryError(''); }
+    void checkService().then(async ids => {
+      const latest = latestLocation.current;
+      if (!ids?.has(selectedRoute) || activeVehicle.current !== vehicleId || !latest.foreground || latest.errorMsg ||
+          !latest.fix || locationQuality(latest.fix) !== 'live') return;
+      const measured = latest.fix;
+      await offlineTransit.publishPosition(vehicleId, measured);
+      if (activeVehicle.current === vehicleId) { setPublishedAt(measured.timestamp); setTelemetryError(''); }
     }).catch(() => {
       if (activeVehicle.current === vehicleId) setTelemetryError('Position was not published. Check connection and telemetry schema; retrying with fresh GPS.');
     }).finally(() => { publishing.current = false; });
-  }, [isActive, vehicleId, fix?.timestamp, now, foreground, isConnected, locationError, publishedAt]);
+  }, [isActive, vehicleId, selectedRoute, canSharePosition, fix?.timestamp, now, foreground, isConnected, locationError, publishedAt, checkService]);
 
   useEffect(() => {
-    void offlineTransit.getTransitData().then((data) => {
+    let current = true;
+    if (foreground && user?.id) void offlineTransit.getTransitData().then((data) => {
+      if (!current) return;
       const validRoutes = data.routes.filter((route) => !route.is_coming_soon);
-      setRoutes(validRoutes);
-      setMapRoutes(validRoutes);
+      setCatalogRoutes(validRoutes);
       if (data.status !== 'ready') setShiftError(data.syncedAt ? `Routes cached at ${new Date(data.syncedAt).toLocaleString()}; refresh unavailable.` : 'Routes unavailable.');
       setMapTerminals(data.terminals);
       if (validRoutes.length > 0) {
@@ -130,10 +161,9 @@ export default function DashboardScreen() {
       }
     });
 
-    return () => {
-      stopAnomalyDetection();
-    };
-  }, []);
+    return () => { current = false; };
+  }, [foreground, isConnected, user?.id]);
+  useEffect(() => () => stopAnomalyDetection(), []);
 
   useEffect(() => {
     if (isActive) return;
@@ -205,6 +235,7 @@ export default function DashboardScreen() {
         .limit(1)
         .maybeSingle();
       if (!data || data.is_sample || cancelled) return;
+      setClosingUnconfirmed(false);
       setVehicleId(data.id);
       setSelectedRoute(data.route_id);
       setBodyNumber(data.body_number || '');
@@ -270,6 +301,7 @@ export default function DashboardScreen() {
         setTelemetryError('');
         setEndShiftSheetOpen(false);
         setIsActive(false);
+        setClosingUnconfirmed(false);
         triggerHaptic('medium');
         return;
       }
@@ -294,6 +326,7 @@ export default function DashboardScreen() {
 
       if (!isConnected) throw new Error('Connect to the internet before starting a shift.');
       await checkTrackingAccess('Allow location access to start a live shift.');
+      if (!(await checkService())?.has(selectedRoute)) throw new Error('Route service could not be confirmed. Choose a current route.');
       const { fix: measured, foreground: active, errorMsg } = latestLocation.current;
       if (!measured || !active || errorMsg || locationQuality(measured) !== 'live') throw new Error('Wait for a fresh GPS fix with accuracy within 30 m before starting.');
       const created = await supabase
@@ -319,9 +352,12 @@ export default function DashboardScreen() {
       } else {
         setShiftStartedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
       }
-      await offlineTransit.publishPosition(newVehicleId, measured);
-      setCurrentPosition(measured);
-      setPublishedAt(measured.timestamp);
+      if (!(await checkService())?.has(selectedRoute)) throw new Error('Route service changed before the first GPS reading could be shared.');
+      const first = latestLocation.current;
+      if (!first.foreground || first.errorMsg || !first.fix || locationQuality(first.fix) !== 'live') throw new Error('A fresh foreground GPS reading is required to start the shift.');
+      await offlineTransit.publishPosition(newVehicleId, first.fix);
+      setCurrentPosition(first.fix);
+      setPublishedAt(first.fix.timestamp);
       setVehicleId(newVehicleId);
       setPassengerCount(0);
       setIsActive(true);
@@ -331,16 +367,21 @@ export default function DashboardScreen() {
       triggerHaptic('error');
       let rollbackFailed = false;
       if (insertedId) {
-        const rollback = await supabase
-          .from('vehicles')
-          .update({ is_active: false, ended_at: new Date().toISOString() })
-          .eq('id', insertedId);
-        rollbackFailed = Boolean(rollback.error);
+        try {
+          const rollback = await supabase.from('vehicles')
+            .update({ is_active: false, ended_at: new Date().toISOString() }).eq('id', insertedId);
+          rollbackFailed = Boolean(rollback.error);
+        } catch { rollbackFailed = true; }
+        if (rollbackFailed) {
+          setClosingUnconfirmed(true);
+          setVehicleId(insertedId);
+          setIsActive(true);
+        }
       }
       const message =
         error instanceof Error ? error.message : 'The shift could not start. Check your connection and try again.';
       setShiftError(
-        rollbackFailed ? `${message} The unit may still appear active. Ask a supervisor to check it.` : message
+        rollbackFailed ? `${message} Closing the shift could not be confirmed. Use End shift to retry.` : message
       );
     } finally {
       setStarting(false);
@@ -358,7 +399,7 @@ export default function DashboardScreen() {
         : 'Maluwag';
 
   const liveVehicle: VehicleData | null =
-    vehicleId && currentPosition && gpsUsable
+    canSharePosition && vehicleId && currentPosition && gpsUsable
       ? {
           id: vehicleId,
           vehicle_id: vehicleId,
@@ -516,11 +557,11 @@ export default function DashboardScreen() {
             )}
             <Text style={styles.submitUnit}>{[bodyNumber, plateNumber].filter(Boolean).join(' · ') || 'Select an assigned unit'}</Text>
             <TouchableOpacity
-              style={[styles.primaryBtn, (!locationReady || starting) && styles.disabledBtn]}
+              style={[styles.primaryBtn, !canStartShift && styles.disabledBtn]}
               onPress={toggleShift}
-              disabled={!locationReady || starting}
+              disabled={!canStartShift}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !locationReady || starting, busy: starting }}
+              accessibilityState={{ disabled: !canStartShift, busy: starting }}
             >
               {starting ? (
                 <ActivityIndicator color={Colors.subtleGray} />
@@ -565,7 +606,7 @@ export default function DashboardScreen() {
           <View style={styles.trackingPanel}>
             <View style={styles.mapFrame}>
               <LeafletMap
-                routes={mapRoutes}
+                routes={routes}
                 terminals={mapTerminals}
                 vehicles={liveVehicle ? [liveVehicle] : []}
                 selectedVehicle={liveVehicle}
@@ -586,7 +627,10 @@ export default function DashboardScreen() {
                 {locationError || telemetryError}
               </Text>
             )}
-            {!!locationError && <TouchableOpacity accessibilityRole="button" onPress={requestLocationPerm} style={styles.keepActiveBtn}><Text style={styles.keepActiveText}>Enable location / retry</Text></TouchableOpacity>}
+            {!routeInService && <Text accessibilityRole="alert" style={styles.shiftError}>{selectedRoute && serviceIds && !serviceIds.has(selectedRoute)
+              ? 'This shift’s route is out of service. GPS sharing is paused. You can end the shift.'
+              : 'Route service is unconfirmed. GPS sharing is paused. You can end the shift.'}</Text>}
+            {(!!locationError || (foreground && locationQuality(fix, now) !== 'live')) && <TouchableOpacity accessibilityRole="button" onPress={requestLocationPerm} style={styles.keepActiveBtn}><Text style={styles.keepActiveText}>Enable location / retry</Text></TouchableOpacity>}
 
             {/* 2-Column Telemetry */}
             <View style={styles.telemetryGrid}>

@@ -106,10 +106,11 @@ function normalizeTransit(rawRoutes: RouteData[], rawTerminals: TerminalData[]) 
   return { routes, terminals };
 }
 
-async function readAll<T>(table: string): Promise<T[]> {
+async function readAll<T>(table: string, columns = '*'): Promise<T[]> {
   const rows: T[] = [];
   for (let offset = 0; ; offset += 500) {
-    const { data, error } = await supabase.from(table).select('*').order('id').range(offset, offset + 499);
+    const { data, error } = await supabase.from(table).select(columns).order('id').range(offset, offset + 499)
+      .overrideTypes<T[], { merge: false }>();
     if (error) throw new Error(error.message);
     if (!Array.isArray(data)) throw new Error(`Could not read ${table}.`);
     rows.push(...data);
@@ -124,6 +125,7 @@ export class OfflineTransitService {
   private requestSequence = 0;
   private successfulRequest = 0;
   private cacheWrite: Promise<void> = Promise.resolve();
+  private serviceColumns = '*';
   private constructor() {}
   public static getInstance(): OfflineTransitService {
     return OfflineTransitService.instance ??= new OfflineTransitService();
@@ -181,11 +183,23 @@ export class OfflineTransitService {
     if (error) throw new Error(error.message);
   }
 
+  /** Legacy catalogs differ in optional publication flags. Poll only the columns this catalog exposes. */
+  public async getInServiceRouteIds(): Promise<Set<string>> {
+    const rows = await readAll<RouteData>('routes', this.serviceColumns);
+    if (this.serviceColumns === '*' && rows.length) {
+      this.serviceColumns = ['id','is_archived','is_coming_soon','is_sample','is_active','is_published','deleted_at','status']
+        .filter(column => column in rows[0]).join(',');
+    }
+    return new Set(rows.filter(activeRoute).map(route => route.id));
+  }
+
   /** A failed fleet request rejects; an empty successful feed returns []. */
-  public async getVehicles(): Promise<VehicleData[]> {
+  public async getVehicles(routeIds?: ReadonlySet<string>): Promise<VehicleData[]> {
+    const inService = routeIds ?? await this.getInServiceRouteIds();
+    if (!inService.size) return [];
     const { data, error } = await supabase.from('vehicles').select('*').eq('is_active', true);
     if (error) throw new Error(error.message);
-    const activeVehicles = realRows<any>(data ?? []).filter(vehicle => vehicle.is_active && !vehicle.deleted_at);
+    const activeVehicles = realRows<any>(data ?? []).filter(vehicle => vehicle.is_active && !vehicle.deleted_at && inService.has(vehicle.route_id));
     if (!activeVehicles.length) return [];
     const { data: positions, error: positionError } = await supabase.from('vehicle_positions')
       .select('*').in('vehicle_id', activeVehicles.map(vehicle => vehicle.id))

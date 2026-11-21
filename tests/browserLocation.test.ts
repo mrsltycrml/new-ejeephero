@@ -24,8 +24,9 @@ test('an explicit GPS tap works without a permissions query and owns the actual 
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { isSecureContext: true } });
   try {
-    const watch = browserLocationWatch(pos => readings.push(pos), msg => messages.push(msg));
-    await watch.resume(false);
+    const requested = { current: false };
+    const watch = browserLocationWatch(pos => readings.push(pos), msg => messages.push(msg), requested);
+    await watch.resume();
     assert.match(messages.at(-1)!, /Enable location/);
     watch.start();
     callbacks[0].error({ code: 3 } as GeolocationPositionError);
@@ -41,8 +42,10 @@ test('an explicit GPS tap works without a permissions query and owns the actual 
     callbacks[1].error({ code: 1 } as GeolocationPositionError);
     assert.match(messages.at(-1)!, /blocked for this website/);
     assert.deepEqual(cleared, [0, 1]);
-    await watch.resume(true);
-    callbacks[2].success(position);
+    await watch.resume();
+    assert.equal(requested.current, false);
+    assert.equal(callbacks.length, 2);
+    watch.start();
     watch.stop();
     assert.deepEqual(cleared, [0, 1, 2]);
     assert.equal(await getBrowserPosition(), position);
@@ -64,14 +67,14 @@ test('a delayed permission check cannot override a manual request or restart a s
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { isSecureContext: true } });
   try {
-    const watch = browserLocationWatch(() => {}, message => messages.push(message));
-    const pending = watch.resume(false);
+    const watch = browserLocationWatch(() => {}, message => messages.push(message), {current:false});
+    const pending = watch.resume();
     watch.start();
     answer({ state: 'prompt' });
     await pending;
     assert.equal(started, 1);
     assert.deepEqual(messages, ['Getting a fresh GPS reading…']);
-    const resuming = watch.resume(false);
+    const resuming = watch.resume();
     watch.stop();
     answer({ state: 'granted' });
     await resuming;
@@ -80,5 +83,33 @@ test('a delayed permission check cannot override a manual request or restart a s
     nav.mock.restore();
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
     else Reflect.deleteProperty(globalThis, 'window');
+  }
+});
+
+test('an explicit request survives suspension before a first fix and clears on denial or a new session',async()=>{
+  let permission: PermissionState | undefined;
+  let count=0, lastError: PositionErrorCallback;
+  const nav=mock.getter(globalThis,'navigator',()=>({
+    permissions:permission && {query:async()=>({state:permission})},
+    geolocation:{watchPosition(_:PositionCallback,onError:PositionErrorCallback){lastError=onError;return ++count;},clearWatch(){}},
+  } as unknown as Navigator));
+  const originalWindow=Object.getOwnPropertyDescriptor(globalThis,'window');
+  Object.defineProperty(globalThis,'window',{configurable:true,value:{isSecureContext:true}});
+  const requested={current:false};
+  const watch=()=>browserLocationWatch(()=>{},()=>{},requested);
+  try {
+    const initial=watch(); await initial.resume(); assert.equal(count,0);
+    initial.start(); lastError!({code:3} as GeolocationPositionError); initial.stop();
+    const resumed=watch(); await resumed.resume(); assert.equal(count,2);
+    resumed.stop(); permission='prompt'; const prompted=watch();await prompted.resume();assert.equal(count,3);
+    lastError!({code:1} as GeolocationPositionError);assert.equal(requested.current,false);
+    await watch().resume();assert.equal(count,3);
+    prompted.start();prompted.stop();permission='denied';await watch().resume();assert.equal(requested.current,false);
+    permission=undefined;const newSession=browserLocationWatch(()=>{},()=>{},{current:false});
+    await newSession.resume();assert.equal(count,4);
+  } finally {
+    nav.mock.restore();
+    if(originalWindow) Object.defineProperty(globalThis,'window',originalWindow);
+    else Reflect.deleteProperty(globalThis,'window');
   }
 });

@@ -111,8 +111,12 @@ test('Fleet opens Route 1 review in one tap and returns to the monitor', async (
     await setImmediate();
     find(render(),'Button','Review Route 1 map and stops').props.onPress();
     const manager = find(render(),'RouteManager');
-    assert.equal(manager.props.openRoute1,true);
+    assert.equal(manager.props.initialPage,'route1');
     manager.props.onBack();
+    find(render(),'Button','Add route').props.onPress();
+    const add = find(render(),'RouteManager');
+    assert.equal(add.props.initialPage,'add');
+    add.props.onBack();
     assert.ok(find(render(),'Map'));
   } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); }
 });

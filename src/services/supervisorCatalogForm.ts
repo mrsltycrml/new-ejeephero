@@ -5,6 +5,15 @@ export function routeForm(route?: RouteData) {
     color_code: route?.color_code ?? '#1F4E79', is_coming_soon: route?.is_coming_soon ?? true };
 }
 
+export function matchingRoute(routes: RouteData[], name: string, editingId?: string) {
+  const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+  const proposed = normalize(name);
+  const existing = routes.find(route => route.id !== editingId && normalize(route.name) === proposed);
+  if (existing || !/^route ?2($|[ :()–—→-])/.test(proposed)) return existing;
+  return routes.find(route => route.id === 'a2000000-0000-0000-0000-000000000002' &&
+    route.id !== editingId && route.is_coming_soon);
+}
+
 export function routeChanges(form: ReturnType<typeof routeForm>, route?: RouteData) {
   const initial = routeForm(route);
   if (!form.name.trim()) throw new Error('Enter the route name and travel direction.');

@@ -26,7 +26,7 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
   const [revision, setRevision] = useState(0);
   const previous = useRef<MeasuredFix | null>(null);
   const browserStart = useRef<(() => void) | null>(null);
-  const browserLocated = useRef(false);
+  const browserRequested = useRef(false);
   const enableLocation = useCallback(async () => {
     if (Platform.OS === 'web') { browserStart.current?.(); return; }
     try {
@@ -39,7 +39,7 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
     const sub = AppState.addEventListener('change', state => { setForeground(state === 'active'); setNow(Date.now()); });
     return () => sub.remove();
   }, []);
-  useEffect(() => { setLocation(null); previous.current = null; browserLocated.current = false; }, [user?.id]);
+  useEffect(() => { setLocation(null); previous.current = null; browserRequested.current = false; }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -58,12 +58,12 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
     };
     if (Platform.OS === 'web') {
       if (!foreground) { setErrorMsg('Tracking paused. Reopen eSAKAY to resume GPS.'); return; }
-      const watch = browserLocationWatch(pos => { browserLocated.current = true; onPosition(pos); }, message => {
+      const watch = browserLocationWatch(onPosition, message => {
         setLocation(null);
         setErrorMsg(message);
-      });
+      }, browserRequested);
       browserStart.current = watch.start;
-      void watch.resume(browserLocated.current);
+      void watch.resume();
       const timer = setInterval(() => setNow(Date.now()), 5000);
       return () => { cancelled = true; browserStart.current = null; watch.stop(); clearInterval(timer); };
     }

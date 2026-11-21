@@ -40,6 +40,7 @@ try {
     alter table routes enable row level security;
     alter table terminals enable row level security;
     alter table vehicles enable row level security;
+    alter table vehicle_positions enable row level security;
     create table fleet_registry_units(body_number text,plate_number text,deleted_at timestamptz);
     insert into fleet_registry_units values ('Catalog test unit','CAT-001',null);
     grant select on routes, terminals to authenticated, anon;
@@ -47,9 +48,9 @@ try {
     create policy terminals_reference on terminals for select to anon,authenticated
       using(exists(select 1 from routes where routes.id = terminals.route_id and not is_archived));
   `);
-  // Install the existing shift RLS and fleet guard together with the new catalog trigger.
+  // Install the real shift and position policies, including supervisor history access.
   await db.exec(security.slice(security.indexOf('grant select,insert on public.vehicles'),
-    security.indexOf('grant select,insert on public.vehicle_positions')));
+    security.indexOf('grant select on public.speed_events')));
   const planning = read('../migrations/20261027130000_passenger_safety_and_fares.sql');
   await db.exec(planning.split('-- Emergency requests')[0]);
   await db.exec(read('../migrations/20261118030000_walking_directions.sql'));
@@ -68,10 +69,31 @@ try {
   await db.exec(read('../migrations/20261121030000_idempotent_catalog_create.sql'));
   await db.exec(`insert into routes(id,name) values ('550e8400-e29b-41d4-a716-446655440000','Existing Route 1')`);
   await db.exec(read('../migrations/20261121040000_route1_activation.sql'));
+  await db.exec(read('../migrations/20261121050000_catalog_route_names.sql'));
   await db.exec(read('./supervisor_catalog.sql'));
   await db.exec(read('./idempotent_catalog_create.sql'));
   await db.exec(read('./route1_activation.sql'));
-  console.log('Supervisor catalog, idempotent create and Route 1 SQL regressions passed in isolated PostgreSQL.');
+  await db.exec(read('./catalog_route_names.sql'));
+  // PGlite queues client queries. PostgreSQL's unique index is the cross-session arbiter.
+  const createRoute = 'select public.supervisor_create_catalog_item(gen_random_uuid(), \'route\', null, jsonb_build_object(\'name\', $1::text))';
+  const attempts = await Promise.allSettled(['Shared Route', '  SHARED   route  '].map(name => db.query(createRoute, [name])));
+  if (attempts.filter(r => r.status === 'fulfilled').length !== 1 ||
+      attempts.filter(r => r.status === 'rejected' && r.reason.code === '23505').length !== 1) {
+    throw new Error('Two submitted creates must yield one route and one duplicate-name error.');
+  }
+  await db.exec('reset role; reset request.jwt.claims;');
+  await db.exec(read('../migrations/20261117170000_supervisor_hidden_profiles.sql'));
+  await db.exec(`insert into public.profiles(id,role,status,supervisor_hidden)
+    values ('00000000-0000-4000-8000-000000000601','driver','approved',true)`);
+  // Production grants these roles EXECUTE on new public functions by default.
+  await db.exec('alter default privileges in schema public grant execute on functions to anon, authenticated, service_role');
+  await db.exec(read('../migrations/20261121145250_restore_supervisor_controls.sql'));
+  await db.exec(read('./supervisor_controls.sql'));
+  await db.exec(read('../migrations/20261122010000_positions_require_in_service_route.sql'));
+  await db.exec(read('./position_route_status.sql'));
+  console.log('Driver position route-status SQL regressions passed in isolated PostgreSQL.');
+  console.log('Supervisor visibility and force-end SQL regressions passed in isolated PostgreSQL.');
+  console.log('Supervisor catalog, idempotent create, Route 1 and duplicate route name SQL regressions passed in isolated PostgreSQL.');
 } catch (error) {
   console.error(error.message, error.where || '', error.detail || '');
   process.exitCode = 1;

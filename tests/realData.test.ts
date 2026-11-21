@@ -14,6 +14,7 @@ let readOverride: ((table: string) => Promise<any>) | null = null;
 let writeOverride: (() => Promise<void>) | null = null;
 let fleet: any[] = [];
 const published: any[] = [];
+const routeProjections:string[] = [];
 const storage = { getItem: async (key: string) => {
   if (cacheReadFailed) throw new Error('Storage unreadable');
   return cache.get(key) ?? null;
@@ -25,12 +26,17 @@ const storage = { getItem: async (key: string) => {
 const database = {
   rpc: async () => ({ data: failed ? null : fleet, error: failed ? { message: 'offline' } : null }),
   from(table: string) {
-    let start = 0, end = Infinity;
+    let start = 0, end = Infinity, columns = '*';
     const query: any = {
-      select: () => query, eq: () => query, in: () => query, gte: () => query, order: () => query, limit: () => query,
+      select: (value = '*') => { columns = value; if (table === 'routes') routeProjections.push(value); return query; },
+      eq: () => query, in: () => query, gte: () => query, order: () => query, limit: () => query, overrideTypes: () => query,
       insert: async (row: any) => { if (!failed) published.push(row); return { error: failed ? { message: 'offline' } : null }; },
       range: (a: number, b: number) => { start = a; end = b; return query; },
-      then: (resolve: any, reject: any) => (readOverride ? readOverride(table) : Promise.resolve({ data: failed ? null : (tables[table] ?? []).slice(start, end + 1), error: failed ? { message: 'offline' } : null })).then(resolve, reject),
+      then: (resolve: any, reject: any) => (readOverride ? readOverride(table) : Promise.resolve({
+        data: failed ? null : (tables[table] ?? []).slice(start, end + 1).map(row =>
+          columns === '*' ? row : Object.fromEntries(columns.split(',').map(key => [key, row[key]]))),
+        error: failed ? { message: 'offline' } : null,
+      })).then(resolve, reject),
     };
     return query;
   },
@@ -57,6 +63,7 @@ test.beforeEach(() => {
   // Isolate the service's memory without exposing a production reset API.
   offlineTransit = Reflect.construct(OfflineTransitService, []);
   cache.clear(); tables = {}; failed = false; cacheWriteFailed = false; cacheReadFailed = false;
+  routeProjections.length=0;
   readOverride = null; writeOverride = null;
 });
 
@@ -228,7 +235,7 @@ test('overlapping cache persistence is serialized and the final disk snapshot is
 });
 
 test('live fleet excludes sample database vehicles and preserves missing telemetry as unknown', async () => {
-  tables = { vehicles: [{ id: 'real', is_active: true, body_number: 'REAL', plate_number: 'TEST-1' }, { id: 'sample', is_sample: true, is_active: true }], vehicle_positions: ['real', 'sample'].map(vehicle_id => ({ vehicle_id, latitude: 14.6, longitude: 121.1, speed: null, heading: null, timestamp: new Date().toISOString(), captured_at: new Date().toISOString() })) };
+  tables = { routes:[route], vehicles: [{ id: 'real', route_id:route.id, is_active: true, body_number: 'REAL', plate_number: 'TEST-1' }, { id: 'sample', route_id:route.id, is_sample: true, is_active: true }], vehicle_positions: ['real', 'sample'].map(vehicle_id => ({ vehicle_id, latitude: 14.6, longitude: 121.1, speed: null, heading: null, timestamp: new Date().toISOString(), captured_at: new Date().toISOString() })) };
   const result = await offlineTransit.getVehicles();
   assert.deepEqual(result.map(row => row.vehicle_id), ['real']);
   assert.equal(result[0].speed, null);
@@ -240,7 +247,7 @@ test('live fleet excludes sample database vehicles and preserves missing telemet
 
 test('vehicle loader retains capture accuracy and km/h but drops stale and legacy positions', async () => {
   const captured_at = new Date(Date.now() - 5000).toISOString();
-  tables = { vehicles: [{ id: 'v', is_active: true }], vehicle_positions: [{ vehicle_id: 'v', latitude: 14.6, longitude: 121, speed: 18, heading: 90, accuracy: 7, timestamp: new Date().toISOString(), captured_at }] };
+  tables = { routes:[route], vehicles: [{ id: 'v', route_id:route.id, is_active: true }], vehicle_positions: [{ vehicle_id: 'v', latitude: 14.6, longitude: 121, speed: 18, heading: 90, accuracy: 7, timestamp: new Date().toISOString(), captured_at }] };
   const [vehicle] = await offlineTransit.getVehicles();
   assert.equal(vehicle.speed, 18);
   assert.equal(vehicle.accuracy, 7);
@@ -249,6 +256,34 @@ test('vehicle loader retains capture accuracy and km/h but drops stale and legac
   assert.deepEqual(await offlineTransit.getVehicles(), []);
   delete tables.vehicle_positions[0].captured_at;
   assert.deepEqual(await offlineTransit.getVehicles(), []);
+});
+
+test('the live fleet omits upcoming, archived and missing routes even with fresh vehicle positions',async()=>{
+  const stamp=new Date().toISOString();
+  const ids=['regular','upcoming','archived','missing'];
+  tables={
+    routes:ids.slice(0,3).map(id=>({...route,id,is_coming_soon:id==='upcoming',is_archived:id==='archived'})),
+    vehicles:ids.map(id=>({id,route_id:id,is_active:true})),
+    vehicle_positions:ids.map(vehicle_id=>({vehicle_id,latitude:14.6,longitude:121,accuracy:8,timestamp:stamp,captured_at:stamp})),
+  };
+  assert.deepEqual((await offlineTransit.getVehicles()).map(v=>v.id),['regular']);
+  tables.routes[0].is_coming_soon=true;
+  assert.deepEqual(await offlineTransit.getVehicles(),[]);
+  assert.deepEqual(routeProjections,['*','id,is_archived,is_coming_soon,is_active']);
+});
+
+test('service polling selects only available status fields and observes changes to optional publication flags',async()=>{
+  tables.routes=[{id:'legacy',is_archived:false,is_coming_soon:false}];
+  assert.deepEqual([...await offlineTransit.getInServiceRouteIds()],['legacy']);
+  await offlineTransit.getInServiceRouteIds();
+  assert.deepEqual(routeProjections,['*','id,is_archived,is_coming_soon']);
+
+  const newer=Reflect.construct(OfflineTransitService,[]);
+  tables.routes=[{id:'current',is_published:true,status:'active',coordinates:[]}];
+  assert.deepEqual([...await newer.getInServiceRouteIds()],['current']);
+  tables.routes[0].is_published=false;
+  assert.deepEqual([...await newer.getInServiceRouteIds()],[]);
+  assert.equal(routeProjections.at(-1),'id,is_published,status');
 });
 
 test('publication rejects unusable fixes, preserves measured evidence and reports database failure', async () => {

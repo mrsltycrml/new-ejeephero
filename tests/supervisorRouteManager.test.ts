@@ -27,7 +27,7 @@ type Row = Record<string, any>;
 type Catalog = { routes: Row[]; terminals: Row[] };
 type Reply = { data?: string | null; error?: { code: string; message: string } };
 
-async function mount(rows: Catalog, rpc: (name: string, args: Row) => Promise<Reply>, openRoute1 = false) {
+async function mount(rows: Catalog, rpc: (name: string, args: Row) => Promise<Reply>, openRoute1: boolean | 'add' = false) {
   const managerSlots: any[] = [];
   let panelSlots: any[] = [],slots=managerSlots;
   const draftIds: string[] = [];
@@ -38,7 +38,7 @@ async function mount(rows: Catalog, rpc: (name: string, args: Row) => Promise<Re
     useState(initial: any) {
       const owner = slots;
       const index = cursor++;
-      if (!(index in slots)) slots[index] = initial;
+      if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
       return [owner[index], (value: any) => { owner[index] = typeof value === 'function' ? value(owner[index]) : value; }];
     },
     useRef(initial: any) { return slots[cursor++] ??= { current: initial }; },
@@ -69,7 +69,7 @@ async function mount(rows: Catalog, rpc: (name: string, args: Row) => Promise<Re
   new Function('require', 'exports', outputText)((name: string) => modules[name], component);
   function render() {
     slots=managerSlots;cursor = 0;
-    const root=component.default({ openRoute1,onChanged: async () => { changes++; }, onBack() {} });
+    const root=component.default({ initialPage:openRoute1 === 'add' ? 'add' : openRoute1 ? 'route1' : 'list',onChanged: async () => { changes++; }, onBack() {} });
     if(root.type===panel.default){slots=panelSlots;cursor=0;return panel.default(root.props);}
     panelSlots=[];return root;
   }
@@ -95,6 +95,34 @@ async function mount(rows: Catalog, rpc: (name: string, args: Row) => Promise<Re
     toggle(label: string, value: boolean) { const toggle = control('Switch', label); assert.ok(!toggle.disabled); toggle.onValueChange(value); },
   };
 }
+
+test('the dedicated Add route page opens the existing route for name matches and the Route 2 reservation', async () => {
+  const route2 = { id:'a2000000-0000-0000-0000-000000000002', name:'Route 2: Coming soon', is_coming_soon:true };
+  const rows = { routes:[route2, {id:'other', name:'Market Eastbound'}], terminals:[] };
+  let writes = 0;
+  const ui = await mount(rows,async()=>{writes++;return {};},'add');
+  assert.equal(ui.control('Switch','Coming soon').value,true);
+  for (const name of [' market   EASTBOUND ', 'Route 2: Station to Park']) {
+    ui.fill('Route name and direction',name);
+    assert.equal(ui.control('Button','Save route').disabled,true);
+    assert.ok(ui.control('Button','Open existing route'));
+  }
+  ui.tap('Open existing route');
+  assert.equal(ui.control('Select','Route').value,route2.id);
+  assert.equal(writes,0);
+});
+
+test('a duplicate saved by another supervisor refreshes the directory and can be opened', async () => {
+  const rows: Catalog = { routes:[], terminals:[] };
+  const ui = await mount(rows,async()=>{
+    rows.routes.push({id:'concurrent',name:'Market Eastbound'});
+    return {error:{code:'23505',message:'duplicate key'}};
+  },'add');
+  ui.fill('Route name and direction','Market Eastbound'); ui.tap('Save route'); await setImmediate();
+  assert.equal(ui.control('Button','Save route').disabled,true);
+  ui.tap('Open existing route');
+  assert.equal(ui.control('Select','Route').value,'concurrent');
+});
 
 test('route and stop forms create, patch and retire the selected records through the named RPCs', async () => {
   const existing = '00000000-0000-4000-8000-000000000001';

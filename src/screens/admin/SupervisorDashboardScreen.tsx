@@ -157,7 +157,7 @@ export default function SupervisorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [manageMode, setManageMode] = useState<'none' | 'list' | 'route1'>('none');
+  const [manageMode, setManageMode] = useState<'none' | 'list' | 'route1' | 'add'>('none');
   const [dataError, setDataError] = useState('');
   const [transitNotice, setTransitNotice] = useState('');
 
@@ -410,7 +410,10 @@ export default function SupervisorDashboardScreen() {
 
   const gpsIssueCount = currentLiveUnits.filter(unit => unit.stale).length;
 
-  if (manageMode !== 'none') return <SupervisorRouteManager openRoute1={manageMode==='route1'} onChanged={loadDashboard} onBack={() => setManageMode('none')} />;
+  if (manageMode !== 'none') return <SupervisorRouteManager initialPage={manageMode} onChanged={loadDashboard} onBack={() => setManageMode('none')} />;
+  const addRouteButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add route" style={styles.backNavRow} onPress={() => setManageMode('add')}>
+    <Text style={styles.rowTitle}>Add route</Text>
+  </TouchableOpacity>;
   const route1ReviewButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Review Route 1 map and stops" style={styles.backNavRow} onPress={()=>setManageMode('route1')}>
     <Text style={styles.rowTitle}>Review Route 1 map and stops</Text>
   </TouchableOpacity>;
@@ -418,6 +421,7 @@ export default function SupervisorDashboardScreen() {
   if (dataError) return <ScrollView style={ops.page} contentContainerStyle={ops.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
     <Text accessibilityRole="alert" style={ops.errorBanner}>{dataError}</Text>
     {route1ReviewButton}
+    {addRouteButton}
     <TouchableOpacity accessibilityRole="button" style={styles.backNavRow} onPress={() => setManageMode('list')}>
       <Text style={styles.rowTitle}>Manage routes and stops</Text>
     </TouchableOpacity>
@@ -452,6 +456,7 @@ export default function SupervisorDashboardScreen() {
           <Text style={ops.mastheadMeta}>{formatReportingPeriod(period)}</Text>
         </View>
         {route1ReviewButton}
+        {addRouteButton}
 
         {!!transitNotice && <Text accessibilityRole="alert" style={styles.rowSub}>{transitNotice}</Text>}
 
