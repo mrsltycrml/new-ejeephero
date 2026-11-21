@@ -1,0 +1,24 @@
+{
+  "name": "eSAKAY",
+  "short_name": "eSAKAY",
+  "description": "Real-time Makati e-Jeepney tracker, fare calculator, and commuter safety app.",
+  "start_url": "/new-ejeephero/",
+  "id": "/new-ejeephero/",
+  "scope": "/new-ejeephero/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F4EF",
+  "theme_color": "#13263F",
+  "icons": [
+    {
+      "src": "/new-ejeephero/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/new-ejeephero/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
