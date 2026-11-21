@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, Keyboard, Linking, Platform, Vibration, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking, Platform, Vibration, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap, { type LeafletMapRef } from '../../components/LeafletMap';
 import PassengerStopGuide from '../../components/PassengerStopGuide';
@@ -16,7 +16,7 @@ import { quotePassengerFare, validFareMatrix, verifiedRideDistance } from '../..
 import { DESTINATION_RADIUS_METERS, STOP_SEARCH_METERS, atPassengerDestination, passengerPlanRide } from '../../services/passengerTrip';
 import { distanceMeters, evaluateBoardingLocation, type LoadingZone } from '../../services/passengerSafety';
 import { getWalkingDirections, type WalkingRoute } from '../../services/walkingDirections';
-import { searchPassengerPlaces } from '../../services/placeSearchService';
+import PassengerDestinationSearch from '../../components/PassengerDestinationSearch';
 import { type PassengerPlace } from '../../services/passengerPlaces';
 import { locationDescription, locationQuality, vehicleTelemetryReadout } from '../../services/locationQuality';
 import { rideLeg, selectJourneyStop, confirmedPassengerUse, permitsPassengerUse, passengerStopOptions, passengerUseLabel } from '../../services/routeMap';
@@ -31,8 +31,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleRouteIds, vehicleError, nearby, endRide, selectedRouteId, fleetRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setRideStops, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const map = useRef<LeafletMapRef>(null);
-  const destinationInput = useRef<React.ElementRef<typeof TextInput>>(null);
-  const wide = useWindowDimensions().width >= 860;
+  const { width, height } = useWindowDimensions();
   const pendingPlace = useRef<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
 
@@ -44,17 +43,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const locatedStops = useMemo(() => stops.filter(t => !selectedRouteId || t.route_id === selectedRouteId), [stops, selectedRouteId]);
   const overview = useMemo(() => passengerMapOverview(routes, locatedStops, selectedRouteId), [routes, locatedStops, selectedRouteId]);
   const landmark = overview?.landmarks.find(p => p.id === landmarkId);
-  const [query, setQuery] = useState(place?.name || destination?.name || '');
-  const [searchOpen, setSearchOpen] = useState(false);
-  useEffect(() => {
-    if (!searchOpen) setQuery(place?.name || destination?.name || '');
-  }, [searchOpen, place?.name, destination?.name]);
+  const searchScope = useMemo(() => ({ routes, stops, selectedRouteId }), [routes, stops, selectedRouteId]);
   const [boardingOpen, setBoardingOpen] = useState(false);
-  const [places, setPlaces] = useState<PassengerPlace[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState('');
-  const [searched, setSearched] = useState(false);
-  const searchVersion = useRef(0);
   const [selected, setSelected] = useState<VehicleData | null>(null);
   const [zones, setZones] = useState<LoadingZone[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -70,12 +60,10 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     setWalkingBusy(false); setWalkingError(''); setDestinationWalks({});
     return () => { walkingRequest.current++; };
   }, [user?.id, selectedRouteId, boardingStop?.id, alightingStop?.id, place?.id, transit.syncedAt]);
-  useEffect(() => () => { searchVersion.current++; }, [user?.id]);
 
   useEffect(() => {
     if (route?.params?.showStopGuide) {
       setBoardingOpen(true);
-      setSearchOpen(false);
     }
   }, [route?.params?.showStopGuide]);
 
@@ -136,7 +124,6 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const stopBadgeCode = boardingStop && permitsPassengerUse(boardingStop, 'board') ? 'BOARDING CONFIRMED' : 'NO BOARDING STOP';
   const routeName = (id?: string) => routes.find(item => item.id === id)?.name || 'Route unavailable';
 
-  const results = routeStops.filter(t => permitsPassengerUse(t, 'alight') && t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
   const allModeVehicles = isConnected ? vehicles : [];
   const displayed = fleetRouteId
     ? allModeVehicles.filter((v) => v.route_id === fleetRouteId)
@@ -188,55 +175,21 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     setInspectedStop(stop);
     setLandmarkId(null);
     setManualOpen(true);
-    setSearchOpen(false);
     setSelected(null);
-  };
-
-  const searchPlaces = async () => {
-    if (query.trim().length < 3 || searching) return;
-    const version = ++searchVersion.current;
-    setSearching(true);
-    setSearchError('');
-    setSearchOpen(true);
-    try {
-      const found = await searchPassengerPlaces(query);
-      if (version === searchVersion.current) {
-        setPlaces(found);
-        setSearched(true);
-      }
-    } catch (error: any) {
-      if (version === searchVersion.current) setSearchError(error.message);
-    } finally {
-      if (version === searchVersion.current) setSearching(false);
-    }
   };
 
   const choosePlace = (value: PassengerPlace) => {
-    searchVersion.current++;
-    destinationInput.current?.blur();
-    Keyboard.dismiss();
     pendingPlace.current = value.id;
     triggerHaptic('light');
     setPlace(value);
-    setSelectedRouteId(null);
+    setBoardingStop(null);
     setDestination(null);
-    setQuery(value.name);
     setInspectedStop(null);
+    setLandmarkId(null);
     setManualOpen(false);
-    setSearching(false);
-    setSearched(false);
-    setSearchError('');
-    setPlaces([]);
-    setSearchOpen(false);
     setSelected(null);
     scroll.current?.scrollTo({ y: 0, animated: false });
   };
-  const chooseStopAsDestination = (stop: TerminalData) => {
-    if (!permitsPassengerUse(stop, 'alight')) return;
-    choosePlace({ id: `stop:${stop.id}`, name: stop.name, address: '', latitude: stop.latitude, longitude: stop.longitude });
-    setInspectedStop(stop);
-  };
-
   const selectVehicle = (vehicle: VehicleData) => {
     triggerHaptic('light');
     setLandmarkId(null);
@@ -456,119 +409,6 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     </View>}
   </View>;
 
-  const tripPlanner = <View style={styles.planner}>
-    <View style={styles.plannerHeading}>
-      <Text accessibilityRole="header" style={styles.plannerTitle}>Plan your ride</Text>
-      <Ionicons name="navigate" size={31} color={Colors.midnight} accessible={false} />
-    </View>
-    <View style={styles.plannerBody}>
-    {locationControl}
-    <Text style={s.label}>Destination</Text>
-    <View style={[styles.searchInputWrap, searchOpen && styles.searchInputActive]}>
-      <Ionicons name="search-outline" size={21} color={Colors.action} />
-      <TextInput
-        ref={destinationInput}
-        accessibilityLabel="Search destination"
-        value={query}
-        selectTextOnFocus
-        onFocus={() => setSearchOpen(true)}
-        onChangeText={(value) => {
-          searchVersion.current++;
-          setQuery(value);
-          setPlaces([]);
-          setSearched(false);
-          setSearching(false);
-          setSearchError('');
-        }}
-        onSubmitEditing={searchPlaces}
-        returnKeyType="search"
-        enterKeyHint="search"
-        placeholder="Where are you going?"
-        placeholderTextColor={Colors.subtleGray}
-        style={styles.searchInputText}
-      />
-    </View>
-
-    {searchOpen && <>
-      {query.length > 0 && query.trim().length < 3 && <Text style={s.muted}>Enter at least 3 characters to search places.</Text>}
-      <View style={styles.searchActions}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Search"
-          disabled={searching || query.trim().length < 3}
-          accessibilityState={{ disabled: searching || query.trim().length < 3, busy: searching }}
-          onPress={searchPlaces}
-          style={[s.button, { flex: 1 }, (query.trim().length < 3 || searching) && { opacity: 0.55 }]}
-        >
-          <Ionicons name="search" size={18} color={Colors.white} />
-          <Text style={s.buttonText}>{searching ? 'Searching…' : 'Search'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" style={styles.cancelButton} onPress={() => {
-          searchVersion.current++;
-          destinationInput.current?.blur(); Keyboard.dismiss();
-          setQuery(place?.name || destination?.name || ''); setPlaces([]); setSearchError('');
-          setSearched(false); setSearching(false); setSearchOpen(false);
-        }}><Text style={s.label}>Cancel</Text></TouchableOpacity>
-      </View>
-
-      {!!searchError && <Text accessibilityRole="alert" style={s.body}>{searchError}</Text>}
-
-      {searched && <View style={styles.listGroup}>
-        <Text accessibilityRole="header" style={styles.groupHeading}>Matching places</Text>
-        {places.length > 0 && (
-          places.map((value) => (
-            <TouchableOpacity
-              key={value.id}
-              accessibilityRole="button"
-              onPress={() => choosePlace(value)}
-              style={styles.dividerRow}
-            >
-              <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{value.name}</Text>
-                <Text style={styles.rowSubtitle}>{value.address}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-            </TouchableOpacity>
-          ))
-        )}
-        {searched && !places.length && !searching && (
-          <Text style={[s.muted, { paddingVertical: 8 }]}>No places found. Add a street or city name and search again.</Text>
-        )}
-      </View>}
-
-      {results.length > 0 && <View style={styles.listGroup}>
-        <Text style={styles.groupHeading}>Route stops</Text>
-        {results.map((stop) => {
-          const num = Number.isFinite(stop.sequence_order) ? String(stop.sequence_order) : '—';
-          return (
-            <TouchableOpacity
-              key={stop.id}
-              accessibilityRole="button"
-              onPress={() => chooseStopAsDestination(stop)}
-              style={styles.dividerRow}
-            >
-              <View style={styles.stopNumBox}>
-                <Text style={styles.stopNumText}>{num}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{stop.name}</Text>
-                <Text style={styles.rowSubtitle}>{routeName(stop.route_id)}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
-            </TouchableOpacity>
-          );
-        })}
-      </View>}
-
-      <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')}>
-        <Text style={s.muted}>Metro Manila place search · OpenStreetMap / Photon</Text>
-      </TouchableOpacity>
-    </>}
-    {!searchOpen && (result || <Text style={s.muted}>Find your boarding stop, alighting stop and fare.</Text>)}
-    </View>
-  </View>;
-
   // 2) WHERE TO BOARD VIEW (Board 02 left)
   if (boardingOpen) {
     const targetVehicle = currentSelected;
@@ -761,14 +601,15 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
 
   return (
     <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={styles.home}>
-      <View style={[styles.layout, wide && styles.wideLayout]}>
-        <View style={wide && styles.plannerColumn}>{tripPlanner}</View>
-        <View style={[styles.mapColumn, wide && styles.wideMapColumn]}>
-          <View style={[styles.mapContainer, wide && styles.wideMap]}>
+      <View style={styles.layout}>
+        <PassengerDestinationSearch key={user?.id} scope={searchScope} selectedName={place?.name || destination?.name || ''} online={isConnected} onSelect={choosePlace} />
+        <View style={styles.mapColumn}>
+          <View style={[styles.mapContainer, { height: width >= 860 ? 400 : Math.min(380, Math.max(240, (height || 700) * 0.40)) }]}>
             <LeafletMap ref={map} destinationPlace={place} hideOccupancy {...journeyMapProps}
               vehicles={displayed} userLocation={locationFresh ? fix : null}
               selectedVehicle={currentSelected} isOffline={!isConnected} onSelectVehicle={selectVehicle} />
           </View>
+          <View style={styles.rideDetails}>{locationControl}{result}</View>
           {mapKey}
           <View style={styles.mapCaption}>
             <Ionicons name="bus-outline" size={18} color={Colors.subtleGray} />
@@ -802,17 +643,10 @@ const styles = StyleSheet.create({
   mapLink: { color: Colors.action, fontSize: 14, fontWeight: '700', paddingVertical: 5 },
   pinDetail: { paddingTop: 8, gap: 4, borderTopWidth: 1, borderColor: Colors.border },
   home: { flexGrow: 1, backgroundColor: Colors.canvas, paddingBottom: 28 },
-  layout: { width: '100%', maxWidth: 1200, alignSelf: 'center', backgroundColor: Colors.paper },
-  wideLayout: { width: '96%', flexDirection: 'row', alignItems: 'stretch', marginTop: 16, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, overflow: 'hidden' },
-  plannerColumn: { width: '40%', maxWidth: 442 },
-  planner: { backgroundColor: Colors.paper },
-  plannerHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: Colors.signal, paddingHorizontal: 22, paddingVertical: 17 },
-  plannerBody: { paddingHorizontal: 22, paddingTop: 8, paddingBottom: 20, gap: 10 },
-  plannerTitle: { flexShrink: 1, fontSize: 33, fontWeight: '800', letterSpacing: -1, color: Colors.midnight },
+  layout: { width: '100%', maxWidth: 960, alignSelf: 'center', backgroundColor: Colors.paper },
+  rideDetails: { paddingHorizontal: 16, paddingBottom: 8 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingVertical: 10, borderBottomWidth: 1, borderColor: Colors.border },
   locationAction: { fontSize: 14, fontWeight: '700', color: Colors.action },
-  searchActions: { flexDirection: 'row', gap: 10 },
-  cancelButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 10 },
   result: { gap: 8, marginTop: 4, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 14 },
   resultHeading: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: Colors.midnight },
   itinerary: { gap: 12, paddingVertical: 4 },
@@ -820,10 +654,8 @@ const styles = StyleSheet.create({
   itineraryText: { flex: 1, gap: 2 },
   fareLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.actionTint, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12 },
   mapColumn: { backgroundColor: Colors.paper },
-  wideMapColumn: { flex: 1, minWidth: 0, borderLeftWidth: 1, borderColor: Colors.border },
-  wideMap: { minHeight: 360, flex: 1 },
   mapCaption: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
-  tools: { width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8 },
+  tools: { width: '100%', maxWidth: 960, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8 },
   details: { gap: 8 },
   manual: { gap: 10, paddingBottom: 8 },
   actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 48, borderBottomWidth: 1, borderColor: Colors.border },
@@ -916,48 +748,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: Colors.ink,
-  },
-  searchInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    minHeight: 50,
-    paddingHorizontal: 14,
-    borderRadius: 9,
-    backgroundColor: Colors.paper,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  searchInputText: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.ink,
-    paddingVertical: 10,
-  },
-  searchInputActive: { borderColor: Colors.action, backgroundColor: Colors.actionTint },
-  listGroup: {
-    marginTop: 4,
-  },
-  groupHeading: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.subtleGray,
-    marginBottom: 6,
-  },
-  stopNumBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.brandGreen,
-    backgroundColor: Colors.paleGreen,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopNumText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: Colors.brandGreen,
   },
   mapFrameSmall: {
     height: 210,

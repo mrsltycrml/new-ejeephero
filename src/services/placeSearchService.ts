@@ -1,29 +1,64 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { parsePlaces, type PassengerPlace } from './passengerPlaces';
+import { parsePlaces, type PassengerPlace } from './passengerPlaces.ts';
+import { corridorBounds, inRouteCorridor, rankPlaces, routePlaceCatalog, type PassengerPlaceSearchScope } from './routePlaceSearch.ts';
+export { searchLocalPassengerPlaces, PLACE_CORRIDOR_METERS, type PassengerPlaceSearchScope } from './routePlaceSearch.ts';
 
-// User-submitted searches only; no background requests or precise passenger GPS sent.
-// Provider can be replaced with a hosted Photon-compatible service for production volume.
+// Only the typed query and catalog map bounds go to the provider.
 const endpoint = process.env.EXPO_PUBLIC_PLACE_SEARCH_URL || 'https://photon.komoot.io/api/';
 let lastRequest = 0;
-export async function searchPassengerPlaces(query: string): Promise<PassengerPlace[]> {
+
+const cancelled = () => Object.assign(new Error('Place search cancelled.'), { name: 'AbortError' });
+function checkCancellation(signal?: AbortSignal) {
+  if (signal?.aborted) throw cancelled();
+}
+
+function waitForSlot(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(cancelled());
+    }
+    signal?.addEventListener('abort', onAbort);
+  });
+}
+
+export async function searchPassengerPlaces(query: string, scope: PassengerPlaceSearchScope, signal?: AbortSignal): Promise<PassengerPlace[]> {
+  checkCancellation(signal);
   const q = query.trim();
-  if (q.length < 3) throw new Error('Enter at least 3 characters.');
-  const cacheKey = `esakay-place-search-v1:${q.toLowerCase()}`;
-  try {
-    const cached = JSON.parse(await AsyncStorage.getItem(cacheKey) || 'null');
-    if (cached && Date.now() - cached.at < 86400000 && Array.isArray(cached.results)) return cached.results;
-  } catch { /* A cache miss must not block a search. */ }
-  if (Date.now() - lastRequest < 1200) throw new Error('Please wait a moment before searching again.');
+  if (!scope || !q) return [];
+  const { places, lines } = routePlaceCatalog(scope);
+  const local = rankPlaces(q, places);
+  if (q.length < 3 || !lines.length) return local;
+  while (Date.now() - lastRequest < 1200) {
+    await waitForSlot(1200 - (Date.now() - lastRequest), signal);
+    checkCancellation(signal);
+  }
   lastRequest = Date.now();
-  const abort = new AbortController(); const timeout = setTimeout(() => abort.abort(), 12000);
+  const abort = new AbortController();
+  const onAbort = () => abort.abort();
+  signal?.addEventListener('abort', onAbort);
+  const timeout = setTimeout(onAbort, 12000);
   try {
-    const params = new URLSearchParams({ q, limit: '8', lang: 'en', lat: '14.57', lon: '121.03', bbox: '120.85,14.4,121.15,14.75' });
+    const bounds = corridorBounds(lines);
+    const [west, south, east, north] = bounds;
+    const params = new URLSearchParams({ q, limit: '24', lang: 'en',
+      lat: String((south + north) / 2), lon: String((west + east) / 2), bbox: bounds.join(',') });
     const response = await fetch(`${endpoint}?${params}`, { signal: abort.signal });
     if (!response.ok) throw new Error('Place search is unavailable. Please try again shortly.');
-    const results = parsePlaces(await response.json());
-    try { await AsyncStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), results })); } catch { /* Optional cache. */ }
-    return results;
+    const results = parsePlaces(await response.json(), bounds);
+    checkCancellation(signal);
+    if (abort.signal.aborted) throw new Error('Search took too long. Please try again.');
+    return rankPlaces(q, local, results.filter(place => inRouteCorridor(place, lines)));
   } catch (error: any) {
-    throw new Error(error?.name === 'AbortError' ? 'Search took too long. Please try again.' : error?.message || 'Could not search places. Check your connection.');
-  } finally { clearTimeout(timeout); }
+    checkCancellation(signal);
+    if (local.length) return local;
+    throw new Error(abort.signal.aborted ? 'Search took too long. Please try again.' : error?.message || 'Could not search places. Check your connection.');
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', onAbort);
+  }
 }

@@ -225,6 +225,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #map { width: 100%; height: 100%; overflow: hidden; background-color: #edf1f3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #map.leaflet-container { touch-action: none; }
     
     /* Terminal Marker */
     .terminal-marker {
@@ -650,7 +651,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       if (data.destinationPlace) {
         var placeLabel = document.createElement('span');
         placeLabel.textContent = 'Destination: ' + data.destinationPlace.name;
-        L.marker([data.destinationPlace.latitude, data.destinationPlace.longitude], { title: 'Destination: ' + data.destinationPlace.name }).bindPopup(placeLabel).addTo(userLayer);
+        L.marker([data.destinationPlace.latitude, data.destinationPlace.longitude], { title: 'Destination: ' + data.destinationPlace.name, zIndexOffset: -200 }).bindPopup(placeLabel).addTo(userLayer);
       }
       if (data.userLocation) {
         var uHtml = '<div class="user-pulse-container">' +

@@ -47,12 +47,12 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
         center: [121.035, 14.575],
         zoom: 13, maxZoom: 19,
         attributionControl: { compact: true },
-        cooperativeGestures: true,
+        cooperativeGestures: false,
         dragRotate: false, pitchWithRotate: false,
       });
       map = instance;
       instance.touchZoomRotate.disableRotation();
-      instance.addControl(new lib.NavigationControl({ showCompass: false }));
+      instance.addControl(new lib.NavigationControl({ showCompass: false }), 'bottom-left');
       instance.once('load', () => {
         if (cancelled) return;
         clearTimeout(timeout);
@@ -202,7 +202,7 @@ function addPin(view: { map: MapLibre.Map; lib: MapLibrary }, point: Point, titl
     minWidth: '30px', height: '30px', borderRadius: '15px', border: '2px solid white',
     background: color, color: 'white', display: 'grid', placeItems: 'center',
     font: 'bold 13px system-ui', cursor: click ? 'pointer' : 'default', padding: '0 5px', zIndex: String(zIndex),
-    boxShadow: '0 2px 4px #0005',
+    boxShadow: '0 2px 4px #0005', pointerEvents: click ? 'auto' : 'none',
   });
   if (pin) {
     const tip = document.createElement('span');

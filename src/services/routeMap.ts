@@ -47,13 +47,18 @@ export function reconcileJourneySelection(state: JourneySelection, routes: Route
   return selectJourneyStop(boarding, route.alightingStop, 'alighting', routes, stops);
 }
 
+export function projectOntoSegment(a: Point, b: Point, target: Point) {
+  const scale = Math.cos(target.latitude * Math.PI / 180);
+  const dx = (b.longitude - a.longitude) * scale, dy = b.latitude - a.latitude;
+  const fraction = Math.max(0, Math.min(1, ((target.longitude - a.longitude) * scale * dx + (target.latitude - a.latitude) * dy) / (dx * dx + dy * dy || 1)));
+  const point = { latitude: a.latitude + dy * fraction, longitude: a.longitude + (b.longitude - a.longitude) * fraction };
+  return { point, fraction };
+}
+
 function projectStop(coordinates: Point[], stop: Point) {
   let distanceAlong = 0;
   const candidates = coordinates.slice(1).map((b, index) => {
-    const a = coordinates[index], scale = Math.cos(stop.latitude * Math.PI / 180);
-    const dx = (b.longitude - a.longitude) * scale, dy = b.latitude - a.latitude;
-    const fraction = Math.max(0, Math.min(1, ((stop.longitude - a.longitude) * scale * dx + (stop.latitude - a.latitude) * dy) / (dx * dx + dy * dy || 1)));
-    const point = { latitude: a.latitude + (b.latitude - a.latitude) * fraction, longitude: a.longitude + (b.longitude - a.longitude) * fraction };
+    const a = coordinates[index], { point, fraction } = projectOntoSegment(a, b, stop);
     const length = meters(a, b);
     const result = { point, index, distance: meters(point, stop), along: distanceAlong + length * fraction };
     distanceAlong += length;
