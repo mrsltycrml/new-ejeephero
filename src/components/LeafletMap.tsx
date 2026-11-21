@@ -7,8 +7,11 @@ import { GeofenceEvaluationResult } from '../services/geofencingService';
 import { buildJourneyMap, passengerUseLabel, type WalkingRouteGeometry } from '../services/routeMap';
 import { locationQuality, validPoint, type Point } from '../services/locationQuality';
 import MapcnPassengerMap from './MapcnPassengerMap';
+import type { PassengerMapOverview } from '../services/passengerMapOverview';
+import type { Route1FieldPin } from '../services/route1FieldMap';
 
 export interface LeafletMapRef {
+  fitPoints?: (points: Point[]) => void;
   centerOn: (latitude: number, longitude: number, zoom?: number) => void;
   animateToRegion: (
     region: { latitude: number; longitude: number; latitudeDelta?: number; longitudeDelta?: number },
@@ -17,6 +20,8 @@ export interface LeafletMapRef {
 }
 
 export interface LeafletMapProps {
+  passengerOverview?: PassengerMapOverview | null;
+  onSelectLandmark?: (pin: Route1FieldPin) => void;
   fieldReview?: {
     line: { id: string; name: string; color_code: string; coordinates: Point[]; isSelected: boolean };
     pins: (Point & { id: string; name: string; role: string; isSelected: boolean })[];
@@ -49,6 +54,8 @@ export interface LeafletMapProps {
 
 const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   fieldReview,
+  passengerOverview,
+  onSelectLandmark,
   preferMapcn = false,
   routes,
   terminals,
@@ -83,6 +90,12 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
 
   // Expose imperative methods to parent (like recenter)
   useImperativeHandle(ref, () => ({
+    fitPoints: points => {
+      if (!points.length || !points.every(validPoint)) return;
+      if (showMapcn) return mapcnControls.current?.fitPoints?.(points);
+      if (isWeb) iframeRef.current?.contentWindow?.postMessage({ type: 'FIT_POINTS', points }, '*');
+      else webViewRef.current?.injectJavaScript('window.fitMapPoints?.(' + scriptJson(points) + '); true;');
+    },
     centerOn: (latitude: number, longitude: number, zoom = 16) => {
       if (showMapcn) return mapcnControls.current?.centerOn(latitude, longitude, zoom);
       if (!validPoint({ latitude, longitude }) || !Number.isFinite(zoom)) return;
@@ -109,7 +122,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   }), [isWeb, showMapcn]);
 
   // Serializable payload for the webview
-  const journeyMap = useMemo(() => buildJourneyMap({ routes, terminals, fleetMode, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes }), [routes, terminals, fleetMode, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes]);
+  const journeyMap = useMemo(() => buildJourneyMap({ routes, terminals, fleetMode, showLocatedStops: passengerOverview !== undefined, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes }), [routes, terminals, fleetMode, passengerOverview, selectedRouteId, boardingStop, alightingStop, destinationPlace, walkingRoutes]);
   const mapRoutes = useMemo(() => journeyMap.routes.map(r => ({
       id: r.id,
       name: r.name,
@@ -127,9 +140,15 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       isSelected: selectedTerminal?.id === t.id,
       role: t.id === journeyMap.boarding?.id ? 'Board' : t.id === journeyMap.alighting?.id ? 'Alight' : fleetMode ? 'Stop' : passengerUseLabel(t),
     })), [journeyMap, fleetMode, geofenceResult?.currentZone?.id, selectedTerminal?.id]);
+  const displayRoutes = useMemo(() => fieldReview ? [fieldReview.line] : [...(passengerOverview?.referenceLines ?? []), ...mapRoutes],
+    [fieldReview, passengerOverview, mapRoutes]);
+  const displayPins = useMemo(() => fieldReview?.pins ?? [...mapTerminals, ...(passengerOverview?.landmarks ?? []).map(pin => ({
+      ...pin.point, id: pin.id, name: pin.name, role: 'Landmark', isSelected: false,
+    }))],
+    [fieldReview, mapTerminals, passengerOverview]);
   const mapData = useMemo(() => ({
-    routes: fieldReview ? [fieldReview.line] : mapRoutes,
-    terminals: fieldReview?.pins ?? mapTerminals,
+    routes: displayRoutes,
+    terminals: displayPins,
     fieldReview: !!fieldReview,
     canPickCurb: !!fieldReview?.onPickCurb,
     vehicles: vehicles.filter(v => !v.is_sample && ['live', 'weak'].includes(locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now))).map(v => ({
@@ -152,8 +171,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     destinationPlace: journeyMap.destinationPlace,
     rideCoordinates: journeyMap.rideCoordinates,
     walkingRoutes: journeyMap.walkingRoutes,
-    fitPoints: fieldReview?.fitPoints ?? journeyMap.fitPoints,
-    cameraKey: fieldReview?.cameraKey ?? journeyMap.cameraKey,
+    fitPoints: fieldReview?.fitPoints ?? [...journeyMap.fitPoints, ...(passengerOverview?.referenceLines.flatMap(r => r.coordinates) ?? [])],
+    cameraKey: fieldReview?.cameraKey ?? JSON.stringify([journeyMap.cameraKey, passengerOverview?.variant.id, passengerOverview?.referenceLines.map(r => r.id)]),
     selectedRouteId,
     selectedVehicleId: selectedVehicle?.id || null,
     vehicleSelectionKey,
@@ -161,8 +180,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     hideOccupancy,
     isOffline: Boolean(isOffline),
   }), [
-    fieldReview, mapRoutes,
-    mapTerminals,
+    fieldReview, passengerOverview, displayRoutes, displayPins,
     vehicles,
     userLocation,
     destinationPlace,
@@ -236,6 +254,12 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       transform: scale(1.08);
       border-color: #FFFFFF;
     }
+    .terminal-pin:after {
+      content: ''; position: absolute; top: 28px; left: 10px;
+      border: 6px solid transparent; border-top: 9px solid #203B53;
+    }
+    .terminal-pin.landmark-pin { background-color: #965418; }
+    .terminal-pin.landmark-pin:after { border-top-color: #965418; }
     .terminal-pin.safe-recommended {
       border-color: #C89A43;
       box-shadow: 0 0 0 2px rgba(200, 154, 67, 0.25);
@@ -373,12 +397,12 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         var mapEl = document.getElementById('map');
         if (!mapEl) return;
         var terms = (data && data.terminals) || [];
-        var listHtml = terms.slice(0, 10).map(function(t) {
+        var listHtml = terms.map(function(t) {
           return '<div style="padding:8px 12px;margin:4px 0;background:#fff;border-radius:8px;border:1px solid #dce2e8;font-size:12px;color:#1f2d3a;font-weight:600;">' +
-            escapedMapText(t.name) + ' <span style="color:#778493;font-weight:400;">(' + Number(t.latitude).toFixed(4) + ', ' + Number(t.longitude).toFixed(4) + ')</span></div>';
+            escapedMapText(t.name) + ' <span style="color:#52606d;font-weight:400;">' + escapedMapText(t.role) + ' (' + Number(t.latitude).toFixed(4) + ', ' + Number(t.longitude).toFixed(4) + ')</span></div>';
         }).join('');
         mapEl.innerHTML = '<div style="padding:16px;padding-top:48px;height:100%;overflow-y:auto;background:#f4f1ea;">' +
-          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">' + (data.fieldReview ? 'Map unavailable — field reference points' : 'Map unavailable — verified stop list') + '</div>' +
+          '<div style="font-size:14px;font-weight:800;color:#A62B36;margin-bottom:8px;">' + (data.fieldReview ? 'Field reference points' : 'Stops and landmarks') + '</div>' +
           listHtml + '</div>';
       };
       window.renderMapData(${scriptJson(initialDataRef.current)});
@@ -476,6 +500,9 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     var terminalsLayer = L.layerGroup().addTo(map);
     var vehiclesLayer = L.layerGroup().addTo(map);
     var userLayer = L.layerGroup().addTo(map);
+    window.fitMapPoints = function(points) {
+      if (Array.isArray(points) && points.length) map.fitBounds(points.map(function(p) { return [p.latitude,p.longitude]; }), {padding:[30,30],maxZoom:16});
+    };
 
     function sendEvent(type, data) {
       var msg = JSON.stringify({ type: type, ...data });
@@ -515,8 +542,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
             var latlngs = route.coordinates.map(function(c) { return [c.latitude, c.longitude]; });
             var p = L.polyline(latlngs, {
               color: route.color_code || '#C41E3A',
-              weight: route.isSelected ? 7 : 3,
-              opacity: route.isSelected ? 0.95 : (data.selectedRouteId ? 0.25 : 0.65)
+              weight: route.referenceDirection === 'outbound' ? 8 : route.referenceDirection === 'inbound' ? 4 : route.isSelected ? 7 : 5,
+              opacity: route.referenceDirection || route.isSelected ? 0.95 : (data.selectedRouteId ? 0.25 : 0.85)
             }).addTo(routesLayer);
             var routeLabel = document.createElement('span');
             routeLabel.textContent = route.name;
@@ -540,7 +567,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         L.marker([(a.latitude+b.latitude)/2,(a.longitude+b.longitude)/2], {interactive:false, icon:L.divIcon({className:'route-direction',html:'<span style="display:block;color:#12734A;font-size:24px;text-shadow:0 0 3px white;transform:rotate('+angle+'deg)">↑</span>',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(routesLayer);
       }
       if (window.journeyCameraKey !== data.cameraKey) {
-        if (data.fitPoints.length) map.fitBounds(data.fitPoints.map(function(p) { return [p.latitude,p.longitude]; }), {padding:[30,30],maxZoom:16});
+        window.fitMapPoints(data.fitPoints);
         window.journeyCameraKey = data.cameraKey;
       }
       // Selection/request identity moves the camera once; telemetry never changes this key.
@@ -561,21 +588,21 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       if (data.terminals) {
         data.terminals.forEach(function(term) {
           // Marker
-          var iconSymbol = data.fieldReview ? term.role.charAt(0) : (term.is_esakay_hub ? 'H' : 'S');
+          var iconSymbol = data.fieldReview || term.role === 'Landmark' ? term.role.charAt(0) : (term.is_esakay_hub ? 'H' : 'S');
           var pinClasses = 'terminal-pin' + (term.isSelected ? ' selected' : '');
           
           var html = '<div class="terminal-marker">' +
-            '<div class="' + pinClasses + '">' + iconSymbol + '</div>' +
+            '<div class="' + pinClasses + (term.role === 'Landmark' ? ' landmark-pin' : '') + '">' + iconSymbol + '</div>' +
             '</div>';
 
           var markerIcon = L.divIcon({
             className: 'custom-terminal-icon',
             html: html,
             iconSize: [34, 34],
-            iconAnchor: [17, 17]
+            iconAnchor: [17, 36]
           });
 
-          var marker = L.marker([term.latitude, term.longitude], { icon: markerIcon, title: term.name }).addTo(terminalsLayer);
+          var marker = L.marker([term.latitude, term.longitude], { icon: markerIcon, title: term.name, zIndexOffset: term.role === 'Landmark' ? 0 : 100 }).addTo(terminalsLayer);
           var stopLabel = document.createElement('span'); stopLabel.textContent = term.role + ': ' + term.name; marker.bindTooltip(stopLabel);
           marker.on('click', function() {
             sendEvent('SELECT_TERMINAL', { id: term.id });
@@ -649,6 +676,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       if (e.source !== window.parent) return;
       if (e.data && e.data.type === 'UPDATE_DATA') {
         window.renderMapData(e.data.data);
+      } else if (e.data && e.data.type === 'FIT_POINTS' && window.fitMapPoints) {
+        window.fitMapPoints(e.data.points);
       } else if (e.data && e.data.type === 'CENTER' && window.leafletMap) {
         var lat=Number(e.data.latitude), lon=Number(e.data.longitude), zoom=Number(e.data.zoom);
         if (Number.isFinite(lat) && Number.isFinite(lon) && Number.isFinite(zoom)) window.leafletMap.flyTo([lat,lon],Math.min(19,Math.max(10,zoom)),{duration:0.2});
@@ -676,9 +705,11 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           else if (pin && pin.id !== 'draft-curb') fieldReview.onSelect(pin.id);
           return;
         }
-        if (payload.type === 'SELECT_TERMINAL' && onSelectTerminal) {
+        if (payload.type === 'SELECT_TERMINAL') {
+          const referencePin = passengerOverview?.landmarks.find(p => p.id === payload.id);
+          if (referencePin) { onSelectLandmark?.(referencePin); return; }
           const found = journeyMap.terminals.find((t) => t.id === payload.id);
-          if (found) onSelectTerminal(found);
+          if (found) onSelectTerminal?.(found);
         } else if (payload.type === 'SELECT_VEHICLE' && onSelectVehicle) {
           const found = vehicles.find((v) => v.id === payload.id);
           if (found) onSelectVehicle(found);
@@ -687,7 +718,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         // ignore non-map messages
       }
     },
-    [onSelectTerminal, onSelectVehicle, journeyMap.terminals, vehicles, fieldReview]
+    [onSelectTerminal, onSelectVehicle, onSelectLandmark, passengerOverview, journeyMap.terminals, vehicles, fieldReview]
   );
 
   useEffect(() => {

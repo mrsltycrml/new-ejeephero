@@ -36,12 +36,14 @@ const stops = ['a', 'b', 'c'].map((id, sequence_order) => ({ id, name: id, route
 const catalog = { routes: [route], terminals: stops, status: 'ready', syncedAt: '2026-11-18T00:00:00Z', isFromCache: false, latencyMs: 0, error: null };
 let read: () => Promise<any> = async () => catalog;
 let liveRoutes = new Set<string>(), fleet:any[]=[], device:any=null;
+let readFleet = async () => fleet;
+let connected = true;
 Object.assign(globalThis, { __journeyReact: react, __journeyRead: () => read(), __journeyRoutes:()=>new Set(liveRoutes),
-  __journeyFleet:()=>fleet, __journeyLocation:()=>device });
+  __journeyFleet:()=>readFleet(), __journeyLocation:()=>device, __journeyConnected:()=>connected });
 const fixtures: Record<string, string> = {
   react: 'const r=globalThis.__journeyReact; export default r; export const {createContext,useContext,useState,useRef,useCallback,useMemo,useEffect}=r;',
   './AuthContext': 'export const useAuth=()=>({user:{id:"passenger"}});',
-  './NetworkContext': 'export const useNetwork=()=>({isConnected:true});',
+  './NetworkContext': 'export const useNetwork=()=>({isConnected:globalThis.__journeyConnected()});',
   './LocationContext': 'export const useLocation=()=>({location:globalThis.__journeyLocation(),errorMsg:null,foreground:true});',
   '/services/offlineTransitService': 'export const offlineTransit={getTransitData:()=>globalThis.__journeyRead(),getInServiceRouteIds:async()=>globalThis.__journeyRoutes(),getVehicles:async()=>globalThis.__journeyFleet()};',
 };
@@ -60,21 +62,21 @@ const hooks = registerHooks({
 const { PassengerJourneyProvider } = await import('../src/contexts/PassengerJourneyContext.tsx');
 hooks.deregister();
 const render = () => { index = 0; refIndex = 0; hook=0;afterRender=[];return PassengerJourneyProvider({ children: null }).props.value; };
+async function settle() {
+  for (let i = 0; i < 3; i++) { render(); afterRender.forEach(fn => fn()); await setImmediate(); }
+  return render();
+}
 const path = { id: 'p', source: 'Fixture', coordinates: stops.slice(0, 2), distance_meters: 120, duration_seconds: 90, steps: [], source_url: 'https://operator.example/walk', verified_at: '2026-01-01', accessible: null };
 
-test('passenger map, nearby matches and a confirmed ride lose an off-catalog unit on refresh',async t=>{
+test('the map includes new service routes while ride matching uses the loaded catalog',async t=>{
   states=[];refs=[];mounted=true;read=async()=>catalog;liveRoutes=new Set(['r','unlisted']);
   const now=Date.now(), point={latitude:14.5,longitude:121,accuracy:4};
   t.mock.timers.enable({apis:['Date','setInterval'],now});
   device={coords:point,timestamp:now};
   fleet=['r','upcoming','unlisted'].map(id=>({...point,id,vehicle_id:id,route_id:id,body_number:id,plate_number:'TEST',recorded_at:new Date(now).toISOString()}));
-  async function settle(){
-    for(let i=0;i<3;i++){render();afterRender.forEach(fn=>fn());await setImmediate();}
-    return render();
-  }
   try{
     let journey=await settle();
-    assert.deepEqual(journey.vehicles.map((v:any)=>v.id),['r']);
+    assert.deepEqual(journey.vehicles.map((v:any)=>v.id),['r','unlisted']);
     assert.deepEqual(journey.nearby.map((v:any)=>v.id),['r']);
     journey.setUnit(fleet[1]);assert.equal(render().unit,null);
     journey.setUnit(fleet[0]);assert.equal(render().unit.vehicle_id,'r');
@@ -84,6 +86,65 @@ test('passenger map, nearby matches and a confirmed ride lose an off-catalog uni
     assert.equal(journey.unit,null);
   }finally{
     hooksState.forEach(slot=>slot?.cleanup?.());hooksState.length=0;mounted=false;device=null;fleet=[];t.mock.timers.reset();
+  }
+});
+
+test('a newly active route appears without clearing the passenger walk, and stalled pins expire', async t => {
+  states = []; refs = []; mounted = true;
+  const now = Date.now();
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now });
+  const secondRoute = { ...route, id: 's' };
+  let routes = [route];
+  read = async () => ({ ...catalog, routes });
+  liveRoutes = new Set(['r']);
+  const vehicle = (id: string, latitude: number) => ({ id, vehicle_id: id, route_id: id, latitude,
+    longitude: 121, accuracy: 7, recorded_at: new Date(Date.now()).toISOString() });
+  fleet = [vehicle('r', 14.5)];
+  try {
+    let journey = await settle();
+    journey.setRideStops(stops[0], stops[2]);
+    journey.showWalk({ ...path, steps: [{ instruction: 'Walk to Gate A', distance_meters: 120 }] }, 'Origin', 'Gate A');
+    journey = await settle();
+    const { walk, walkingRoutes, transit } = journey;
+    const version = journey.getJourneyVersion();
+    assert.equal(journey.selectedRouteId, 'r');
+    assert.equal(journey.fleetRouteId, null);
+    assert.deepEqual(journey.nearby, []);
+
+    routes = [route, secondRoute]; liveRoutes.add('s');
+    fleet = [vehicle('r', 14.51), vehicle('s', 14.6)];
+    t.mock.timers.tick(5000); journey = await settle();
+    assert.deepEqual(journey.vehicles.map((v: any) => [v.id, v.latitude]), [['r', 14.51], ['s', 14.6]]);
+    assert.equal(journey.walk, walk, 'the same walking instructions stay open on route r');
+    assert.equal(journey.walkingRoutes, walkingRoutes, 'the selected walking geometry stays on the map');
+    assert.equal(journey.getJourneyVersion(), version);
+    assert.equal(journey.transit, transit, 'fleet updates do not replace the planning catalog');
+    assert.equal(journey.boardingStop.id, stops[0].id);
+    assert.equal(journey.alightingStop.id, stops[2].id);
+    assert.ok(journey.vehicleRouteIds.has('s'));
+    assert.equal(journey.fleetRouteId, null);
+    await journey.refreshTransit(); journey = await settle();
+    assert.equal(journey.walk, null, 'manual catalog refresh still invalidates the walk');
+    journey.setSelectedRouteId('s'); journey = await settle();
+    assert.equal(journey.fleetRouteId, 's');
+    await journey.refreshTransit(); assert.equal(render().fleetRouteId, 's');
+    journey.setSelectedRouteId(null); assert.equal(render().fleetRouteId, null);
+
+    let finishRead!: (value: any[]) => void;
+    readFleet = () => new Promise(resolve => { finishRead = resolve; });
+    t.mock.timers.tick(5000); await settle();
+    t.mock.timers.tick(25_000); journey = await settle();
+    assert.deepEqual(journey.vehicles, [], 'a pending read cannot keep expired locations on the map');
+    connected = false; await settle();
+    finishRead([vehicle('r', 14.52)]); journey = await settle();
+    assert.deepEqual(journey.vehicles, [], 'a late response cannot repopulate the disconnected map');
+    fleet = [vehicle('s', 14.61)]; readFleet = async () => fleet;
+    connected = true; journey = await settle();
+    assert.deepEqual(journey.vehicles.map((v: any) => v.id), ['s']);
+  } finally {
+    hooksState.forEach(slot => slot?.cleanup?.());
+    hooksState.length = 0; mounted = false; fleet = []; connected = true; readFleet = async () => fleet;
+    t.mock.timers.reset();
   }
 });
 

@@ -13,7 +13,7 @@ test('route line import keeps GeoJSON longitude, latitude and travel order', () 
   }
 });
 
-test('Route 1 review keeps both dated directional traces continuous and the two Tivoli curbs distinct', () => {
+test('Route 1 review keeps both dated directional traces continuous and the later Tivoli platforms distinct', () => {
   assert.equal(route1Variants.length, 2);
   for (const variant of route1Variants) {
     assert.notEqual(variant.source, variant.returnSource);
@@ -26,7 +26,11 @@ test('Route 1 review keeps both dated directional traces continuous and the two 
       });
     }
   }
-  const tivoli = route1Pins.filter(pin => pin.id.startsWith('tivoli'));
+  const photoPins = route1Pins.filter(pin => !pin.variantId || pin.variantId === 'buendia_2022');
+  assert.equal(photoPins.length, 6);
+  assert.ok(photoPins.every(pin => pin.kind === 'landmark' && !pin.direction));
+  const tivoli = route1Pins.filter(pin => pin.id.startsWith('tivoli-'));
+  assert.ok(tivoli.every(pin => pin.variantId === 'one_ayala_2026'));
   assert.deepEqual(tivoli.map(pin => pin.direction), ['outbound', 'inbound']);
   assert.notDeepEqual(tivoli[0].point, tivoli[1].point);
   assert.equal(route1Pins.find(pin => pin.id === 'bridge')?.kind, 'landmark');

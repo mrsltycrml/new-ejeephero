@@ -11,6 +11,7 @@ let failed = false;
 let cacheWriteFailed = false;
 let cacheReadFailed = false;
 let readOverride: ((table: string) => Promise<any>) | null = null;
+let serverPageSize = 1000;
 let writeOverride: (() => Promise<void>) | null = null;
 let fleet: any[] = [];
 const published: any[] = [];
@@ -27,14 +28,38 @@ const database = {
   rpc: async () => ({ data: failed ? null : fleet, error: failed ? { message: 'offline' } : null }),
   from(table: string) {
     let start = 0, end = Infinity, columns = '*';
+    let maxRows = serverPageSize;
+    let sortKey = '', ascending = true;
+    const filters: Array<(row: any) => boolean> = [];
+    const field = (row: any, key: string) => key.split('.').reduce((value, part) => value?.[part], row);
+    const filter = (predicate: (row: any) => boolean) => { filters.push(predicate); return query; };
+    function rows() {
+      let result = tables[table] ?? [];
+      if (table === 'vehicle_positions') {
+        result = result.map((row, i) => ({ id: String(i).padStart(6, '0'), ...row }));
+        if (columns.includes('vehicles!inner(*)')) {
+          const vehicles = new Map(tables.vehicles.map(v => [v.id, v]));
+          result = result.filter(row => vehicles.has(row.vehicle_id)).map(row => ({ ...row, vehicles: vehicles.get(row.vehicle_id) }));
+        }
+      }
+      result = result.filter(row => filters.every(predicate => predicate(row)));
+      if (sortKey) result.sort((a, b) => (a[sortKey] < b[sortKey] ? -1 : a[sortKey] > b[sortKey] ? 1 : 0) * (ascending ? 1 : -1));
+      return result.slice(start, Math.min(end + 1, start + maxRows)).map(row =>
+        columns.includes('*') ? row : Object.fromEntries(columns.split(',').map(key => [key, row[key]])));
+    }
     const query: any = {
       select: (value = '*') => { columns = value; if (table === 'routes') routeProjections.push(value); return query; },
-      eq: () => query, in: () => query, gte: () => query, order: () => query, limit: () => query, overrideTypes: () => query,
+      eq: (key: string, value: any) => filter(row => field(row, key) === value),
+      is: (key: string, value: null) => filter(row => (field(row, key) ?? null) === value),
+      in: (key: string, values: any[]) => filter(row => values.includes(field(row, key))),
+      gte: (key: string, value: string) => filter(row => field(row, key) >= value),
+      gt: (key: string, value: string) => filter(row => field(row, key) > value),
+      order: (key: string, options?: { ascending: boolean }) => { sortKey = key; ascending = options?.ascending ?? true; return query; },
+      limit: (n: number) => { maxRows = Math.min(n, maxRows); return query; }, overrideTypes: () => query,
       insert: async (row: any) => { if (!failed) published.push(row); return { error: failed ? { message: 'offline' } : null }; },
       range: (a: number, b: number) => { start = a; end = b; return query; },
       then: (resolve: any, reject: any) => (readOverride ? readOverride(table) : Promise.resolve({
-        data: failed ? null : (tables[table] ?? []).slice(start, end + 1).map(row =>
-          columns === '*' ? row : Object.fromEntries(columns.split(',').map(key => [key, row[key]]))),
+        data: failed ? null : rows(), count: (tables[table] ?? []).length,
         error: failed ? { message: 'offline' } : null,
       })).then(resolve, reject),
     };
@@ -65,6 +90,7 @@ test.beforeEach(() => {
   cache.clear(); tables = {}; failed = false; cacheWriteFailed = false; cacheReadFailed = false;
   routeProjections.length=0;
   readOverride = null; writeOverride = null;
+  serverPageSize = 1000;
 });
 
 test('empty fleet stays empty even in development; sample fleet rows are excluded', async () => {
@@ -258,6 +284,48 @@ test('vehicle loader retains capture accuracy and km/h but drops stale and legac
   assert.deepEqual(await offlineTransit.getVehicles(), []);
 });
 
+test('a busy unit and server page caps cannot crowd other shifts off the passenger map', async () => {
+  const now = Date.now();
+  const stamp = new Date(now - 1000).toISOString();
+  const fix = { latitude: 14.6, longitude: 121, timestamp: stamp, captured_at: stamp };
+  const vehicles = Array.from({ length: 1001 }, (_, i) => ({ id: 'v' + i, is_active: true, route_id: i % 2 ? 'b' : route.id }));
+  const older = new Date(now - 5000).toISOString();
+  tables = {
+    routes: [route, { ...route, id: 'b' }], vehicles,
+    vehicle_positions: [
+      ...Array.from({ length: 320 }, () => ({ ...fix, vehicle_id: 'v0' })),
+      ...vehicles.map(v => ({ ...fix, vehicle_id: v.id, latitude: 14.5, captured_at: older })),
+    ],
+  };
+  serverPageSize = 200;
+  const result = await offlineTransit.getVehicles();
+  assert.deepEqual(new Set(result.map(v => v.id)), new Set(vehicles.map(v => v.id)));
+  assert.equal(result.length, vehicles.length);
+  assert.equal(result.find(v => v.id === 'v0')?.latitude, 14.6);
+});
+
+test('the next fleet read replaces moved units and drops ended, invalid, stale and sample-only fixes', async () => {
+  const now = Date.now();
+  const stamp = new Date(now - 5000).toISOString();
+  const ids = ['moving', 'ended', 'off', 'deleted', 'bad', 'old', 'future', 'sample-only'];
+  tables = {
+    routes: [route], vehicles: ids.map(id => ({ id, route_id: route.id, is_active: true })),
+    vehicle_positions: ids.map(vehicle_id => ({ vehicle_id, latitude: 14.6, longitude: 121, captured_at: stamp, timestamp: stamp })),
+  };
+  assert.equal((await offlineTransit.getVehicles()).length, ids.length);
+  const measured = new Date(now).toISOString();
+  tables.vehicle_positions.push({ ...tables.vehicle_positions[0], latitude: 14.61, captured_at: measured });
+  tables.vehicles[1].ended_at = measured;
+  tables.vehicles[2].is_active = false;
+  tables.vehicles[3].deleted_at = measured;
+  tables.vehicle_positions[4].longitude = 181;
+  tables.vehicle_positions[5].captured_at = new Date(now - 31_000).toISOString();
+  tables.vehicle_positions[6].captured_at = new Date(now + 60_000).toISOString();
+  tables.vehicle_positions[7].is_sample = true;
+  const result = await offlineTransit.getVehicles();
+  assert.deepEqual(result.map(v => [v.id, v.latitude, v.recorded_at]), [['moving', 14.61, measured]]);
+});
+
 test('the live fleet omits upcoming, archived and missing routes even with fresh vehicle positions',async()=>{
   const stamp=new Date().toISOString();
   const ids=['regular','upcoming','archived','missing'];
@@ -302,16 +370,19 @@ test('publication rejects unusable fixes, preserves measured evidence and report
 
 test('sample operations and registry rows are excluded before counts and summaries', async () => {
   tables = Object.fromEntries(['vehicles', 'profiles', 'routes', 'speed_events', 'trip_violations', 'fleet_registry_units'].map(table => [table, [{ id: 'real' }, { id: 'sample', is_sample: true }]]));
+  tables.profiles.forEach(profile => { profile.role = 'driver'; });
   const operations = await loadAdminOperations();
   for (const rows of [operations.shifts, operations.drivers, operations.routes, operations.speedEvents, operations.tripViolations]) assert.equal(rows?.length, 1);
   assert.deepEqual((await loadRegistry('units', 'test-admin')).rows.map(row => row.id), ['real']);
 });
 
 test('sync reads all pages, including generic routes after the first 500', async () => {
+  serverPageSize = 200;
   tables = { routes: Array.from({ length: 501 }, (_, index) => ({ ...route, id: 'route-' + index })), terminals: [{ ...stop, route_id: 'route-500' }] };
   const result = await offlineTransit.getTransitData();
   assert.equal(result.routes.length, 501);
   assert.equal(result.terminals[0].route_id, 'route-500');
+  assert.equal((await offlineTransit.getInServiceRouteIds()).size, 501);
 });
 
 test('missing loading areas do not manufacture a legal zone', () => {

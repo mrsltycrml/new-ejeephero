@@ -1,5 +1,8 @@
 // © OpenStreetMap contributors, ODbL 1.0. https://www.openstreetmap.org/copyright
-// Ordered [longitude, latitude] vertices from the directional OSM records cited in route1FieldMap.ts.
+// Ordered [longitude, latitude] from OSM route ways. Relation 9236380 is outbound and 11611024 is inbound.
+// The October 2022 sheet corresponds in time to v45/v12, both edited 2022-09-02, with no platform members.
+// Both lines pass the Estrella approach on J. P. Rizal and cross the Pasig at the Makati–Mandaluyong Bridge.
+// One Ayala v59/v29 (2026-08-31) includes the directional Tivoli platforms and the Maysilo platform.
 // Two adjacent Boni Avenue ways in the 2022 return were reordered at their shared endpoints. The Jupiter retrace is in the source.
 
 export const buendiaOutbound: [number, number][] = [

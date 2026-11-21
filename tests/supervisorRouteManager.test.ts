@@ -248,7 +248,7 @@ test('previewing either alignment and selecting map or list pins never writes; p
   },true);
   assert.ok(ui.nodes().includes('No alignment confirmed'));
   assert.ok(ui.nodes().some(n=>typeof n==='string' && n.includes('doubles back on Jupiter')));
-  assert.deepEqual(ui.map().pins.map((p:Row)=>p.id),['buendia','jupiter','bridge','school','tivoli-city-hall','maysilo']);
+  assert.deepEqual(ui.map().pins.map((p:Row)=>p.id),['buendia','jupiter','bridge','school','tivoli','maysilo-circle']);
   ui.control('Pressable','Open the dated OpenStreetMap route record').onPress();
   assert.equal(ui.sourceLinks.at(-1),variants[0].source);
   ui.map().onSelectPin('jupiter');
@@ -438,15 +438,16 @@ test('bridge and school centers cannot become a new curb, even after manual conf
 
 test('duplicate directional curb is rejected and a stale Route 1 variant requires reopening the stop', async () => {
   const variant = 'buendia_2022';
+  const existingCurb = { latitude: 14.552, longitude: 121.032 };
   const rows: Catalog = {routes:[{id:outbound,name:'Outbound',route1_variant:variant},{id:inbound,name:'Return',route1_variant:variant}],
-    terminals:[{id:'existing',route_id:outbound,name:'Curb',...curb,sequence_order:1,location_source_url:operator,location_verified_at:'2025-01-01'}]};
+    terminals:[{id:'existing',route_id:outbound,name:'Curb',...existingCurb,sequence_order:1,location_source_url:operator,location_verified_at:'2025-01-01'}]};
   const calls:Row[]=[];
   const ui=await mount(rows,async (_name,args)=>{
     calls.push(args);rows.routes.forEach(r=>r.route1_variant='one_ayala_2026');
     return {error:{code:'40001',message:'Route 1 changed.'}};
   },true);
   ui.select('Reference pin','jupiter');ui.select('Stop on this direction','new');ui.tap('Review new curb');
-  ui.fill('Location source (HTTPS)',operator);ui.toggle('Place curb on map',true);ui.map().onPickCurb(curb);
+  ui.fill('Location source (HTTPS)',operator);ui.toggle('Place curb on map',true);ui.map().onPickCurb(existingCurb);
   ui.toggle('Verified against the source',true);ui.tap('Save stop');await setImmediate();
   assert.equal(calls.length,0);
   assert.ok(ui.nodes().some(n=>typeof n==='string' && n.includes('curb already exists')));

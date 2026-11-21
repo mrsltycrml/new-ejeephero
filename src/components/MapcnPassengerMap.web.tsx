@@ -46,6 +46,7 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
         style: streetStyle,
         center: [121.035, 14.575],
         zoom: 13, maxZoom: 19,
+        attributionControl: { compact: true },
         cooperativeGestures: true,
         dragRotate: false, pitchWithRotate: false,
       });
@@ -81,7 +82,12 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
       if (!view || !validPoint({ latitude, longitude }) || !Number.isFinite(zoom)) return;
       view.map.easeTo({ center: [longitude, latitude], zoom: Math.min(19, Math.max(3, zoom)) });
     };
-    return { centerOn, animateToRegion: region => centerOn(region.latitude, region.longitude, region.latitudeDelta && region.latitudeDelta < 0.01 ? 17 : 16) };
+    return { centerOn, fitPoints: points => {
+      if (!view || !points.length || !points.every(validPoint)) return;
+      const bounds = new view.lib.LngLatBounds();
+      points.forEach(p => bounds.extend(coordinates(p)));
+      view.map.fitBounds(bounds, { padding: 35, maxZoom: 16, duration: 450 });
+    }, animateToRegion: region => centerOn(region.latitude, region.longitude, region.latitudeDelta && region.latitudeDelta < 0.01 ? 17 : 16) };
   }, [view]);
 
   const { routes, terminals, destinationPlace, walkingRoutes, rideCoordinates, fitPoints, cameraKey, vehicles, userLocation, selectedVehicleId, vehicleSelectionKey, vehicleFocusRequestId } = data;
@@ -89,14 +95,15 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
     if (!view) return;
     const { map } = view;
     const lines: Feature<LineString>[] = [];
-    const addLine = (line: Point[], kind: 'route' | 'ride' | 'walk', color: string, selected = false) => {
+    const addLine = (line: Point[], kind: 'route' | 'ride' | 'walk', color: string, selected = false, width = selected ? 7 : 5) => {
       if (line.length > 1) lines.push({
         type: 'Feature', geometry: { type: 'LineString', coordinates: line.map(coordinates) },
-        properties: { kind, color, selected, directed: kind === 'ride' || (selected && rideCoordinates.length < 2) },
+        properties: { kind, color, width, directed: kind === 'ride' || (selected && rideCoordinates.length < 2) },
       });
     };
     for (const route of routes) {
-      addLine(route.coordinates, 'route', /^#[0-9a-f]{6}$/i.test(route.color_code) ? route.color_code : '#225ca0', route.isSelected);
+      addLine(route.coordinates, 'route', /^#[0-9a-f]{6}$/i.test(route.color_code) ? route.color_code : '#225ca0', route.isSelected,
+        route.referenceDirection === 'outbound' ? 8 : route.referenceDirection === 'inbound' ? 4 : undefined);
     }
     addLine(rideCoordinates, 'ride', '#12734a');
     for (const path of walkingRoutes) addLine(path.coordinates, 'walk', '#203b53');
@@ -110,7 +117,7 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
     map.addLayer({
       id: 'esakay-routes', type: 'line', source: sourceId, filter: ['==', ['get', 'kind'], 'route'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': ['get', 'color'], 'line-width': ['case', ['boolean', ['get', 'selected'], false], 6, 3], 'line-opacity': 0.75 },
+      paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': 0.94 },
     });
     map.addLayer({
       id: 'esakay-ride', type: 'line', source: sourceId, filter: ['==', ['get', 'kind'], 'ride'],
@@ -148,8 +155,8 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
     const markers = terminals.map(stop => {
       const color = stop.role === 'Landmark' || stop.role === 'Alight' ? '#a45600'
         : stop.role === 'Curb' || stop.role === 'Board' ? '#12734a' : '#225ca0';
-      return addPin(view, stop, `${stop.role}: ${stop.name}`, color, stop.role[0],
-        () => select.current({ type: 'SELECT_TERMINAL', id: stop.id }), stop.isSelected ? 15 : 2);
+      return addPin(view, stop, `${stop.role}: ${stop.name}`, color, stop.role === 'Landmark' ? 'L' : stop.role === 'Passenger use unconfirmed' ? 'S' : stop.role[0],
+        () => select.current({ type: 'SELECT_TERMINAL', id: stop.id }), stop.isSelected ? 15 : stop.role === 'Landmark' ? 2 : 5, true);
     });
     if (destinationPlace) markers.push(addPin(view, destinationPlace, destinationPlace.name, '#b22e39', 'D', undefined, 20));
     return () => { markers.forEach(marker => marker.remove()); };
@@ -158,7 +165,7 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
   useEffect(() => {
     if (!view) return;
     const markers = vehicles.map(vehicle => addPin(view, vehicle, `${vehicle.body_number || 'Vehicle'} · ${vehicle.quality === 'weak' ? 'Weak GPS' : 'Current GPS'}`,
-      '#7b4339', 'V', () => select.current({ type: 'SELECT_VEHICLE', id: vehicle.id }), vehicle.isSelected ? 12 : 1));
+      '#244765', vehicle.body_number || 'E-jeep', () => select.current({ type: 'SELECT_VEHICLE', id: vehicle.id }), vehicle.isSelected ? 18 : 10));
     if (userLocation) markers.push(addPin(view, userLocation, 'Your location', '#175dcc', '●', undefined, 30));
     return () => { markers.forEach(marker => marker.remove()); };
   }, [view, vehicles, userLocation]);
@@ -187,17 +194,22 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
   </div>;
 }
 
-function addPin(view: { map: MapLibre.Map; lib: MapLibrary }, point: Point, title: string, color: string, glyph: string, click?: () => void, zIndex = 1) {
+function addPin(view: { map: MapLibre.Map; lib: MapLibrary }, point: Point, title: string, color: string, glyph: string, click?: () => void, zIndex = 1, pin = false) {
   const element = document.createElement(click ? 'button' : 'span');
   element.textContent = glyph;
   element.title = title;
   Object.assign(element.style, {
-    width: '32px', height: '32px', borderRadius: '50%', border: '2px solid white',
+    minWidth: '30px', height: '30px', borderRadius: '15px', border: '2px solid white',
     background: color, color: 'white', display: 'grid', placeItems: 'center',
-    font: 'bold 13px system-ui', cursor: click ? 'pointer' : 'default', padding: '0', zIndex: String(zIndex),
+    font: 'bold 13px system-ui', cursor: click ? 'pointer' : 'default', padding: '0 5px', zIndex: String(zIndex),
     boxShadow: '0 2px 4px #0005',
   });
-  const marker = new view.lib.Marker({ element }).setLngLat(coordinates(point)).addTo(view.map);
+  if (pin) {
+    const tip = document.createElement('span');
+    Object.assign(tip.style, { position: 'absolute', bottom: '-8px', borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '8px solid ' + color });
+    element.appendChild(tip);
+  }
+  const marker = new view.lib.Marker({ element, anchor: pin ? 'bottom' : 'center', offset: [0, pin ? -6 : 0] }).setLngLat(coordinates(point)).addTo(view.map);
   element.setAttribute('aria-label', title);
   if (click) {
     element.setAttribute('type', 'button');

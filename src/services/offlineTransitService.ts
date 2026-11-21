@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-import { FRESH_TELEMETRY_WINDOW_MS, pickLatestFreshPositions } from '../utils/operationsSummary';
+import { FRESH_TELEMETRY_WINDOW_MS, pickLatestFreshPositions, type FleetShift, type TelemetryRow } from '../utils/operationsSummary';
 import { realRows } from '../utils/realData';
-import { telemetryFix, positionPayload, validPoint, type MeasuredFix } from './locationQuality';
+import { telemetryFix, positionPayload, type MeasuredFix } from './locationQuality';
 import { activeRoute, verifiedRoute, verifiedStop } from './routeMap';
 import type { PassengerUse } from '../../supabase/functions/_shared/passengerStopUse';
 
@@ -92,6 +92,10 @@ export type TransitResult = {
   error: string | null;
 };
 type TransitSnapshot = Pick<TransitResult, 'routes' | 'terminals'> & { syncedAt: string };
+type FleetPosition = TelemetryRow & {
+  id: string;
+  vehicles: FleetShift & { is_sample?: boolean; deleted_at?: string | null };
+};
 
 // One new envelope prevents old seeded caches and partial writes from returning.
 const CACHE_KEY = '@ejeephero_real_transit_v1';
@@ -108,13 +112,13 @@ function normalizeTransit(rawRoutes: RouteData[], rawTerminals: TerminalData[]) 
 
 async function readAll<T>(table: string, columns = '*'): Promise<T[]> {
   const rows: T[] = [];
-  for (let offset = 0; ; offset += 500) {
-    const { data, error } = await supabase.from(table).select(columns).order('id').range(offset, offset + 499)
+  for (;;) {
+    const { data, count, error } = await supabase.from(table).select(columns, { count: 'exact' }).order('id').range(rows.length, rows.length + 499)
       .overrideTypes<T[], { merge: false }>();
     if (error) throw new Error(error.message);
     if (!Array.isArray(data)) throw new Error(`Could not read ${table}.`);
     rows.push(...data);
-    if (data.length < 500) return rows;
+    if (!data.length || (count != null && rows.length >= count)) return rows;
   }
 }
 
@@ -197,22 +201,29 @@ export class OfflineTransitService {
   public async getVehicles(routeIds?: ReadonlySet<string>): Promise<VehicleData[]> {
     const inService = routeIds ?? await this.getInServiceRouteIds();
     if (!inService.size) return [];
-    const { data, error } = await supabase.from('vehicles').select('*').eq('is_active', true);
-    if (error) throw new Error(error.message);
-    const activeVehicles = realRows<any>(data ?? []).filter(vehicle => vehicle.is_active && !vehicle.deleted_at && inService.has(vehicle.route_id));
-    if (!activeVehicles.length) return [];
-    const { data: positions, error: positionError } = await supabase.from('vehicle_positions')
-      .select('*').in('vehicle_id', activeVehicles.map(vehicle => vehicle.id))
-      .gte('timestamp', new Date(Date.now() - FRESH_TELEMETRY_WINDOW_MS).toISOString())
-      .order('timestamp', { ascending: false }).limit(300);
-    if (positionError) throw new Error(positionError.message);
-    const latest = pickLatestFreshPositions(realRows(positions ?? []));
-    return activeVehicles.flatMap(vehicle => {
-      const position = latest.get(vehicle.id);
-      if (!position || !validPoint(position)) return [];
+    const since = new Date(Date.now() - FRESH_TELEMETRY_WINDOW_MS).toISOString();
+    const positions: FleetPosition[] = [];
+    let afterId: string | null = null;
+    for (;;) {
+      let query = supabase.from('vehicle_positions').select('*,vehicles!inner(*)')
+        .eq('vehicles.is_active', true).is('vehicles.ended_at', null)
+        .gte('timestamp', since).gte('captured_at', since);
+      if (afterId) query = query.gt('id', afterId);
+      const { data, error } = await query.order('id').limit(500).overrideTypes<FleetPosition[], { merge: false }>();
+      if (error) throw new Error(error.message);
+      if (!Array.isArray(data)) throw new Error('Could not read vehicle positions.');
+      if (!data.length) break;
+      positions.push(...realRows(data));
+      // Continue even on short pages: the server may enforce a lower row cap.
+      afterId = data[data.length - 1].id;
+    }
+    const latest = pickLatestFreshPositions(positions);
+    return [...latest.values()].flatMap(position => {
+      const vehicle = position.vehicles;
+      if (vehicle.is_sample || vehicle.deleted_at || !inService.has(vehicle.route_id)) return [];
       const fix = telemetryFix(position);
       const count = Number.isFinite(vehicle.passenger_count) ? vehicle.passenger_count : null;
-      const capacity = Number.isFinite(vehicle.max_capacity) && vehicle.max_capacity > 0 ? vehicle.max_capacity : null;
+      const capacity = vehicle.max_capacity != null && Number.isFinite(vehicle.max_capacity) && vehicle.max_capacity > 0 ? vehicle.max_capacity : null;
       const full = count != null && capacity != null ? count >= capacity : null;
       return [{
         id: vehicle.id, vehicle_id: vehicle.id, route_id: vehicle.route_id,
@@ -220,7 +231,7 @@ export class OfflineTransitService {
         latitude: position.latitude, longitude: position.longitude,
         speed: fix.speed, heading: fix.heading, accuracy: fix.accuracy, recorded_at: position.captured_at!,
         passenger_count: count, max_capacity: capacity, is_full: full,
-        status: full == null ? null : full ? 'Puno' as const : count >= capacity * 0.7 ? 'Sakto' as const : 'Maluwag' as const,
+        status: count == null || capacity == null ? null : full ? 'Puno' as const : count >= capacity * 0.7 ? 'Sakto' as const : 'Maluwag' as const,
       }];
     });
   }

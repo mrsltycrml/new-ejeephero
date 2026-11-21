@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as routeMap from '../src/services/routeMap.ts';
+import * as passengerMapOverview from '../src/services/passengerMapOverview.ts';
 import * as quality from '../src/services/locationQuality.ts';
 import * as safety from '../src/services/passengerSafety.ts';
 import * as fare from '../src/services/passengerFare.ts';
@@ -18,7 +19,7 @@ const stops = ['board', null, 'alight', 'both'].map((passenger_use, i) => ({
 const journey = { transit: { routes: [route], terminals: stops, status: 'cached' }, selectedRouteId: 'r', boardingStop: null,
   alightingStop: null, vehicles: [], nearby: [], walkingRoutes: [], getJourneyVersion: () => 0 };
 
-function screen(file: string, props: Record<string, any> = {}) {
+function screen(file: string, props: Record<string, any> = {}, journeyState: Record<string, any> = journey) {
   const slots: any[] = [];
   let cursor = 0;
   const react = {
@@ -34,10 +35,10 @@ function screen(file: string, props: Record<string, any> = {}) {
     react: { ...react, default: react }, 'react-native': { View: 'View', Text: 'Text', TouchableOpacity: 'Button',
       TextInput: 'Input', Platform: { OS: 'web' }, StyleSheet: { create: (s: any) => s }, useWindowDimensions: () => ({ width: 400 }) },
     PassengerUI: { PassengerSelect: 'Select', passengerStyles: {} }, AppUI: { FormScrollView: 'Scroll', triggerHaptic() {} },
-    PassengerJourneyContext: { usePassengerJourney: () => journey }, NetworkContext: { useNetwork: () => ({ isConnected: true }) },
+    PassengerJourneyContext: { usePassengerJourney: () => journeyState }, NetworkContext: { useNetwork: () => ({ isConnected: true }) },
     AuthContext: { useAuth: () => ({}) }, LocationContext: { useLocation: () => ({ fix: null, now: Date.now() }) },
     LeafletMap: { default: 'Map' }, theme: { Colors: {} }, passengerFare: fare, passengerSafety: safety,
-    routeMap, locationQuality: quality, stopLandmarks: landmarks, reportingPeriod: { manilaDateKey },
+    routeMap, passengerMapOverview, locationQuality: quality, stopLandmarks: landmarks, reportingPeriod: { manilaDateKey },
     esakayOperations: { LANDMARK_REFERENCE: { date: '', stops: [] } },
   };
   const code = ts.transpileModule(readFileSync(new URL(file, import.meta.url), 'utf8'), { compilerOptions: {
@@ -56,12 +57,17 @@ function screen(file: string, props: Record<string, any> = {}) {
 test('home map inspection, manual controls and fare selectors enforce the current stop role', () => {
   const home = screen('../src/screens/passenger/HomeScreen.tsx');
   const map = home().find(node => node.type === 'Map');
-  assert.deepEqual(map.props.terminals.map((s: any) => s.id), ['0','2','3']);
+  assert.deepEqual(map.props.terminals.map((s: any) => s.id), ['0','1','2','3']);
+  const button = (tree: any[], label: string) => tree.find(n => n.type === 'Button' && n.children.some((child: any) => child?.children?.includes(label)));
+  map.props.onSelectTerminal(stops[1]);
+  const unconfirmed = home();
+  assert.ok(unconfirmed.some(n => n.type === 'Text' && n.children.includes('Passenger use unconfirmed')));
+  assert.equal(button(unconfirmed, 'Board here'), undefined);
+  assert.equal(button(unconfirmed, 'Alight here'), undefined);
   map.props.onSelectTerminal(stops[2]);
   const manual = home();
-  const button = (label: string) => manual.find(n => n.type === 'Button' && n.children.some((child: any) => child?.children?.includes(label)));
-  assert.equal(button('Board here').props.disabled, true);
-  assert.equal(button('Alight here').props.disabled, false);
+  assert.equal(button(manual, 'Board here').props.disabled, true);
+  assert.equal(button(manual, 'Alight here').props.disabled, false);
   for (const tree of [manual, screen('../src/screens/passenger/FareScreen.tsx')()]) {
     const ids = (label: string) => tree.find(n => n.type === 'Select' && n.props.label === label).props.options.map((o: any) => o.value);
     assert.deepEqual(ids('Boarding stop'), ['0','3']);
@@ -79,4 +85,16 @@ test('the passenger guide offers a walk to boarding stops only', () => {
     const canWalk = tree.some(n => n.type === 'Text' && n.children.includes('Walk to this stop'));
     assert.equal(canWalk, stop.passenger_use === 'board' || stop.passenger_use === 'both');
   }
+});
+
+test('the home map keeps other routes visible after choosing a boarding stop until the passenger filters the fleet', () => {
+  const vehicles = ['r', 's'].map(id => ({ id, vehicle_id: id, route_id: id }));
+  const state = { ...journey, boardingStop: stops[0], vehicles, fleetRouteId: null as string | null };
+  const home = screen('../src/screens/passenger/HomeScreen.tsx', {}, state);
+  const pins = () => home().find(node => node.type === 'Map').props.vehicles;
+  assert.deepEqual(pins(), vehicles);
+  state.fleetRouteId = 'r';
+  assert.deepEqual(pins(), [vehicles[0]]);
+  state.fleetRouteId = null;
+  assert.deepEqual(pins(), vehicles);
 });

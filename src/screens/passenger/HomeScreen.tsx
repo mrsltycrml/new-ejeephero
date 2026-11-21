@@ -22,12 +22,13 @@ import { locationDescription, locationQuality, vehicleTelemetryReadout } from '.
 import { rideLeg, selectJourneyStop, confirmedPassengerUse, permitsPassengerUse, passengerStopOptions, passengerUseLabel } from '../../services/routeMap';
 import { Colors } from '../../constants/theme';
 import { manilaDateKey } from '../../utils/reportingPeriod';
+import { passengerMapOverview } from '../../services/passengerMapOverview';
 
 export default function PassengerHomeScreen({ route, navigation }: any) {
   const { fix, quality, errorMsg, foreground, enableLocation } = useLocation();
   const { isConnected } = useNetwork();
   const { user, getAccessToken } = useAuth();
-  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleRouteIds, vehicleError, nearby, endRide, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setRideStops, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
+  const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleRouteIds, vehicleError, nearby, endRide, selectedRouteId, fleetRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setRideStops, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const map = useRef<LeafletMapRef>(null);
   const destinationInput = useRef<React.ElementRef<typeof TextInput>>(null);
@@ -38,6 +39,11 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const stops = transit.terminals;
   const routes = transit.routes;
   const [inspectedStop, setInspectedStop] = useState<TerminalData | null>(null);
+  const [landmarkId, setLandmarkId] = useState<string | null>(null);
+  const [pinListOpen, setPinListOpen] = useState(false);
+  const locatedStops = useMemo(() => stops.filter(t => !selectedRouteId || t.route_id === selectedRouteId), [stops, selectedRouteId]);
+  const overview = useMemo(() => passengerMapOverview(routes, locatedStops, selectedRouteId), [routes, locatedStops, selectedRouteId]);
+  const landmark = overview?.landmarks.find(p => p.id === landmarkId);
   const [query, setQuery] = useState(place?.name || destination?.name || '');
   const [searchOpen, setSearchOpen] = useState(false);
   useEffect(() => {
@@ -131,9 +137,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const routeName = (id?: string) => routes.find(item => item.id === id)?.name || 'Route unavailable';
 
   const results = routeStops.filter(t => permitsPassengerUse(t, 'alight') && t.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
-  const allModeVehicles = isConnected ? vehicles.filter(vehicle => !vehicle.is_sample && ['live', 'weak'].includes(locationQuality({ ...vehicle, timestamp: Date.parse(vehicle.recorded_at || '') }, now))) : [];
-  const displayed = selectedRouteId
-    ? allModeVehicles.filter((v) => v.route_id === selectedRouteId)
+  const allModeVehicles = isConnected ? vehicles : [];
+  const displayed = fleetRouteId
+    ? allModeVehicles.filter((v) => v.route_id === fleetRouteId)
     : allModeVehicles;
   const currentSelected = selected
     ? displayed.find((v) => v.vehicle_id === selected.vehicle_id) || null
@@ -180,6 +186,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     walkingRequest.current++; setWalkingBusy(false); setWalkingError('');
     triggerHaptic('light');
     setInspectedStop(stop);
+    setLandmarkId(null);
     setManualOpen(true);
     setSearchOpen(false);
     setSelected(null);
@@ -232,6 +239,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
 
   const selectVehicle = (vehicle: VehicleData) => {
     triggerHaptic('light');
+    setLandmarkId(null);
+    setInspectedStop(null);
     setSelected(vehicle);
   };
 
@@ -358,7 +367,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
       <Text style={s.muted}>{transitNotice}</Text>
       <PassengerSelect label="Route" value={selectedRouteId || ''} options={[{ value: '', label: 'All published routes' }, ...routes.map(r => ({ value: r.id, label: r.name }))]}
         onSelect={id => { pendingPlace.current = null; setSelectedRouteId(id || null); setInspectedStop(null); setSelected(null); }} />
-      {!hasPath && <Text style={s.muted}>Route path unavailable.</Text>}
+      {!hasPath && <Text style={s.muted}>Operator-confirmed route path unavailable.</Text>}
       {!routeStops.length && <Text style={s.muted}>Verified stop locations unavailable.</Text>}
       <PassengerSelect label="Boarding stop" value={boardingStop?.id || ''} disabled={!boardingOptions.length}
         options={boardingOptions.map(stop => ({ value: stop.id, label: stop.name }))}
@@ -399,7 +408,53 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
       onWalk={stop => void requestWalk(stop)} walkingBusy={walkingBusy} onRefresh={refreshZones} loading={zonesLoading}
       loadError={zonesError || transit.status !== 'ready'} openRequest={route?.params?.showStopGuide} />
   </View>;
-  const journeyMapProps = { preferMapcn: true, routes, terminals: routeStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes, selectedTerminal: activeStop, onSelectTerminal: chooseDestination, vehicleSelectionKey: selected?.id ?? null };
+  const journeyMapProps = { preferMapcn: true, routes, terminals: locatedStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes,
+    passengerOverview: overview, selectedTerminal: inspectedStop, onSelectTerminal: chooseDestination, vehicleSelectionKey: selected?.id ?? null,
+    onSelectLandmark: (pin: { id: string }) => { setLandmarkId(pin.id); setInspectedStop(null); setSelected(null); } };
+  const referenceLines = overview?.referenceLines ?? [];
+  const publishedLines = routes.filter(r => (!selectedRouteId || r.id === selectedRouteId) && r.coordinates.length > 1);
+  const locatedStop = locatedStops.find(t => t.id === inspectedStop?.id);
+  const inspectedPin = landmark?.point ?? locatedStop;
+  const pinCount = locatedStops.length + (overview?.landmarks.length ?? 0);
+  const mapKey = <View style={styles.mapKey}>
+    <View style={styles.mapKeyHeading}>
+      <Text style={s.label}>{referenceLines.length ? 'Route 1 · reference map' : 'Route map'}</Text>
+      {(referenceLines.length > 0 || publishedLines.length > 0) && <TouchableOpacity accessibilityRole="button" onPress={() =>
+        map.current?.fitPoints?.([...referenceLines, ...publishedLines].flatMap(line => line.coordinates))}>
+        <Text style={styles.mapLink}>Show full route</Text>
+      </TouchableOpacity>}
+    </View>
+    {overview && referenceLines.length > 0 && <>
+      <View style={styles.mapDirections}>{referenceLines.map(line =>
+        <TouchableOpacity key={line.id} accessibilityRole="link" style={styles.mapDirection}
+          onPress={() => void Linking.openURL(line.referenceDirection === 'outbound' ? overview.variant.source : overview.variant.returnSource)}>
+          <View style={[styles.mapStroke, { backgroundColor: line.color_code }]} />
+          <Text style={styles.mapKeyText}>{line.referenceDirection === 'outbound' ? 'To City Hall' : 'To Makati'}</Text>
+        </TouchableOpacity>)}</View>
+      <Text style={s.muted}>{overview.variant.label} · © OpenStreetMap contributors. Current service alignment awaits confirmation.</Text>
+    </>}
+    {pinCount > 0 && <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: pinListOpen }}
+      style={styles.mapKeyHeading} onPress={() => setPinListOpen(!pinListOpen)}>
+      <Text style={styles.mapLink}>Stops and landmarks ({pinCount})</Text>
+      <Ionicons name={pinListOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.action} />
+    </TouchableOpacity>}
+    {pinListOpen && <View>{[
+      ...locatedStops.map(stop => ({ id: stop.id, name: stop.name, point: stop, select: () => chooseDestination(stop) })),
+      ...(overview?.landmarks ?? []).map(pin => ({ id: pin.id, name: pin.name, point: pin.point, select: () => journeyMapProps.onSelectLandmark(pin) })),
+    ].map(item => <TouchableOpacity key={item.id} accessibilityRole="button" accessibilityLabel={item.name} style={styles.actionRow} onPress={() => {
+      item.select(); setPinListOpen(false); map.current?.centerOn(item.point.latitude, item.point.longitude, 17);
+    }}>
+      <Text style={s.label}>{item.name}</Text><Ionicons name="location-outline" size={18} color={Colors.action} />
+    </TouchableOpacity>)}</View>}
+    {inspectedPin && <View style={styles.pinDetail}>
+      <Text style={s.label}>{landmark?.name ?? locatedStop?.name}</Text>
+      <Text style={s.muted}>{landmark ? 'Landmark reference · Boarding and alighting unconfirmed.' : locatedStop ? passengerUseLabel(locatedStop) : ''}</Text>
+      <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(
+        `https://earth.google.com/web/@${inspectedPin.latitude},${inspectedPin.longitude},0a,600d,35y,0h,0t,0r`)}>
+        <Text style={styles.mapLink}>View pin in Google Earth</Text>
+      </TouchableOpacity>
+    </View>}
+  </View>;
 
   const tripPlanner = <View style={styles.planner}>
     <View style={styles.plannerHeading}>
@@ -551,6 +606,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           </View>
         </View>
 
+        {mapKey}
         {trackingCard}
         {locationControl}
         {result}
@@ -640,6 +696,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           />
         </View>
 
+        {mapKey}
         {trackingCard}
         {locationControl}
         {journeyControls}
@@ -712,9 +769,13 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
               vehicles={displayed} userLocation={locationFresh ? fix : null}
               selectedVehicle={currentSelected} isOffline={!isConnected} onSelectVehicle={selectVehicle} />
           </View>
+          {mapKey}
           <View style={styles.mapCaption}>
             <Ionicons name="bus-outline" size={18} color={Colors.subtleGray} />
             <Text style={[s.muted, { flex: 1 }]}>{vehicleError || (!displayed.length ? 'No current vehicle locations available.' : 'Tap an e-jeep to see its speed and GPS reading.')}</Text>
+            {displayed.length > 0 && <TouchableOpacity accessibilityRole="button" onPress={() => map.current?.fitPoints?.(displayed)}>
+              <Text style={styles.mapLink}>Show {displayed.length} {displayed.length === 1 ? 'e-jeep' : 'e-jeeps'}</Text>
+            </TouchableOpacity>}
           </View>
           {trackingCard}
         </View>
@@ -732,6 +793,14 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  mapKey: { paddingHorizontal: 16, paddingVertical: 10, gap: 6, backgroundColor: Colors.paper },
+  mapKeyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
+  mapDirections: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  mapDirection: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 28 },
+  mapStroke: { width: 22, height: 5, borderRadius: 3 },
+  mapKeyText: { color: Colors.ink, fontSize: 13, fontWeight: '600' },
+  mapLink: { color: Colors.action, fontSize: 14, fontWeight: '700', paddingVertical: 5 },
+  pinDetail: { paddingTop: 8, gap: 4, borderTopWidth: 1, borderColor: Colors.border },
   home: { flexGrow: 1, backgroundColor: Colors.canvas, paddingBottom: 28 },
   layout: { width: '100%', maxWidth: 1200, alignSelf: 'center', backgroundColor: Colors.paper },
   wideLayout: { width: '96%', flexDirection: 'row', alignItems: 'stretch', marginTop: 16, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, overflow: 'hidden' },

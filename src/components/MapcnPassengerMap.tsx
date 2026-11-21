@@ -9,7 +9,7 @@ export type MapcnPassengerMapProps = {
   onFailure: () => void;
   onSelect: (data: { type: 'SELECT_TERMINAL' | 'SELECT_VEHICLE'; id: string }) => void;
   data: {
-    routes: { coordinates: Point[]; isSelected: boolean; color_code: string }[];
+    routes: { coordinates: Point[]; isSelected: boolean; color_code: string; referenceDirection?: 'outbound' | 'inbound' }[];
     terminals: (Point & { id: string; name: string; role: string; isSelected: boolean })[];
     vehicles: (Point & { id: string; body_number: string; quality: string; isSelected: boolean })[];
     userLocation: Point | null;

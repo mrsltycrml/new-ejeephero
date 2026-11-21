@@ -71,15 +71,17 @@ export function rideLeg(route: RouteData | undefined, boarding: TerminalData | n
   return [from.point, ...route.coordinates.slice(from.index + 1, to.index + 1), to.point].filter((p, i, points) => i === 0 || meters(p, points[i - 1]) > 0.01);
 }
 
-export function buildJourneyMap(input: { routes: RouteData[]; terminals: TerminalData[]; fleetMode?: boolean; selectedRouteId?: string | null; boardingStop?: TerminalData | null; alightingStop?: TerminalData | null; destinationPlace?: (Point & { name: string }) | null; walkingRoutes?: WalkingRouteGeometry[] }) {
+export function buildJourneyMap(input: { routes: RouteData[]; terminals: TerminalData[]; fleetMode?: boolean; showLocatedStops?: boolean; selectedRouteId?: string | null; boardingStop?: TerminalData | null; alightingStop?: TerminalData | null; destinationPlace?: (Point & { name: string }) | null; walkingRoutes?: WalkingRouteGeometry[] }) {
   const routes = input.routes.filter(verifiedRoute);
-  const terminals = input.terminals.filter(t => (input.fleetMode ? verifiedStop(t) : confirmedPassengerUse(t)) && input.routes.some(r => r.id === t.route_id && activeRoute(r)));
+  const terminals = input.terminals.filter(t => (input.fleetMode || input.showLocatedStops ? verifiedStop(t) : confirmedPassengerUse(t)) && input.routes.some(r => r.id === t.route_id && activeRoute(r)));
   const route = routes.find(r => r.id === input.selectedRouteId);
   const boarding = terminals.find(t => t.id === input.boardingStop?.id && t.route_id === input.selectedRouteId && permitsPassengerUse(t, 'board'));
   const alighting = terminals.find(t => t.id === input.alightingStop?.id && t.route_id === input.selectedRouteId && permitsPassengerUse(t, 'alight'));
   const destinationPlace = input.destinationPlace && validPoint(input.destinationPlace) ? input.destinationPlace : null;
   const walkingRoutes = (input.walkingRoutes || []).filter(w => w.source?.trim() && Number.isFinite(Date.parse(w.generatedAt)) && Array.isArray(w.coordinates) && w.coordinates.length > 1 && w.coordinates.every(validPoint));
-  const fitPoints = [...(input.selectedRouteId ? route?.coordinates || [] : routes.flatMap(r => r.coordinates)), ...[boarding, alighting, destinationPlace].filter((p): p is NonNullable<typeof p> => Boolean(p)), ...walkingRoutes.flatMap(w => w.coordinates)].map(p => ({ latitude: p.latitude, longitude: p.longitude }));
+  const overviewStops = input.showLocatedStops && !boarding && !alighting && !destinationPlace && !walkingRoutes.length
+    ? terminals.filter(t => !input.selectedRouteId || t.route_id === input.selectedRouteId) : [];
+  const fitPoints = [...(input.selectedRouteId ? route?.coordinates || [] : routes.flatMap(r => r.coordinates)), ...overviewStops, ...[boarding, alighting, destinationPlace].filter((p): p is NonNullable<typeof p> => Boolean(p)), ...walkingRoutes.flatMap(w => w.coordinates)].map(p => ({ latitude: p.latitude, longitude: p.longitude }));
   const cameraKey = JSON.stringify([input.selectedRouteId, boarding?.id, alighting?.id, fitPoints]);
   return { routes, terminals, boarding, alighting, destinationPlace, walkingRoutes, rideCoordinates: rideLeg(route, boarding, alighting), fitPoints, cameraKey };
 }

@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildJourneyMap, rideLeg, selectJourneyStop, selectJourneyRoute, reconcileJourneySelection, permitsPassengerUse, passengerStopOptions } from '../src/services/routeMap.ts';
 import { scriptJson } from '../src/utils/scriptJson.ts';
+import { passengerMapOverview } from '../src/services/passengerMapOverview.ts';
+import { ROUTE1_OUTBOUND_ID, ROUTE1_INBOUND_ID } from '../src/services/route1FieldMap.ts';
 
 const a = { latitude: 14.6, longitude: 121 };
 const b = { latitude: 14.6, longitude: 121.01 };
@@ -10,6 +12,37 @@ const route: any = { id: 'r-any', name: '</script><b>Route</b>', coordinates: [a
 const stop = (id: string, point: typeof a, order: number, route_id = route.id): any => ({ id, ...point, route_id, sequence_order: order, name: id, location_verified_at: '2026-11-01', location_source_url: 'https://example.test/stops',
   passenger_use: 'both', passenger_use_verified_at: '2026-11-01', passenger_use_source_url: 'https://example.test/operations' });
 const origin = stop('a', a, 1), end = stop('c', c, 3);
+test('Route 1 map shows the dated street lines and landmark pins before operational confirmation', () => {
+  const buendia = { ...route, id: ROUTE1_OUTBOUND_ID, geometry_verified_at: null, coordinates: [] };
+  const overview = passengerMapOverview([buendia], [])!;
+  assert.deepEqual(overview.referenceLines.map(l => l.referenceDirection), ['outbound', 'inbound']);
+  assert.ok(overview.referenceLines.every(l => l.coordinates.length > 20));
+  assert.ok(overview.landmarks.some(p => p.id === 'jupiter'));
+  const jupiter = overview.landmarks.find(p => p.id === 'jupiter')!;
+  const surveyed = { ...origin, id: 'surveyed-junction', route_id: buendia.id, ...jupiter.point };
+  assert.ok(!passengerMapOverview([buendia], [surveyed])?.landmarks.some(p => p.id === 'jupiter'));
+  assert.ok(passengerMapOverview([buendia], [{ ...surveyed, route_id: 'another-route' }])?.landmarks.some(p => p.id === 'jupiter'));
+  assert.ok(!overview.landmarks.some(p => p.id === 'one-ayala'));
+  assert.deepEqual(buildJourneyMap({ routes: [buendia], terminals: [] }).routes, []);
+  assert.equal(passengerMapOverview([{ ...buendia, is_coming_soon: true }], []), null);
+  assert.equal(passengerMapOverview([{ ...buendia, is_archived: true }], []), null);
+  assert.equal(passengerMapOverview([buendia], [], 'other-route'), null);
+  assert.equal(passengerMapOverview([buendia], [], ROUTE1_INBOUND_ID), null);
+  assert.deepEqual(passengerMapOverview([buendia], [], buendia.id)?.referenceLines.map(l => l.referenceDirection), ['outbound']);
+});
+test('published direction replaces the reference line and surveyed stop replaces its matched landmark', () => {
+  const activated = { ...route, id: ROUTE1_OUTBOUND_ID, route1_variant: 'one_ayala_2026' };
+  const pin = passengerMapOverview([activated], [])!.landmarks.find(p => p.existingStopId)!;
+  const located = { ...origin, id: pin.existingStopId!, route_id: activated.id, passenger_use: null };
+  const overview = passengerMapOverview([activated], [located])!;
+  assert.deepEqual(overview.referenceLines, []);
+  assert.ok(overview.landmarks.some(p => p.id === 'one-ayala') || pin.id === 'one-ayala');
+  assert.ok(!overview.landmarks.some(p => p.id === pin.id || p.id === 'buendia'));
+  const map = buildJourneyMap({ routes: [activated], terminals: [located], showLocatedStops: true, boardingStop: located, selectedRouteId: activated.id });
+  assert.deepEqual(map.terminals, [located]);
+  assert.equal(map.boarding, undefined);
+  assert.deepEqual(map.rideCoordinates, []);
+});
 test('passenger roles need both verified location and explicit current operating evidence', () => {
   for (const [use, board, alight] of [['board', true, false], ['alight', false, true], ['both', true, true], [null, false, false], ['unknown', false, false]]) {
     assert.equal(permitsPassengerUse({ ...origin, passenger_use: use }, 'board'), board);
