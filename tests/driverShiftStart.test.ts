@@ -26,6 +26,9 @@ const react = {
 const accepted = { latitude: 14.6, longitude: 121, accuracy: 5, speed: 0, heading: null, timestamp: Date.now() - 1000 };
 const rejectedDeviceReading = { timestamp: accepted.timestamp + 1000, coords: { ...accepted, latitude: 15 } };
 let locationState: any;
+const platform = { OS: 'android' };
+let permission = 'granted', servicesEnabled = true;
+const deviceCalls: string[] = [];
 let inserted = 0;
 const published: any[] = [];
 let restoredShift: any = null, driverId = 'driver';
@@ -44,10 +47,15 @@ const service = { getTransitData: async () => ({ routes: [{ id: 'route', name: '
   publishPosition: async (id: string, fix: any) => published.push(positionPayload(id, fix)) };
 Object.assign(globalThis, { __shiftReact: react, __shiftDb: database, __shiftTransit: service, __shiftLocation: () => locationState,
   __shiftUser: () => ({ user: { id: driverId } }),
-  __shiftDevice: { Accuracy: { High: 1 }, getForegroundPermissionsAsync: async () => ({ status: 'granted' }), hasServicesEnabledAsync: async () => true, getCurrentPositionAsync: async () => rejectedDeviceReading } });
+  __shiftPlatform: platform,
+  __shiftDevice: { Accuracy: { High: 1 },
+    getForegroundPermissionsAsync: async () => { deviceCalls.push('permission'); return { status: permission }; },
+    hasServicesEnabledAsync: async () => { deviceCalls.push('services'); return servicesEnabled; },
+    getCurrentPositionAsync: async () => { deviceCalls.push('position'); return rejectedDeviceReading; },
+  } });
 const fixtures: Record<string, string> = {
   react: 'const r=globalThis.__shiftReact; export default r; export const {useState,useEffect,useRef,useCallback}=r;',
-  'react-native': 'export const ActivityIndicator="Spinner",View="View",Text="Text",TouchableOpacity="Button",ScrollView="Scroll"; export const StyleSheet={create:s=>s};',
+  'react-native': 'export const Platform=globalThis.__shiftPlatform,ActivityIndicator="Spinner",View="View",Text="Text",TouchableOpacity="Button",ScrollView="Scroll"; export const StyleSheet={create:s=>s};',
   'expo-location': 'export const {Accuracy,getForegroundPermissionsAsync,hasServicesEnabledAsync,getCurrentPositionAsync}=globalThis.__shiftDevice;',
   '@expo/vector-icons': 'export const Ionicons="Icon";',
   '/lib/supabase': 'export const supabase=globalThis.__shiftDb;',
@@ -77,7 +85,10 @@ hooks.deregister();
 const render = () => { index = 0; refIndex = 0; effectIndex = 0; callbackIndex = 0; effects = []; return DashboardScreen(); };
 const flushEffects = () => effects.splice(0).forEach(effect => effect());
 const cleanupEffects = () => effectSlots.forEach(effect => effect.cleanup?.());
-const reset = () => { states = []; refs = []; effectSlots = []; callbackSlots = []; countWrites.length = 0; restoredShift = null; driverId = 'driver'; };
+const reset = () => {
+  states = []; refs = []; effectSlots = []; callbackSlots = []; countWrites.length = 0; restoredShift = null; driverId = 'driver';
+  platform.OS = 'android'; permission = 'granted'; servicesEnabled = true; deviceCalls.length = 0; inserted = 0; published.length = 0;
+};
 const textOf = (node: any): string => typeof node === 'string' ? node : (node?.props?.children || []).flat(Infinity).map(textOf).join('');
 const findStart = (node: any): any => node?.type === 'Button' && textOf(node) === 'Start shift' ? node : (node?.props?.children || []).flat(Infinity).map(findStart).find(Boolean);
 
@@ -107,6 +118,85 @@ const findNode = (node: any, match: (node: any) => boolean): any => match(node) 
 const countButton = (tree: any, direction = 'Increase') => findNode(tree, node => node?.props?.accessibilityLabel === `${direction} passenger count`);
 const countValue = (tree: any) => findNode(tree, node => node?.type === 'View' && node.props.children.some((child: any) => child?.props?.accessibilityLabel === 'Increase passenger count')).props.children[1].props.children[0];
 const restore = (id: string, count: number) => { restoredShift = { id, passenger_count: count, max_capacity: 22, route_id: 'route', body_number: 'Unit', plate_number: 'TEST' }; };
+
+test('web shift enable and start follow the shared foreground fix even when Expo denies permission', async () => {
+  reset(); platform.OS = 'web'; permission = 'denied'; servicesEnabled = false;
+  const now = Date.now();
+  const fix = { ...accepted, timestamp: now };
+  let requests = 0;
+  locationState = { fix: null, now, foreground: true, errorMsg: null, enableLocation: async () => { requests++; } };
+  render(); flushEffects();
+  try {
+    await setImmediate();
+    const initial = render();
+    assert.equal(findStart(initial).props.disabled, true);
+    findNode(initial, node => node?.type === 'Button' && textOf(node) === 'Enable location').props.onPress();
+    await setImmediate();
+    assert.equal(requests, 1);
+    for (const state of [
+      { fix: null }, { fix: { ...fix, accuracy: 31 } }, { fix: { ...fix, timestamp: now - 31_000 } },
+      { fix: { ...fix, latitude: 91 } }, { fix: { ...fix, timestamp: now + 10_000 } },
+      { foreground: false }, { errorMsg: 'GPS reading rejected' },
+    ]) {
+      locationState = { ...locationState, fix, foreground: true, errorMsg: null, ...state };
+      const start = findStart(render());
+      assert.equal(start.props.disabled, true);
+      await start.props.onPress();
+      assert.equal(inserted, 0);
+      assert.equal(published.length, 0);
+    }
+    locationState = { ...locationState, fix, errorMsg: null };
+    const ready = render();
+    assert.match(textOf(ready), /Location enabled/);
+    assert.equal(findStart(ready).props.disabled, false);
+    const pending = findStart(ready).props.onPress();
+    locationState = { ...locationState, foreground: false };
+    render();
+    await pending;
+    assert.equal(inserted, 0, 'the app went into the background during the assignment check');
+    assert.equal(published.length, 0);
+    locationState = { ...locationState, foreground: true };
+    await findStart(render()).props.onPress();
+    assert.equal(inserted, 1);
+    assert.deepEqual(published, [positionPayload('shift', fix)]);
+    assert.deepEqual(deviceCalls, []);
+  } finally { cleanupEffects(); }
+});
+
+test('restored web shift waits for accepted provider evidence and publishes without Expo', async () => {
+  reset(); platform.OS = 'web'; permission = 'denied'; servicesEnabled = false;
+  restore('restored', 2);
+  const fix = { ...accepted, timestamp: Date.now() };
+  locationState = { fix, now: fix.timestamp, foreground: true, errorMsg: 'GPS reading rejected' };
+  render(); flushEffects();
+  try {
+    await setImmediate(); render(); flushEffects(); await setImmediate();
+    assert.match(textOf(render()), /On duty/);
+    assert.equal(published.length, 0);
+    locationState = { ...locationState, errorMsg: null };
+    render(); flushEffects(); await setImmediate();
+    assert.deepEqual(published, [positionPayload('restored', fix)]);
+    assert.deepEqual(deviceCalls, []);
+  } finally { cleanupEffects(); }
+});
+
+test('native shift still requires Expo permission and enabled device services with a live fix', async () => {
+  for (const status of ['denied', 'granted']) {
+    reset(); permission = status; servicesEnabled = false;
+    locationState = { fix: { ...accepted, timestamp: Date.now() }, now: Date.now(), foreground: true, errorMsg: null };
+    render(); flushEffects();
+    try {
+      await setImmediate();
+      const start = findStart(render());
+      assert.equal(start.props.disabled, status === 'denied');
+      await start.props.onPress();
+      assert.ok(deviceCalls.includes('permission'));
+      assert.equal(deviceCalls.includes('services'), status === 'granted');
+      assert.equal(inserted, 0);
+      assert.equal(published.length, 0);
+    } finally { cleanupEffects(); }
+  }
+});
 async function mountCount() {
   reset(); restore('shift-a', 3);
   locationState = { fix: null, now: Date.now(), foreground: true, errorMsg: null, enableLocation: async () => {} };

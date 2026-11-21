@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { useAuth } from './AuthContext';
 import { acceptFix, fromDeviceLocation, locationQuality, type MeasuredFix, type LocationQuality } from '../services/locationQuality';
+import { browserLocationWatch } from '../services/browserLocation';
 
 type LocationContextType = {
   location: Location.LocationObject | null;
@@ -24,7 +25,10 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
   const [now, setNow] = useState(Date.now());
   const [revision, setRevision] = useState(0);
   const previous = useRef<MeasuredFix | null>(null);
+  const browserStart = useRef<(() => void) | null>(null);
+  const browserLocated = useRef(false);
   const enableLocation = useCallback(async () => {
+    if (Platform.OS === 'web') { browserStart.current?.(); return; }
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       setErrorMsg(permission.status === 'granted' ? null : 'Location permission denied. Enable it in device settings.');
@@ -35,11 +39,34 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
     const sub = AppState.addEventListener('change', state => { setForeground(state === 'active'); setNow(Date.now()); });
     return () => sub.remove();
   }, []);
-  useEffect(() => { setLocation(null); previous.current = null; }, [user?.id]);
+  useEffect(() => { setLocation(null); previous.current = null; browserLocated.current = false; }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false, checking = false;
+    const onPosition = (loc: Location.LocationObject) => {
+      if (cancelled) return;
+      const next = fromDeviceLocation(loc);
+      const last = previous.current;
+      const repeat = last && next.timestamp === last.timestamp && next.latitude === last.latitude &&
+        next.longitude === last.longitude && locationQuality(next) === 'live';
+      if (!repeat && !acceptFix(last, next)) { setErrorMsg('Waiting for a fresh, valid GPS reading.'); return; }
+      if (locationQuality(next) === 'live') previous.current = next;
+      setLocation(loc);
+      setNow(Date.now());
+      setErrorMsg(null);
+    };
+    if (Platform.OS === 'web') {
+      if (!foreground) { setErrorMsg('Tracking paused. Reopen eSAKAY to resume GPS.'); return; }
+      const watch = browserLocationWatch(pos => { browserLocated.current = true; onPosition(pos); }, message => {
+        setLocation(null);
+        setErrorMsg(message);
+      });
+      browserStart.current = watch.start;
+      void watch.resume(browserLocated.current);
+      const timer = setInterval(() => setNow(Date.now()), 5000);
+      return () => { cancelled = true; browserStart.current = null; watch.stop(); clearInterval(timer); };
+    }
     let subscriber: Location.LocationSubscription | null = null;
     const stop = () => { subscriber?.remove(); subscriber = null; };
     const check = async () => {
@@ -57,15 +84,7 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
         setErrorMsg(null);
         const sub = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 0 },
-          loc => {
-            if (cancelled) return;
-            const next = fromDeviceLocation(loc);
-            if (!acceptFix(previous.current, next)) { setErrorMsg('GPS reading rejected; waiting for a valid new fix.'); return; }
-            if (locationQuality(next) === 'live') previous.current = next;
-            setLocation(loc);
-            setNow(Date.now());
-            setErrorMsg(null);
-          },
+          onPosition,
           reason => { if (!cancelled) { stop(); setErrorMsg(`Location unavailable: ${reason}`); } }
         );
         if (cancelled) sub.remove(); else subscriber = sub;

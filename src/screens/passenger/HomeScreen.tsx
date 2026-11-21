@@ -333,15 +333,19 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
       if (locationQuality(fix) === 'live') setRideStops(trip.boarding, trip.alighting);
     }}><Text style={s.buttonText}>Use these stops</Text></TouchableOpacity>)}
   </View>);
+  const locationAction = locationFresh ? 'Center' : fix ? 'Retry GPS' : 'Enable location';
+  const locationDetail = errorMsg || (quality === 'weak'
+    ? `${locationDescription(fix, now)}. For boarding guidance, enable Precise Location and wait for accuracy within 30 m.`
+    : locationDescription(fix, now));
   const locationControl = <TouchableOpacity accessibilityRole="button"
-    accessibilityLabel={locationFresh ? 'Center on my location' : 'Enable location'}
-    accessibilityHint={errorMsg || locationDescription(fix, now)}
+    accessibilityLabel={locationFresh ? 'Center on my location' : locationAction}
+    accessibilityHint={locationDetail}
     onPress={() => locationFresh && fix ? map.current?.centerOn(fix.latitude, fix.longitude) : void enableLocation()}
     style={styles.locationRow}>
     <Ionicons name="locate-outline" size={21} color={Colors.action} />
     <View style={styles.itineraryText}><Text style={s.label}>Your location</Text>
-      <Text style={s.muted}>{errorMsg || locationDescription(fix, now)}</Text></View>
-    <Text style={styles.locationAction}>{locationFresh ? 'Center' : 'Enable location'}</Text>
+      <Text style={s.muted}>{locationDetail}</Text></View>
+    <Text style={styles.locationAction}>{locationAction}</Text>
   </TouchableOpacity>;
   const journeyControls = <View style={styles.details}>
     <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: manualOpen }} style={styles.actionRow}

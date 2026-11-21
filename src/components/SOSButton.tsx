@@ -11,6 +11,7 @@ import { passengerStyles as s } from './PassengerUI';
 import EmergencyHotlines from './EmergencyHotlines';
 import { buildEmergencyMessage, type PassengerFix } from '../services/passengerSafety';
 import { validPoint } from '../services/locationQuality';
+import { getBrowserPosition } from '../services/browserLocation';
 import { callEmergencyService, loadEmergencyContacts, type EmergencyContact } from '../services/emergencyService';
 
 type Props = {
@@ -18,6 +19,13 @@ type Props = {
   activeVehiclePlate?: string;
   activeVehicleBody?: string;
 };
+
+async function requestSosPosition() {
+  if (Platform.OS === 'web') return getBrowserPosition();
+  const permission = await Location.requestForegroundPermissionsAsync();
+  if (permission.status !== 'granted') return null;
+  return Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+}
 
 export default function SOSButton({
   activeVehicleId,
@@ -73,10 +81,8 @@ export default function SOSButton({
       let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
         const request = (async () => {
-          const permission = await Location.requestForegroundPermissionsAsync();
-          if (permission.status !== 'granted') return null;
-          const point = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
-          if (!validPoint(point.coords) || !Number.isFinite(point.timestamp) || Math.abs(Date.now() - point.timestamp) > 60_000) return null;
+          const point = await requestSosPosition();
+          if (!point || !validPoint(point.coords) || !Number.isFinite(point.timestamp) || Math.abs(Date.now() - point.timestamp) > 60_000) return null;
           return {
             latitude: point.coords.latitude,
             longitude: point.coords.longitude,

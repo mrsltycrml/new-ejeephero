@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   View,
   Text,
   StyleSheet,
@@ -32,7 +33,10 @@ type ShiftUnit = { bodyNumber: string; plateNumber: string; busyElsewhere?: bool
 
 export default function DashboardScreen() {
   const { user } = useAuth();
-  const { fix, now, foreground, errorMsg: locationError, enableLocation } = useLocation();
+  const location = useLocation();
+  const { fix, now, foreground, errorMsg: locationError, enableLocation } = location;
+  const latestLocation = useRef(location);
+  latestLocation.current = location;
   const { isConnected } = useNetwork();
   const [routes, setRoutes] = useState<any[]>([]);
   const [mapRoutes, setMapRoutes] = useState<RouteData[]>([]);
@@ -54,45 +58,48 @@ export default function DashboardScreen() {
   const [savingPassengerCount, setSavingPassengerCount] = useState(false);
   const [maxCapacity, setMaxCapacity] = useState<number | null>(null);
   const [shiftStartedAt, setShiftStartedAt] = useState<string>('Unavailable');
-  const [locationGranted, setLocationGranted] = useState<boolean>(false);
+  const [nativePermissionGranted, setNativePermissionGranted] = useState(false);
+  const locationReady = Platform.OS === 'web'
+    ? foreground && !locationError && locationQuality(fix, now) === 'live'
+    : nativePermissionGranted;
   const [passengerSheetOpen, setPassengerSheetOpen] = useState(false);
   const [endShiftSheetOpen, setEndShiftSheetOpen] = useState(false);
   const publishing = useRef(false);
   const activeVehicle = useRef<string | null>(null);
   const passengerCountPending = useRef(false);
 
-  const checkLocationPerm = useCallback(async () => {
+  const checkNativePermission = useCallback(async () => {
     try {
       const perm = await Location.getForegroundPermissionsAsync();
-      setLocationGranted(perm.status === 'granted');
+      const granted = perm.status === 'granted';
+      setNativePermissionGranted(granted);
+      return granted;
     } catch {
-      setLocationGranted(false);
+      setNativePermissionGranted(false);
+      return false;
     }
   }, []);
 
   const requestLocationPerm = async () => {
     try {
       await enableLocation();
-      const perm = await Location.getForegroundPermissionsAsync();
-      setLocationGranted(perm.status === 'granted');
-      if (perm.status === 'granted') setShiftError('');
+      if (Platform.OS === 'web' || await checkNativePermission()) setShiftError('');
     } catch {
-      setLocationGranted(false);
+      setNativePermissionGranted(false);
     }
   };
 
   useEffect(() => {
-    void checkLocationPerm();
-  }, [checkLocationPerm]);
+    if (Platform.OS !== 'web') void checkNativePermission();
+  }, [checkNativePermission]);
 
-  const startGpsTracking = useCallback(
-    async () => {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      setLocationGranted(status === 'granted');
-      if (status !== 'granted') throw new Error('Allow location access to monitor this active shift.');
+  const checkTrackingAccess = useCallback(
+    async (permissionMessage: string) => {
+      if (Platform.OS === 'web') return;
+      if (!await checkNativePermission()) throw new Error(permissionMessage);
       if (!await Location.hasServicesEnabledAsync()) throw new Error('Device location services are disabled.');
     },
-    []
+    [checkNativePermission]
   );
 
   useEffect(() => {
@@ -212,7 +219,7 @@ export default function DashboardScreen() {
       setIsActive(true);
       startAnomalyDetection(data.id);
       try {
-        await startGpsTracking();
+        await checkTrackingAccess('Allow location access to monitor this active shift.');
       } catch (error) {
         setTelemetryError(error instanceof Error ? error.message : 'GPS monitoring is paused.');
       }
@@ -220,7 +227,7 @@ export default function DashboardScreen() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, startGpsTracking]);
+  }, [user?.id, checkTrackingAccess]);
 
   const updatePassengerCount = async (nextCount: number) => {
     if (!isActive || !vehicleId || activeVehicle.current !== vehicleId || starting || passengerCountPending.current) return;
@@ -285,13 +292,10 @@ export default function DashboardScreen() {
           'This unit is already on a shift. Select another unit or ask a supervisor to end its current shift.'
         );
 
-      const permission = await Location.getForegroundPermissionsAsync();
-      setLocationGranted(permission.status === 'granted');
-      if (permission.status !== 'granted') throw new Error('Allow location access to start a live shift.');
       if (!isConnected) throw new Error('Connect to the internet before starting a shift.');
-      await startGpsTracking();
-      const measured = fix;
-      if (!measured || !foreground || locationError || locationQuality(measured) !== 'live') throw new Error('Wait for a fresh GPS fix with accuracy within 30 m before starting.');
+      await checkTrackingAccess('Allow location access to start a live shift.');
+      const { fix: measured, foreground: active, errorMsg } = latestLocation.current;
+      if (!measured || !active || errorMsg || locationQuality(measured) !== 'live') throw new Error('Wait for a fresh GPS fix with accuracy within 30 m before starting.');
       const created = await supabase
         .from('vehicles')
         .insert({
@@ -416,7 +420,7 @@ export default function DashboardScreen() {
               )}
             </View>
 
-            {locationGranted ? (
+            {locationReady ? (
               <View style={styles.locationEnabledRow}>
                 <Ionicons name="location-outline" size={20} color={Colors.brandGreen} />
                 <View style={{ flex: 1 }}>
@@ -431,7 +435,9 @@ export default function DashboardScreen() {
                   <View style={{ flex: 1, gap: 4 }}>
                     <Text style={styles.unitTitle}>Location is required</Text>
                     <Text style={styles.fieldHelper}>
-                      Allow location access to share your unit position while on duty.
+                      {Platform.OS === 'web'
+                        ? locationError || 'Allow browser location access and wait for a fresh GPS reading within 30 m accuracy.'
+                        : 'Allow location access to share your unit position while on duty.'}
                     </Text>
                   </View>
                 </View>
@@ -510,16 +516,16 @@ export default function DashboardScreen() {
             )}
             <Text style={styles.submitUnit}>{[bodyNumber, plateNumber].filter(Boolean).join(' · ') || 'Select an assigned unit'}</Text>
             <TouchableOpacity
-              style={[styles.primaryBtn, (!locationGranted || starting) && styles.disabledBtn]}
+              style={[styles.primaryBtn, (!locationReady || starting) && styles.disabledBtn]}
               onPress={toggleShift}
-              disabled={!locationGranted || starting}
+              disabled={!locationReady || starting}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !locationGranted || starting, busy: starting }}
+              accessibilityState={{ disabled: !locationReady || starting, busy: starting }}
             >
               {starting ? (
                 <ActivityIndicator color={Colors.subtleGray} />
               ) : (
-                <Text style={[styles.primaryBtnText, !locationGranted && { color: Colors.subtleGray }]}>
+                <Text style={[styles.primaryBtnText, !locationReady && { color: Colors.subtleGray }]}>
                   Start shift
                 </Text>
               )}
