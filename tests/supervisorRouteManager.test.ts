@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { setImmediate } from 'node:timers/promises';
@@ -18,6 +19,7 @@ type Reply = { data?: string | null; error?: { code: string; message: string } }
 
 async function mount(rows: Catalog, rpc: (name: string, args: Row) => Promise<Reply>) {
   const slots: any[] = [];
+  const draftIds: string[] = [];
   let cursor = 0, onMount: () => void, changes = 0;
   const react = {
     createElement: (type: any, props: any, ...children: any[]) => ({ type, props, children: children.flat(Infinity) }),
@@ -32,6 +34,7 @@ async function mount(rows: Catalog, rpc: (name: string, args: Row) => Promise<Re
   };
   const modules: Record<string, any> = {
     react: { default: react, ...react },
+    'expo-crypto': { randomUUID() { const id = randomUUID(); draftIds.push(id); return id; } },
     'react-native': { ScrollView: 'Scroll', Switch: 'Switch', Text: 'Text', TextInput: 'Input', TouchableOpacity: 'Button', View: 'View' },
     '../lib/supabase': { supabase: { rpc, from(table: keyof Catalog) {
       return { select() { return this; }, order() { return this; },
@@ -59,7 +62,7 @@ async function mount(rows: Catalog, rpc: (name: string, args: Row) => Promise<Re
     return matches[0].props;
   }
   render(); onMount!(); await setImmediate();
-  return { nodes, control, changes: () => changes,
+  return { nodes, control, draftIds, changes: () => changes,
     tap(label: string) { const button = control('Button', label); assert.ok(!button.disabled, label); button.onPress(); },
     fill(label: string, value: string) { const input = control('Input', label); assert.ok(input.editable); input.onChangeText(value); },
     toggle(label: string, value: boolean) { const toggle = control('Switch', label); assert.ok(!toggle.disabled); toggle.onValueChange(value); },
@@ -84,9 +87,10 @@ test('route and stop forms create, patch and retire the selected records through
   }
 
   ui.tap('Add route');
+  assert.equal(ui.draftIds.length, 1);
   ui.fill('Route name and direction', '  Z eastbound  ');
   const routeData = { name: 'Z eastbound', description: '', operating_hours: '', color_code: '#1F4E79', is_coming_soon: true };
-  await save('Save route', 'supervisor_save_route', { p_route_id: null, p_data: routeData }, () => {
+  await save('Save route', 'supervisor_create_catalog_item', { p_request_id: ui.draftIds[0], p_kind: 'route', p_route_id: null, p_data: routeData }, () => {
     rows.routes.push({ id: route, ...routeData }); return { data: route };
   });
   assert.equal(selected(), route, 'use the returned UUID even when another route sorts first');
@@ -99,6 +103,8 @@ test('route and stop forms create, patch and retire the selected records through
   });
 
   ui.tap('Add stop');
+  assert.equal(ui.draftIds.length, 2);
+  assert.notEqual(ui.draftIds[1], ui.draftIds[0]);
   ui.fill('Stop name', 'Market');
   ui.fill('Curbside latitude', '14.5'); ui.fill('Curbside longitude', '121.0');
   ui.fill('Location source (HTTPS)', 'https://example.invalid/pin');
@@ -114,7 +120,7 @@ test('route and stop forms create, patch and retire the selected records through
   const stopData = { name: 'Market', sequence_order: 1, latitude: 14.5, longitude: 121,
     location_source_url: 'https://example.invalid/pin', landmark_desc: 'Clock tower', boarding_side: 'North',
     stop_details_source_url: 'https://example.invalid/curb', travel_direction: 'Eastbound', entrance_instructions: 'Use the gate' };
-  await save('Save stop', 'supervisor_save_stop', { p_route_id: route, p_stop_id: null, p_data: stopData }, () => {
+  await save('Save stop', 'supervisor_create_catalog_item', { p_request_id: ui.draftIds[1], p_kind: 'stop', p_route_id: route, p_data: stopData }, () => {
     rows.terminals.push({ id: stop, route_id: route, location_verified_at: '2025-01-01', ...stopData }); return { data: stop };
   });
   assert.equal(selected(), route, 'a returned stop UUID must not become the selected route');
@@ -144,6 +150,71 @@ test('route and stop forms create, patch and retire the selected records through
   });
   assert.equal(selected(), existing);
   assert.deepEqual(ui.control('Select', 'Route').options.map((o: Row) => o.value), [existing]);
+  assert.equal(ui.draftIds.length, 2, 'only new drafts allocate request IDs');
+});
+
+test('retrying a committed route create after a lost response selects the original result', async () => {
+  const rows: Catalog = { routes: [{ id: randomUUID(), name: 'A different route' }], terminals: [] };
+  const calls: Array<[string, Row]> = [];
+  const receipts = new Map<string, string>();
+  const ui = await mount(rows, async (name, args) => {
+    calls.push([name, args]);
+    const savedId = receipts.get(args.p_request_id);
+    if (savedId) return { data: savedId };
+    const id = randomUUID();
+    rows.routes.push({ ...args.p_data, id });
+    receipts.set(args.p_request_id, id);
+    throw new TypeError('Network request failed');
+  });
+  ui.tap('Add route'); ui.fill('Route name and direction', 'Z eastbound'); ui.tap('Save route');
+  await setImmediate();
+  assert.equal(rows.routes.length, 2, 'server committed before the response was lost');
+  assert.equal(ui.changes(), 0);
+  assert.equal(ui.control('Input', 'Route name and direction').value, 'Z eastbound');
+  ui.tap('Save route'); await setImmediate();
+  assert.equal(ui.draftIds.length, 1);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0][0], 'supervisor_create_catalog_item');
+  assert.equal(calls[0][1].p_request_id, ui.draftIds[0]);
+  assert.deepEqual(calls[1], calls[0]);
+  assert.equal(rows.routes.length, 2);
+  assert.equal(ui.control('Select', 'Route').value, rows.routes[1].id);
+  assert.equal(ui.changes(), 1);
+});
+
+test('edited stop retry shows the server conflict and lets the supervisor inspect the saved stop', async () => {
+  const route = randomUUID(), stop = randomUUID();
+  const rows: Catalog = { routes: [{ id: route, name: 'Market route' }], terminals: [] };
+  const calls: Array<[string, Row]> = [];
+  const message = 'This request was already used with different data.';
+  const ui = await mount(rows, async (name, args) => {
+    calls.push([name, args]);
+    if (calls.length === 1) {
+      rows.terminals.push({ ...args.p_data, route_id: route, id: stop });
+      return { error: { code: '', message: 'Response lost' } };
+    }
+    return { error: { code: '22023', message } };
+  });
+  ui.tap('Add stop'); ui.fill('Stop name', 'Original gate');
+  ui.fill('Curbside latitude', '14.5'); ui.fill('Curbside longitude', '121');
+  ui.fill('Location source (HTTPS)', 'https://example.invalid/pin'); ui.toggle('Verified against the source', true);
+  ui.tap('Save stop'); await setImmediate();
+  ui.fill('Stop name', 'Edited gate'); ui.toggle('Verified against the source', true);
+  ui.tap('Save stop'); await setImmediate();
+  assert.equal(calls.length, 2);
+  const [rpc, first] = calls[0];
+  assert.equal(rpc, 'supervisor_create_catalog_item');
+  assert.deepEqual([first.p_request_id, first.p_kind, first.p_route_id], [ui.draftIds[0], 'stop', route]);
+  assert.deepEqual(calls[1], [rpc, { ...first, p_data: { ...first.p_data, name: 'Edited gate' } }]);
+  assert.ok(ui.nodes().includes(message));
+  assert.equal(ui.changes(), 0);
+  ui.tap('Back and refresh directory'); await setImmediate();
+  assert.equal(ui.control('Select', 'Route').value, route);
+  ui.tap('Edit stop');
+  assert.equal(ui.control('Input', 'Stop name').value, 'Original gate');
+  ui.tap('Back to route directory'); ui.tap('Add stop');
+  assert.equal(ui.draftIds.length, 2);
+  assert.notEqual(ui.draftIds[0], ui.draftIds[1]);
 });
 
 test('same-frame Save taps send one RPC and a rejected patch keeps the draft for correction', async () => {

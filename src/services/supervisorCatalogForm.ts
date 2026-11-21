@@ -22,7 +22,7 @@ export function stopForm(position: number, stop?: TerminalData) {
 
 type StopForm = ReturnType<typeof stopForm>;
 function https(value: string) {
-  try { const u = new URL(value); return u.protocol === 'https:' && !!u.hostname && !/\s/.test(value); } catch { return false; }
+  try { return /^https:\/\/[^/\s?#]+[^\s]*$/.test(value) && !!new URL(value).hostname; } catch { return false; }
 }
 
 export function stopChanges(form: StopForm, initial: StopForm, creating: boolean, maxPosition: number, verified: boolean, needsVerification = false) {
@@ -35,13 +35,15 @@ export function stopChanges(form: StopForm, initial: StopForm, creating: boolean
     if (!Number.isInteger(position) || position < 1 || position > maxPosition) throw new Error(`Enter a stop position from 1 to ${maxPosition}.`);
     data.sequence_order = position;
   }
-  const pinEdited = creating || changed('latitude') || changed('longitude') || changed('location_source_url') || (verified && needsVerification);
+  for (const [key, max] of [['latitude',90],['longitude',180]] as const) {
+    if (!creating && !changed(key)) continue;
+    const value = form[key].trim();
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value) || Math.abs(Number(value)) > max) throw new Error(`Enter a valid surveyed ${key}.`);
+    if (creating || !initial[key].trim() || Number(value) !== Number(initial[key])) data[key] = Number(value);
+  }
+  const moved = !creating && ('latitude' in data || 'longitude' in data);
+  const pinEdited = creating || moved || changed('location_source_url') || (verified && needsVerification);
   if (pinEdited) {
-    for (const [key, max] of [['latitude',90],['longitude',180]] as const) {
-      const value = form[key].trim();
-      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value) || Math.abs(Number(value)) > max) throw new Error(`Enter a valid surveyed ${key}.`);
-      data[key] = Number(value);
-    }
     if (!https(form.location_source_url.trim())) throw new Error('Enter the HTTPS source for this stop location.');
     data.location_source_url = form.location_source_url.trim();
   }
@@ -49,7 +51,6 @@ export function stopChanges(form: StopForm, initial: StopForm, creating: boolean
   for (const key of detailKeys) {
     if (changed(key)) data[key] = form[key].trim() || null;
   }
-  const moved = changed('latitude') || changed('longitude');
   const detailsEdited = detailKeys.some(key => key in data) || changed('stop_details_source_url') ||
     (moved && form.stop_details_source_url.trim() && detailKeys.some(key => form[key].trim()));
   if (detailsEdited) {

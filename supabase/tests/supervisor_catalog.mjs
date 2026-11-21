@@ -63,7 +63,9 @@ try {
   await db.exec(`create trigger vehicles_flag_incomplete_route before update of is_active on vehicles
     for each row execute function public.flag_incomplete_driver_route()`);
   await db.exec(read('./supervisor_catalog.sql'));
-  console.log('Supervisor catalog SQL regressions passed in isolated PostgreSQL.');
+  await db.exec(read('../migrations/20261121030000_idempotent_catalog_create.sql'));
+  await db.exec(read('./idempotent_catalog_create.sql'));
+  console.log('Supervisor catalog and idempotent create SQL regressions passed in isolated PostgreSQL.');
 } catch (error) {
   console.error(error.message, error.where || '', error.detail || '');
   process.exitCode = 1;

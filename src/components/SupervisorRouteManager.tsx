@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { randomUUID } from 'expo-crypto';
 import { supabase } from '../lib/supabase';
 import { realRows } from '../utils/realData';
 import type { RouteData, TerminalData } from '../services/offlineTransitService';
@@ -9,8 +10,9 @@ import { PassengerSelect, passengerStyles as s } from './PassengerUI';
 import RouteLineEditor from './RouteLineEditor';
 
 type Catalog = { routes: RouteData[]; stops: TerminalData[] };
-type Draft = { kind: 'route'; original?: RouteData; form: ReturnType<typeof routeForm> }
-  | { kind: 'stop'; original?: TerminalData; initial: ReturnType<typeof stopForm>; form: ReturnType<typeof stopForm> };
+type DraftTarget<T> = { original: T } | { original?: undefined; requestId: string };
+type Draft = (DraftTarget<RouteData> & { kind: 'route'; form: ReturnType<typeof routeForm> })
+  | (DraftTarget<TerminalData> & { kind: 'stop'; initial: ReturnType<typeof stopForm>; form: ReturnType<typeof stopForm> });
 type Retire = { kind: 'route' | 'stop'; id: string; name: string };
 
 async function currentRows<T>(table: 'routes' | 'terminals') {
@@ -53,11 +55,12 @@ export default function SupervisorRouteManager({ onBack, onChanged }: { onBack: 
   const route = catalog?.routes.find(r => r.id === id);
   const stops = catalog?.stops.filter(t => t.route_id === id) ?? [];
   const locked = busy || loading;
+  const creating = draft !== null && !draft.original;
   function edit(next: Draft | null) { setDraft(next); setRetire(null); setVerified(false); setError(''); setNotice(''); }
   function editStop(stop?: TerminalData) {
     const position = stop ? stops.findIndex(t => t.id === stop.id) + 1 : stops.length + 1;
     const initial = stopForm(position, stop);
-    edit({ kind: 'stop', original: stop, initial, form: initial });
+    edit({ kind: 'stop', ...(stop ? { original: stop } : { requestId: randomUUID() }), initial, form: initial });
   }
   async function submit() {
     if (pending.current || locked) return;
@@ -69,22 +72,28 @@ export default function SupervisorRouteManager({ onBack, onChanged }: { onBack: 
         rpc = retire.kind === 'route' ? 'supervisor_retire_route' : 'supervisor_retire_stop';
         args = retire.kind === 'route' ? { p_route_id: retire.id } : { p_stop_id: retire.id };
         message = `${retire.name} retired.`;
-      } else if (draft?.kind === 'route') {
-        const data = routeChanges(draft.form, draft.original);
+      } else if (draft && (draft.kind === 'route' || route)) {
+        const data = draft.kind === 'route' ? routeChanges(draft.form, draft.original)
+          : stopChanges(draft.form, draft.initial, !draft.original, stops.length + (draft.original ? 0 : 1), verified,
+              !!draft.original && !verifiedStop(draft.original));
         if (!Object.keys(data).length) { setNotice('No changes to save.'); return; }
-        rpc = 'supervisor_save_route'; args = { p_route_id: draft.original?.id ?? null, p_data: data };
-        message = 'Route saved.';
-      } else if (draft?.kind === 'stop' && route) {
-        const data = stopChanges(draft.form, draft.initial, !draft.original, stops.length + (draft.original ? 0 : 1), verified,
-          !!draft.original && !verifiedStop(draft.original));
-        if (!Object.keys(data).length) { setNotice('No changes to save.'); return; }
-        rpc = 'supervisor_save_stop'; args = { p_route_id: route.id, p_stop_id: draft.original?.id ?? null, p_data: data };
-        message = 'Stop saved.';
+        if (!draft.original) {
+          rpc = 'supervisor_create_catalog_item';
+          args = { p_request_id: draft.requestId, p_kind: draft.kind, p_route_id: draft.kind === 'route' ? null : id, p_data: data };
+        } else if (draft.kind === 'route') {
+          rpc = 'supervisor_save_route'; args = { p_route_id: draft.original.id, p_data: data };
+        } else {
+          rpc = 'supervisor_save_stop'; args = { p_route_id: id, p_stop_id: draft.original.id, p_data: data };
+        }
+        message = draft.kind === 'route' ? 'Route saved.' : 'Stop saved.';
       } else return;
       const result = await supabase.rpc(rpc, args);
-      if (result.error) throw new Error(result.error.code === '22023' || result.error.code === '42501' ? result.error.message :
-        'Could not confirm the change. Refresh the directory before trying again.');
-      if (rpc === 'supervisor_save_route' && typeof result.data === 'string') nextId = result.data;
+      if (result.error || (creating && (typeof result.data !== 'string' || !result.data))) {
+        if (result.error?.code === '22023' || result.error?.code === '42501') throw new Error(result.error.message);
+        throw new Error(creating ? `Could not confirm that the ${draft.kind} was added. Retry this draft or refresh the directory to check.`
+          : 'Could not confirm the change. Refresh the directory before trying again.');
+      }
+      if (draft?.kind === 'route' && typeof result.data === 'string') nextId = result.data;
       setDraft(null); setRetire(null); setNotice(message);
       await refresh(nextId); void onChanged();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not confirm the change. Refresh to check.'); }
@@ -103,8 +112,13 @@ export default function SupervisorRouteManager({ onBack, onChanged }: { onBack: 
   function confirmRetire(next: Retire) { edit(null); setRetire(next); }
   if (lineOpen && route) return <RouteLineEditor key={route.id} routes={[route]} initialRouteId={route.id}
     onBack={() => setLineOpen(false)} onPublished={async () => { await refresh(id); await onChanged(); }} />;
+  const inspectCreate = creating && !!error;
   return <ScrollView key={draft?.kind ?? 'list'} style={s.screen} contentContainerStyle={[s.content, { maxWidth: 720 }]} keyboardShouldPersistTaps="handled">
-    {button(draft || retire ? 'Back to route directory' : 'Back to fleet', () => draft || retire ? edit(null) : onBack())}
+    {button(inspectCreate ? 'Back and refresh directory' : draft || retire ? 'Back to route directory' : 'Back to fleet', () => {
+      if (!draft && !retire) return onBack();
+      edit(null);
+      if (inspectCreate) void refresh();
+    })}
     <Text accessibilityRole="header" style={s.title}>{draft ? `${draft.original ? 'Edit' : 'Add'} ${draft.kind}` : 'Manage routes and stops'}</Text>
     {draft?.kind === 'route' && <View style={s.section}>
       {([['name','Route name and direction'],['description','Description'],['operating_hours','Verified operating hours (optional)'],['color_code','Map color']] as const)
@@ -132,7 +146,7 @@ export default function SupervisorRouteManager({ onBack, onChanged }: { onBack: 
     {!draft && !retire && <>
       {loading && <Text style={s.muted}>Loading route directory…</Text>}
       {catalog && <View style={s.section}>
-        {button('Add route', () => edit({ kind:'route', form:routeForm() }), true, locked)}
+        {button('Add route', () => edit({ kind:'route', requestId:randomUUID(), form:routeForm() }), true, locked)}
         {catalog.routes.length > 0 ? <PassengerSelect label="Route" value={id} disabled={locked}
           options={catalog.routes.map(r=>({ value:r.id,label:r.name + (r.is_coming_soon ? ' · Coming soon' : '') }))}
           onSelect={v=>{ setId(v); setNotice(''); setError(''); }} /> : <Text style={s.muted}>No current routes.</Text>}
