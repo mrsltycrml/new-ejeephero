@@ -8,7 +8,12 @@ web-build/
 !.env.example
 .release/
 .impeccable/
-supabase/
+supabase/**
+!supabase/functions
+!supabase/functions/_shared
+!supabase/functions/_shared/passengerStopUse.ts
+!supabase/functions/walking-directions
+!supabase/functions/walking-directions/contract.ts
 r2-bundle/
 *-preview.png
 *.log

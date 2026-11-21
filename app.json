@@ -36,6 +36,7 @@
       "backgroundColor": "#F5F4EF"
     },
     "plugins": [
+      "./plugins/withWorkDatabaseConstructor",
       [
         "expo-location",
         {
