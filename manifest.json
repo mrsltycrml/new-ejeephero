@@ -6,7 +6,7 @@
   "id": "/new-ejeephero/",
   "scope": "/new-ejeephero/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#F5F4EF",
   "theme_color": "#13263F",
   "icons": [
