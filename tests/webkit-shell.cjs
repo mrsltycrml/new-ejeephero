@@ -142,7 +142,7 @@ async function main() {
     });
     await page.setViewportSize({ width: 844, height: 390 });
     // setViewportSize can resolve before WebKit dispatches VisualViewport.resize.
-    await page.waitForFunction(() => document.getElementById('root').offsetHeight === 390, { timeout: 3000 });
+    await page.waitForFunction(() => document.getElementById('root').offsetHeight === 390, null, { timeout: 3000 });
     near('landscape bar bottom', (await box(bar)).bottom, 390);
     near('landscape left inset', (await box(bar)).left, 47);
     near('landscape right inset', (await box(bar)).right, 797);
