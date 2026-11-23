@@ -77,10 +77,10 @@ export default function PassengerDestinationSearch({ scope, online, selectedName
 }
 
 const styles = StyleSheet.create({
-  panel: { paddingHorizontal: 16, paddingVertical: 14, gap: 10, backgroundColor: color.paper, borderRadius: 16, borderWidth: 1, borderColor: color.border, ...elevation.card },
-  panelCompact: { paddingHorizontal: 10, paddingVertical: 8, gap: 0, borderRadius: 18 },
+  panel: { paddingHorizontal: 16, paddingVertical: 14, gap: 10, backgroundColor: color.paper, borderRadius: radius.lg, borderWidth: 1, borderColor: color.border, ...elevation.card },
+  panelCompact: { paddingHorizontal: 10, paddingVertical: 6, gap: 0, borderRadius: radius.pill },
   title: { ...type.title, fontSize: 22, lineHeight: 26, color: color.ink },
-  field: { minHeight: tapTarget, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', backgroundColor: color.sand, borderWidth: 1.5, borderColor: color.border },
+  field: { minHeight: tapTarget, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', backgroundColor: color.paper },
   searchIcon: { position: 'absolute', left: 14 },
   input: { minWidth: 0, minHeight: tapTarget, flex: 1, fontSize: 16, color: color.ink, paddingVertical: 12, paddingLeft: 46, paddingRight: 12 },
   close: { width: tapTarget, minHeight: tapTarget, alignItems: 'center', justifyContent: 'center' },

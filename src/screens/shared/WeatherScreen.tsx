@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { ScreenSkeleton } from '../../components/AppUI';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import { color, radius } from '../../constants/theme';
+import { color, radius, type } from '../../constants/theme';
 import { transitStyles } from '../../constants/transitStyles';
 
 const observed = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -127,7 +127,7 @@ export default function WeatherScreen() {
               {new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}
             </Text>
           </View>
-          <Ionicons aria-hidden name={icon} size={38} color={color.signal} />
+          <Ionicons aria-hidden name={icon} size={38} color={color.actionPressed} />
         </View>
         <View style={styles.observation}>
           <Text style={styles.temp}>{Math.round(weather.main.temp)}°C</Text>
@@ -172,11 +172,11 @@ const styles = StyleSheet.create({
   container: transitStyles.content,
   masthead: { ...transitStyles.masthead, gap: 16 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { color: color.onDark, fontSize: 22, fontWeight: '700' },
-  date: { color: color.onDark, fontSize: 14, marginTop: 3 },
+  title: { ...type.display, color: color.ink },
+  date: { color: color.inkMuted, fontSize: 14, marginTop: 3 },
   observation: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 14, rowGap: 4 },
-  temp: { fontVariant: ['tabular-nums'], fontSize: 44, color: color.onDark, fontWeight: '800', letterSpacing: -1.2 },
-  condition: { fontSize: 18, fontWeight: '600', color: color.onDark, textTransform: 'capitalize' },
+  temp: { ...type.display, fontVariant: ['tabular-nums'], fontSize: 44, color: color.ink, letterSpacing: -1.2 },
+  condition: { fontSize: 18, fontWeight: '600', color: color.inkMuted, textTransform: 'capitalize' },
   advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 16, borderRadius: radius.md, borderLeftWidth: 4 },
   advisoryTitle: { fontSize: 14, fontWeight: '700' },
   advisoryText: { color: color.ink, fontSize: 14, lineHeight: 20, marginTop: 4 },

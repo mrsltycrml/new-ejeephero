@@ -33,8 +33,8 @@ export default function ServiceAccountMenu({ open, onClose, onProfile, onAbout }
 
 const styles = StyleSheet.create({
   layer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 40 },
-  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(19,38,63,0.12)' },
-  menu: { position: 'absolute', top: 64, right: 12, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 8, shadowColor: Colors.ink, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 9 },
+  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(16,36,27,0.16)' },
+  menu: { position: 'absolute', top: 64, right: 12, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 24, padding: 8, shadowColor: Colors.ink, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 9 },
   identity: { flexDirection: 'row', gap: 10, alignItems: 'center', padding: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, marginBottom: 4 },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.actionTint, alignItems: 'center', justifyContent: 'center' },
   identityText: { flex: 1 },
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   confirmBox: { padding: 10, borderTopWidth: 1, borderTopColor: Colors.border, gap: 8, marginTop: 4 },
   confirmTitle: { color: Colors.ink, fontSize: 14, fontWeight: '600' },
   confirmRow: { flexDirection: 'row', gap: 8 },
-  confirmDanger: { flex: 1, minHeight: 44, borderRadius: 10, backgroundColor: Colors.midnight, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
-  confirmDangerText: { color: Colors.paper, fontSize: 14, fontWeight: '700' },
+  confirmDanger: { flex: 1, minHeight: 44, borderRadius: 999, backgroundColor: Colors.ember, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  confirmDangerText: { color: Colors.onDark, fontSize: 14, fontWeight: '700' },
   confirmCancel: { minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
 });

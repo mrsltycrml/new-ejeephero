@@ -466,7 +466,7 @@ export default function DashboardScreen() {
           <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             <View style={styles.fieldGroup}>
               <View style={styles.setupHeader}>
-                <Ionicons aria-hidden name="bus-outline" color={color.signal} size={26} />
+                <Ionicons aria-hidden name="bus-outline" color={color.actionPressed} size={26} />
                 <Text accessibilityRole="header" style={styles.pageTitle}>Start your shift</Text>
               </View>
               <View style={styles.routeFields}>
@@ -868,7 +868,7 @@ const styles = StyleSheet.create({
   masthead: transitStyles.masthead,
   homeFill: { flex: 1, backgroundColor: color.canvas },
   mapFill: { ...StyleSheet.absoluteFill },
-  peekAction: { minHeight: 48, borderRadius: 14, backgroundColor: color.action, alignItems: 'center', justifyContent: 'center' },
+  peekAction: { minHeight: 48, borderRadius: 999, backgroundColor: color.action, alignItems: 'center', justifyContent: 'center' },
   peekActionText: { color: color.onDark, fontSize: 16, fontWeight: '700' },
   setupHeader: { ...transitStyles.masthead, borderRadius: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   routeFields: { padding: 16, gap: 8 },

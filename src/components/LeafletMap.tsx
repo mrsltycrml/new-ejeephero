@@ -254,7 +254,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #map { width: 100%; height: 100%; overflow: hidden; background-color: #edf1f3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    html, body, #map { width: 100%; height: 100%; overflow: hidden; background-color: #E8F6EE; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #map.leaflet-container { touch-action: pan-y; }
     #map.leaflet-touch-drag { touch-action: none; }
     
@@ -269,7 +269,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       width: 32px;
       height: 32px;
       border-radius: 16px;
-      background-color: #203B53;
+      background-color: #0A7A58;
       border: 2px solid #FFFFFF;
       box-shadow: 0 1px 4px rgba(22, 38, 52, 0.28);
       display: flex;
@@ -282,14 +282,16 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       transition: transform 0.2s;
     }
     .terminal-pin.selected {
-      background-color: #A62B36;
+      background-color: #065C42;
       transform: scale(1.08);
+      box-shadow: 0 0 0 3px #C8FF3B, 0 1px 4px rgba(16, 36, 27, 0.28);
       border-color: #FFFFFF;
     }
     .terminal-pin:after {
       content: ''; position: absolute; top: 28px; left: 10px;
-      border: 6px solid transparent; border-top: 9px solid #203B53;
+      border: 6px solid transparent; border-top: 9px solid #0A7A58;
     }
+    .terminal-pin.selected:after { border-top-color: #065C42; }
     .terminal-pin.landmark-pin { background-color: #965418; }
     .terminal-pin.landmark-pin:after { border-top-color: #965418; }
     .terminal-pin.safe-recommended {
@@ -312,46 +314,41 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     /* Vehicle Marker */
     .vehicle-marker-wrapper {
       display: flex;
-      flex-direction: column;
       align-items: center;
       cursor: pointer;
+      filter: drop-shadow(0 0 6px #C8FF3B) drop-shadow(0 2px 5px rgba(16, 36, 27, 0.35));
     }
     .vehicle-pill {
-      background: #FFFFFF;
-      padding: 2px 7px;
-      border-radius: 12px;
+      background: #10241B;
+      border-radius: 999px;
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 800;
       white-space: nowrap;
-      box-shadow: 0 1px 3px rgba(22, 38, 52, 0.18);
-      margin-bottom: 2px;
       display: flex;
       align-items: center;
-      gap: 4px;
-      border: 1px solid #DCE2E8;
+      box-shadow: 0 0 0 2px #C8FF3B;
+      overflow: hidden;
+      color: #FFFDF6;
+    }
+    .vehicle-pill.selected {
+      box-shadow: 0 0 0 3px #C8FF3B;
+    }
+    .vehicle-pill .vehicle-number {
+      background: #C8FF3B;
+      color: #1C3A00;
+      padding: 6px 8px;
+      font-weight: 800;
     }
     .vehicle-pill .dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
+      margin-left: 6px;
     }
-    .vehicle-icon-circle {
-      width: 28px;
-      height: 28px;
-      border-radius: 14px;
-      background: #FFFFFF;
-      border: 2px solid #A62B36;
-      box-shadow: 0 1px 4px rgba(22, 38, 52, 0.22);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      font-weight: 800;
-      color: #203B53;
-    }
-    .vehicle-icon-circle.selected {
-      outline: 3px solid #A62B36;
-      outline-offset: 2px;
+    .vehicle-pill .vehicle-status {
+      padding: 0 8px 0 5px;
+      font-weight: 700;
+      color: #FFFDF6;
     }
 
     /* User Pulse Dot */
@@ -364,9 +361,9 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       width: 14px;
       height: 14px;
       border-radius: 50%;
-      background: #2196F3;
+      background: #0A7A58;
       border: 2.5px solid #FFFFFF;
-      box-shadow: 0 0 6px rgba(33, 150, 243, 0.8);
+      box-shadow: 0 0 6px rgba(10, 122, 88, 0.8);
       position: absolute;
       top: 3px;
       left: 3px;
@@ -375,7 +372,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       width: 28px;
       height: 28px;
       border-radius: 50%;
-      background: rgba(33, 150, 243, 0.35);
+      background: rgba(10, 122, 88, 0.35);
       position: absolute;
       top: -4px;
       left: -4px;
@@ -589,10 +586,17 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         data.routes.forEach(function(route) {
           if (route.coordinates && route.coordinates.length > 0) {
             var latlngs = route.coordinates.map(function(c) { return [c.latitude, c.longitude]; });
+            var routeColor = route.isSelected ? '#0A7A58' : (route.color_code || '#0A7A58');
+            var routeWeight = route.referenceDirection === 'outbound' ? 8 : route.referenceDirection === 'inbound' ? 4 : route.isSelected ? 9 : 5;
+            L.polyline(latlngs, {
+              color: '#ffffff',
+              weight: routeWeight + 4,
+              opacity: 0.92
+            }).addTo(routesLayer);
             var p = L.polyline(latlngs, {
-              color: route.color_code || '#C41E3A',
-              weight: route.referenceDirection === 'outbound' ? 8 : route.referenceDirection === 'inbound' ? 4 : route.isSelected ? 7 : 5,
-              opacity: route.referenceDirection || route.isSelected ? 0.95 : (data.selectedRouteId ? 0.25 : 0.85)
+              color: routeColor,
+              weight: routeWeight,
+              opacity: route.referenceDirection || route.isSelected ? 0.96 : (data.selectedRouteId ? 0.25 : 0.85)
             }).addTo(routesLayer);
             var routeLabel = document.createElement('span');
             routeLabel.textContent = route.name;
@@ -602,7 +606,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         });
       }
       if (data.rideCoordinates && data.rideCoordinates.length > 1) {
-        L.polyline(data.rideCoordinates.map(function(p) { return [p.latitude, p.longitude]; }), {color:'#12734A',weight:10,opacity:1}).addTo(routesLayer);
+        L.polyline(data.rideCoordinates.map(function(p) { return [p.latitude, p.longitude]; }), {color:'#ffffff',weight:14,opacity:0.92}).addTo(routesLayer);
+        L.polyline(data.rideCoordinates.map(function(p) { return [p.latitude, p.longitude]; }), {color:'#0A7A58',weight:10,opacity:1}).addTo(routesLayer);
       }
       (data.walkingRoutes || []).forEach(function(walk) {
         var line = L.polyline(walk.coordinates.map(function(p) { return [p.latitude,p.longitude]; }), {color:'#203B53',weight:4,dashArray:'7 7'}).addTo(routesLayer);
@@ -613,7 +618,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
       for (var i = 1; i < directed.length; i += Math.max(1, Math.ceil(directed.length / 12))) {
         var a = directed[i-1], b = directed[i];
         var angle = Math.atan2((b.longitude-a.longitude)*Math.cos(a.latitude*Math.PI/180), b.latitude-a.latitude)*180/Math.PI;
-        L.marker([(a.latitude+b.latitude)/2,(a.longitude+b.longitude)/2], {interactive:false, icon:L.divIcon({className:'route-direction',html:'<span style="display:block;color:#12734A;font-size:24px;text-shadow:0 0 3px white;transform:rotate('+angle+'deg)">↑</span>',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(routesLayer);
+        L.marker([(a.latitude+b.latitude)/2,(a.longitude+b.longitude)/2], {interactive:false, icon:L.divIcon({className:'route-direction',html:'<span style="display:block;color:#0A7A58;font-size:24px;text-shadow:0 0 3px white;transform:rotate('+angle+'deg)">↑</span>',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(routesLayer);
       }
       if (window.journeyCameraKey !== data.cameraKey) {
         window.fitMapPoints(data.fitPoints);
@@ -671,12 +676,10 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           if (data.hideOccupancy) statusColor = '#B63D32';
 
           var vHtml = '<div class="vehicle-marker-wrapper">' +
-            '<div class="vehicle-pill" style="border-color:' + statusColor + '; color:' + statusColor + ';">' +
+            '<div class="vehicle-pill' + (veh.isSelected ? ' selected' : '') + '">' +
+            '<span class="vehicle-number">' + escapeHtml(veh.body_number || veh.plate_number || labels.Vehicle) + '</span>' +
             '<span class="dot" style="background-color:' + statusColor + ';"></span>' +
-            escapeHtml(veh.body_number || veh.plate_number || labels.Vehicle) + ' • ' + escapeHtml(vehicleStatusText) +
-            '</div>' +
-            '<div class="vehicle-icon-circle' + (veh.isSelected ? ' selected' : '') + '" style="border-color:' + statusColor + ';">' +
-            'EJ' +
+            '<span class="vehicle-status">' + escapeHtml(vehicleStatusText) + '</span>' +
             '</div>' +
             '</div>';
 
@@ -838,15 +841,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#f4f1ea',
+    backgroundColor: '#E8F6EE',
   },
   map: {
     flex: 1,
-    backgroundColor: '#f4f1ea',
+    backgroundColor: '#E8F6EE',
   },
   moveButton: {
     position: 'absolute', top: 8, left: 8, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center',
-    borderWidth: 1, borderColor: '#52606d', borderRadius: 8, backgroundColor: '#fff',
+    borderWidth: 1, borderColor: '#C7D9CF', borderRadius: 999, backgroundColor: '#FFFDF6',
   },
-  moveLabel: { color: '#203b53', fontSize: 14, fontWeight: '700' },
+  moveLabel: { color: '#10241B', fontSize: 14, fontWeight: '700' },
 });

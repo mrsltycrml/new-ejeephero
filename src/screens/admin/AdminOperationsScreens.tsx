@@ -1268,7 +1268,7 @@ const styles = StyleSheet.create({
     color: color.ink,
     letterSpacing: -0.4,
   },
-  topAddBtn: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: radius.md, backgroundColor: color.signal },
+  topAddBtn: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: color.volt },
   recordButton: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, minHeight: 60, paddingVertical: 10, gap: 10 },
   recordHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   selectedUnit: { backgroundColor: color.successBg },

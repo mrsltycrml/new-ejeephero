@@ -68,8 +68,8 @@ export default function DirectoryScreen() {
 
 const styles = StyleSheet.create({
   choices: { gap: 6 },
-  choice: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderWidth: 1, borderColor: color.border, borderRadius: radius.md, backgroundColor: color.paper },
-  selected: { backgroundColor: color.signal },
+  choice: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderWidth: 1, borderColor: color.border, borderRadius: radius.pill, backgroundColor: color.paper },
+  selected: { backgroundColor: color.volt },
   directory: { backgroundColor: color.paper, borderWidth: 1, borderColor: color.border, borderRadius: radius.lg, overflow: 'hidden' },
   routeHeader: { borderRadius: 0 },
   notice: { ...s.body, color: color.ink, backgroundColor: color.warningBg, padding: 16 },

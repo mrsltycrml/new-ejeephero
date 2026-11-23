@@ -90,8 +90,11 @@ test('serialized map executes safely, frames journeys, preserves camera on telem
   assert.equal(fits.length, 1);
   assert.equal(context.window.vehicleFocusKey, JSON.stringify(['selected-unit', 'first-request']));
   assert.equal(flights.length, 0);
-  assert.equal(lines[0].settings.weight, 7);
-  assert.equal(lines[0].label.textContent, name);
+  assert.equal(lines[0].settings.color, '#ffffff');
+  assert.equal(lines[0].settings.weight, 13);
+  assert.equal(lines[1].settings.color, '#0A7A58');
+  assert.equal(lines[1].settings.weight, 9);
+  assert.equal(lines[1].label.textContent, name);
   const marker = markers.find(m => m.settings.icon.className === 'custom-terminal-icon');
   marker.click();
   assert.deepEqual(messages, [{ type: 'MAP_READY' }, { type: 'SELECT_TERMINAL', id: 'stop' }]);

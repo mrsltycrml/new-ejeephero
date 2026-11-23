@@ -24,7 +24,12 @@ function loadMapLibre() {
 }
 
 const coordinates = (p: Point): [number, number] => [p.longitude, p.latitude];
-const streetStyle = 'https://tiles.openfreemap.org/styles/liberty';
+const streetStyle = 'https://tiles.openfreemap.org/styles/bright';
+const chargeTeal = '#0A7A58';
+const chargeInk = '#10241B';
+const chargeVolt = '#C8FF3B';
+const chargeVoltInk = '#1C3A00';
+const chargeEmber = '#C51A2C';
 const sourceId = 'esakay-journey';
 
 export default function MapcnPassengerMap({ data, controls, onFailure, onSelect, onPickCurb }: MapcnPassengerMapProps) {
@@ -140,10 +145,11 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
       });
     };
     for (const route of routes) {
-      addLine(route.coordinates, 'route', /^#[0-9a-f]{6}$/i.test(route.color_code) ? route.color_code : '#225ca0', route.isSelected,
-        route.referenceDirection === 'outbound' ? 8 : route.referenceDirection === 'inbound' ? 4 : undefined);
+      const official = /^#[0-9a-f]{6}$/i.test(route.color_code) ? route.color_code : chargeTeal;
+      addLine(route.coordinates, 'route', route.isSelected ? chargeTeal : official, route.isSelected,
+        route.referenceDirection === 'outbound' ? 8 : route.referenceDirection === 'inbound' ? 4 : route.isSelected ? 9 : 5);
     }
-    addLine(rideCoordinates, 'ride', '#12734a');
+    addLine(rideCoordinates, 'ride', chargeTeal, true, 10);
     for (const path of walkingRoutes) addLine(path.coordinates, 'walk', '#203b53');
     const payload = { type: 'FeatureCollection' as const, features: lines };
     const source = map.getSource<MapLibre.GeoJSONSource>(sourceId);
@@ -153,14 +159,24 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
     }
     map.addSource(sourceId, { type: 'geojson', data: payload });
     map.addLayer({
+      id: 'esakay-routes-casing', type: 'line', source: sourceId, filter: ['==', ['get', 'kind'], 'route'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': ['+', ['get', 'width'], 4], 'line-opacity': 0.92 },
+    });
+    map.addLayer({
       id: 'esakay-routes', type: 'line', source: sourceId, filter: ['==', ['get', 'kind'], 'route'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': 0.94 },
+      paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': 0.96 },
+    });
+    map.addLayer({
+      id: 'esakay-ride-casing', type: 'line', source: sourceId, filter: ['==', ['get', 'kind'], 'ride'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': 14, 'line-opacity': 0.92 },
     });
     map.addLayer({
       id: 'esakay-ride', type: 'line', source: sourceId, filter: ['==', ['get', 'kind'], 'ride'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#12734a', 'line-width': 8 },
+      paint: { 'line-color': chargeTeal, 'line-width': 10 },
     });
     map.addLayer({
       id: 'esakay-walk', type: 'line', source: sourceId, filter: ['==', ['get', 'kind'], 'walk'],
@@ -191,21 +207,20 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
   useEffect(() => {
     if (!view) return;
     const markers = terminals.map(stop => {
-      const color = stop.role === 'Landmark' || stop.role === 'Alight' ? '#a45600'
-        : stop.role === 'Curb' || stop.role === 'Board' ? '#12734a' : '#225ca0';
+      const color = stop.role === 'Landmark' || stop.role === 'Alight' ? '#a45600' : chargeTeal;
       const name = stop.id === 'draft-curb' ? label(stop.name) : stop.name;
       return addPin(view, stop, `${label(stop.role)}: ${name}`, color, stop.role === 'Landmark' ? 'L' : stop.role === 'Passenger use unconfirmed' ? 'S' : stop.role[0],
         () => select.current({ type: 'SELECT_TERMINAL', id: stop.id }), stop.isSelected ? 15 : stop.role === 'Landmark' ? 2 : 5, true);
     });
-    if (destinationPlace) markers.push(addPin(view, destinationPlace, destinationPlace.name, '#b22e39', 'D', undefined, 20));
+    if (destinationPlace) markers.push(addPin(view, destinationPlace, destinationPlace.name, chargeEmber, 'D', undefined, 20));
     return () => { markers.forEach(marker => marker.remove()); };
   }, [view, terminals, destinationPlace, label]);
 
   useEffect(() => {
     if (!view) return;
-    const markers = vehicles.map(vehicle => addPin(view, vehicle, `${vehicle.body_number || label('Vehicle')} · ${label(vehicle.quality === 'weak' ? 'Weak GPS' : 'Current GPS')}`,
-      '#244765', vehicle.body_number || 'E-jeep', () => select.current({ type: 'SELECT_VEHICLE', id: vehicle.id }), vehicle.isSelected ? 18 : 10));
-    if (userLocation) markers.push(addPin(view, userLocation, label('Your location'), '#175dcc', '●', undefined, 30));
+    const markers = vehicles.map(vehicle => addVehiclePin(view, vehicle, `${vehicle.body_number || label('Vehicle')} · ${label(vehicle.quality === 'weak' ? 'Weak GPS' : 'Current GPS')}`,
+      vehicle.body_number || 'E-jeep', () => select.current({ type: 'SELECT_VEHICLE', id: vehicle.id }), vehicle.isSelected));
+    if (userLocation) markers.push(addPin(view, userLocation, label('Your location'), chargeTeal, '●', undefined, 30));
     return () => { markers.forEach(marker => marker.remove()); };
   }, [view, vehicles, userLocation, label]);
 
@@ -237,10 +252,41 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
     vehicleFocus.current.pending = false;
   }, [view, vehicles, selectedVehicleId, vehicleSelectionKey, vehicleFocusRequestId]);
 
-  return <div style={{ position: 'absolute', inset: 0, background: '#edf1f3' }}>
+  return <div style={{ position: 'absolute', inset: 0, background: '#E8F6EE' }}>
     <div ref={containerRef} role="region" aria-label={label('eJeepHero street map')} style={{ width: '100%', height: '100%' }} />
     {!view && <span role="status" style={{ position: 'absolute', bottom: 12, left: 12 }}>{label('Loading street map…')}</span>}
   </div>;
+}
+
+
+function addVehiclePin(view: { map: MapLibre.Map; lib: MapLibrary }, point: Point, title: string, glyph: string, click?: () => void, selected = false) {
+  const element = document.createElement(click ? 'button' : 'span');
+  element.title = title;
+  Object.assign(element.style, {
+    display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', padding: '0',
+    cursor: click ? 'pointer' : 'default', zIndex: selected ? '18' : '10',
+    pointerEvents: click ? 'auto' : 'none', filter: 'drop-shadow(0 0 6px #C8FF3B) drop-shadow(0 2px 5px #10241B55)',
+  });
+  const pill = document.createElement('span');
+  Object.assign(pill.style, {
+    display: 'flex', alignItems: 'center', height: '28px', background: chargeInk,
+    borderRadius: '999px', boxShadow: selected ? '0 0 0 3px #C8FF3B' : '0 0 0 2px #C8FF3B', overflow: 'hidden',
+  });
+  const number = document.createElement('span');
+  number.textContent = glyph;
+  Object.assign(number.style, {
+    background: chargeVolt, color: chargeVoltInk, font: '800 12px/1 system-ui',
+    padding: '0 9px', height: '100%', display: 'grid', placeItems: 'center',
+  });
+  pill.appendChild(number);
+  element.appendChild(pill);
+  const marker = new view.lib.Marker({ element, anchor: 'center' }).setLngLat(coordinates(point)).addTo(view.map);
+  element.setAttribute('aria-label', title);
+  if (click) {
+    element.setAttribute('type', 'button');
+    element.addEventListener('click', event => { event.stopPropagation(); click(); });
+  }
+  return marker;
 }
 
 function addPin(view: { map: MapLibre.Map; lib: MapLibrary }, point: Point, title: string, color: string, glyph: string, click?: () => void, zIndex = 1, pin = false) {

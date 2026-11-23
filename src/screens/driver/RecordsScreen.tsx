@@ -130,11 +130,11 @@ export default function RecordsScreen() {
           <Text accessibilityRole="header" style={styles.title}>Safety records</Text>
           <View style={styles.dateNavRow}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous reporting period" onPress={() => stepPeriod(-1)} style={styles.arrowBtn}>
-              <Ionicons name="chevron-back" size={20} color={color.onDark} />
+              <Ionicons name="chevron-back" size={20} color={color.ink} />
             </TouchableOpacity>
             <Text style={styles.dateNavText}>{formatReportingPeriod(period)}</Text>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next reporting period" onPress={() => stepPeriod(1)} style={styles.arrowBtn}>
-              <Ionicons name="chevron-forward" size={20} color={color.onDark} />
+              <Ionicons name="chevron-forward" size={20} color={color.ink} />
             </TouchableOpacity>
           </View>
         </View>
@@ -230,8 +230,8 @@ const styles = StyleSheet.create({
   masthead: { ...transitStyles.masthead, borderRadius: 0 },
   title: transitStyles.heading,
   dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  arrowBtn: { width: tapTarget, minHeight: tapTarget, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: color.onDark, borderRadius: radius.sm },
-  dateNavText: { flex: 1, textAlign: 'center', fontSize: 16, color: color.onDark, fontWeight: '600' },
+  arrowBtn: { width: tapTarget, minHeight: tapTarget, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: color.border, borderRadius: radius.sm },
+  dateNavText: { flex: 1, textAlign: 'center', fontSize: 16, color: color.ink, fontWeight: '600' },
   segmentBar: { flexDirection: 'row', padding: 4, gap: 4 },
   segmentBtn: { flex: 1, minHeight: tapTarget, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
   segmentBtnActive: transitStyles.selected,

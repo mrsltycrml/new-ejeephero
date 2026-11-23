@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, Switch, Linking, StyleSheet } 
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s, PassengerSelect } from '../../components/PassengerUI';
 import { FormScrollView } from '../../components/AppUI';
-import { color, radius, tapTarget } from '../../constants/theme';
+import { color, font, radius, tapTarget } from '../../constants/theme';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from '../../contexts/LocationContext';
@@ -107,11 +107,11 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
     <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={[s.content, styles.layout]}>
       <View style={[s.heroBanner, styles.ticket]}>
         <View style={styles.headingRow}>
-          <Ionicons aria-hidden name="ticket-outline" color={color.signal} size={24} />
+          <Ionicons aria-hidden name="ticket-outline" color={color.actionPressed} size={24} />
           <Text accessibilityRole="header" style={[s.heroTitle, styles.grow]}>{t('passenger.nav.fare')}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.fare.refreshAll')} accessibilityState={{ disabled: refreshing }}
             disabled={refreshing} onPress={() => void refresh()} style={[styles.source, refreshing && { opacity: 0.6 }]}>
-            <Ionicons aria-hidden name="refresh-outline" size={18} color={color.onDark} />
+            <Ionicons aria-hidden name="refresh-outline" size={18} color={color.actionPressed} />
             <Text style={[s.label, styles.light]}>{t('passenger.fare.refresh')}</Text>
           </TouchableOpacity>
         </View>
@@ -130,7 +130,7 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
               })}</Text>
               <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(quote.source)} style={styles.source}>
                 <Text style={[s.label, styles.light]}>{t('passenger.fare.source')}</Text>
-                <Ionicons aria-hidden name="open-outline" size={16} color={color.onDark} />
+                <Ionicons aria-hidden name="open-outline" size={16} color={color.actionPressed} />
               </TouchableOpacity>
             </View>
           </> : <>
@@ -220,14 +220,14 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
 
 const styles = StyleSheet.create({
   layout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', maxWidth: 1024 },
-  ticket: { flexBasis: 300, flexGrow: 3, flexShrink: 1, minWidth: 0, gap: 12 },
+  ticket: { flexBasis: 300, flexGrow: 3, flexShrink: 1, minWidth: 0, gap: 12, backgroundColor: color.paper, padding: 20, borderRadius: radius.lg, borderWidth: 1, borderColor: color.border },
   controls: { flexBasis: 360, flexGrow: 5, flexShrink: 1, minWidth: 0, gap: 16 },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   total: { gap: 2 },
-  amount: { color: color.signal, fontSize: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  ticketDetail: { color: color.onDarkMuted, fontSize: 15, lineHeight: 21 },
-  ticketFooter: { borderTopWidth: 1, borderTopColor: color.onDarkMuted, borderStyle: 'dashed', paddingTop: 12, gap: 4 },
-  light: { color: color.onDark },
+  amount: { color: color.ink, fontFamily: font.display, fontSize: 40, fontWeight: '700', fontVariant: ['tabular-nums'], letterSpacing: -0.8 },
+  ticketDetail: { color: color.inkMuted, fontSize: 15, lineHeight: 21 },
+  ticketFooter: { borderTopWidth: 1, borderTopColor: color.border, borderStyle: 'dashed', paddingTop: 12, gap: 4 },
+  light: { color: color.actionPressed },
   source: { flexDirection: 'row', gap: 8, alignItems: 'center', minHeight: 48, alignSelf: 'flex-start' },
   segmented: { flexDirection: 'row', padding: 3, backgroundColor: color.sand, borderRadius: radius.md },
   segment: { flex: 1, minHeight: tapTarget, padding: 6, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
@@ -237,5 +237,5 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   suggestion: { borderTopWidth: 1, borderColor: color.border, paddingTop: 12, gap: 8 },
   saving: { color: color.success },
-  walkCard: { borderColor: color.signal, borderWidth: 1.5, backgroundColor: color.paper },
+  walkCard: { borderColor: color.action, borderWidth: 1.5, backgroundColor: color.paper },
 });

@@ -116,6 +116,7 @@ export const Colors = {
   signal: color.signal,
   onDark: color.onDark,
   onDarkMuted: color.onDarkMuted,
+  ember: color.ember,
   primaryRed: color.ember,
   white: color.paper,
   offWhite: color.canvas,

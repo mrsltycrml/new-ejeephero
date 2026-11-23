@@ -706,7 +706,7 @@ const styles = StyleSheet.create({
   topOverlay: { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 3 },
   floatingBar: {
     backgroundColor: color.paper,
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: color.border,
     paddingHorizontal: 8,
@@ -716,10 +716,10 @@ const styles = StyleSheet.create({
   loadingBayFloat: { top: 'auto', bottom: 228, left: 12, right: 'auto' },
   warningBanner: { position: 'absolute', left: 12, right: 12, bottom: 176, zIndex: 3 },
   warningBannerWide: { left: 'auto', right: 16, width: 420, maxWidth: '42%' },
-  warningCard: { margin: 0, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, backgroundColor: color.dangerBg },
+  warningCard: { margin: 0, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.lg, backgroundColor: color.dangerBg },
   mapMoveButton: { top: 88, left: 12, right: 'auto' },
   mapMoveButtonWide: { top: 12, left: 'auto', right: 12 },
-  peekAction: { minHeight: 48, borderRadius: 14, backgroundColor: color.action, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  peekAction: { minHeight: 48, borderRadius: radius.pill, backgroundColor: color.action, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   peekActionText: { color: color.onDark, fontSize: 16, fontWeight: '700' },
   statusSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '50%', zIndex: 2,

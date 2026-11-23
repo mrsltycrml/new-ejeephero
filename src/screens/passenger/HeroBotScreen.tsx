@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   column: { maxWidth: 640, gap: 12 },
   bubble: { gap: 6, padding: 14, maxWidth: '94%', borderRadius: radius.lg },
   incoming: { alignSelf: 'flex-start', backgroundColor: color.paper, borderWidth: 1, borderColor: color.border },
-  outgoing: { alignSelf: 'flex-end', backgroundColor: color.ink },
+  outgoing: { alignSelf: 'flex-end', backgroundColor: color.action },
   sender: { color: color.action },
   light: { color: color.onDark },
   status: { flexDirection: 'row', gap: 8, alignItems: 'center' },
@@ -124,5 +124,5 @@ const styles = StyleSheet.create({
   composer: { backgroundColor: color.paper, borderTopWidth: 1, borderColor: color.border, paddingTop: 12 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', maxWidth: 640, paddingHorizontal: 16, alignSelf: 'center' },
   iconButton: { width: tapTarget, height: tapTarget, alignItems: 'center', justifyContent: 'center' },
-  send: { backgroundColor: color.action, borderRadius: radius.md },
+  send: { backgroundColor: color.action, borderRadius: radius.pill },
 });
