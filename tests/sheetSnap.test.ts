@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nearestSheetSnap, sheetHeights, sheetSnap } from '../src/constants/sheetSnap.ts';
+import { fitSheetHeights, nearestSheetSnap, sheetHeights, sheetSnap } from '../src/constants/sheetSnap.ts';
 
 test('sheet snaps leave a peek short enough for a phone map and an expanded sheet under the screen height', () => {
   const heights = sheetHeights(844);
@@ -20,4 +20,15 @@ test('a taller peek never shrinks below the requested summary height', () => {
   const heights = sheetHeights(844, 210);
   assert.equal(heights.peek, 210);
   assert.ok(heights.half > 210);
+});
+
+test('an open sheet stops below the floating search so it can be dragged back to the map', () => {
+  // Commuter map area on a 390x844 phone: below the header, above the tab bar.
+  const area = 738;
+  const heights = fitSheetHeights(area, undefined, 96);
+  assert.ok(heights.expanded <= area - 96, 'expanded sheet must leave the top 96px (search + handle) clear');
+  assert.ok(heights.half <= heights.expanded && heights.half > heights.peek);
+  assert.equal(heights.peek, sheetSnap.peek);
+  // Tiny areas never shrink below the peek.
+  assert.equal(fitSheetHeights(150).expanded, sheetSnap.peek);
 });

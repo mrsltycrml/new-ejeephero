@@ -59,6 +59,8 @@ export const radius = {
 
 export const type = {
   display: { fontFamily: font.display, fontSize: 36, lineHeight: 42, fontWeight: '700', letterSpacing: -0.8 } satisfies TextStyle,
+  /** Detail-page headings inside cards (route names and similar long titles). */
+  headline: { fontFamily: font.display, fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.5 } satisfies TextStyle,
   title: { fontFamily: font.display, fontSize: 24, lineHeight: 30, fontWeight: '700', letterSpacing: -0.4 } satisfies TextStyle,
   body: { fontFamily: font.regular, fontSize: 16, lineHeight: 24, fontWeight: '400' } satisfies TextStyle,
   label: { fontFamily: font.bold, fontSize: 14, lineHeight: 18, fontWeight: '700' } satisfies TextStyle,

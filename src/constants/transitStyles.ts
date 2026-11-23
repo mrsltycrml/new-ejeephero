@@ -7,6 +7,10 @@ export const transitStyles = StyleSheet.create({
   panel: { backgroundColor: color.paper, borderColor: color.border, borderWidth: 1, borderRadius: radius.lg },
   masthead: { backgroundColor: 'transparent', borderRadius: 0, padding: space.lg, gap: space.xs },
   heading: { color: color.ink, ...type.display, fontSize: 36, lineHeight: 42 },
+  /** Heading for a detail card: smaller than a screen heading and allowed to wrap inside the card padding. */
+  detailHeading: { color: color.ink, ...type.headline, flexShrink: 1, minWidth: 0 },
+  /** Shared inner padding for content cards. */
+  cardBody: { paddingHorizontal: space.lg, paddingVertical: space.lg, gap: space.xs },
   description: { color: color.inkMuted, fontSize: 15, lineHeight: 22 },
   primaryButton: {
     minHeight: tapTarget, paddingHorizontal: space.md, paddingVertical: 12, borderRadius: radius.pill,

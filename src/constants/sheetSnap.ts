@@ -30,3 +30,13 @@ export function nearestSheetSnap(
     Math.abs(heights[snap] - height) < Math.abs(heights[best] - height) ? snap : best
   );
 }
+
+/**
+ * Snap heights for a sheet inside a screen area of `areaHeight`. The open sheet always stops
+ * `topClearance` below the top of that area, so floating controls and the handle stay reachable.
+ */
+export function fitSheetHeights(areaHeight: number, peek?: number, topClearance = 96): Record<SheetSnap, number> {
+  const raw = sheetHeights(areaHeight, peek);
+  const max = Math.max(raw.peek, areaHeight - topClearance);
+  return { peek: raw.peek, half: Math.min(raw.half, max), expanded: Math.min(raw.expanded, max) };
+}

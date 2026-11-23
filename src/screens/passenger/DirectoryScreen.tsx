@@ -4,7 +4,7 @@ import { View, Text, ScrollView, TouchableOpacity, RefreshControl, StyleSheet } 
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s } from '../../components/PassengerUI';
 import PassengerRouteRow from '../../components/PassengerRouteRow';
-import { color, radius, tapTarget } from '../../constants/theme';
+import { color, radius, space, tapTarget, type } from '../../constants/theme';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { confirmedPassengerUse, verifiedStop } from '../../services/routeMap';
 import { passengerMapOverview } from '../../services/passengerMapOverview';
@@ -36,8 +36,8 @@ export default function DirectoryScreen() {
         </TouchableOpacity>)}
       </View>}
       <View style={styles.directory}>
-        <View style={[s.heroBanner, styles.routeHeader]}>
-          <Text accessibilityRole="header" style={s.heroTitle}>{route?.name || t('passenger.nav.directory')}</Text>
+        <View style={[styles.cardBody, styles.routeHeader]}>
+          <Text accessibilityRole="header" style={styles.detailTitle}>{route?.name || t('passenger.nav.directory')}</Text>
           {!!route?.description && <Text style={s.heroSubtitle}>{route.description}</Text>}
           {transit.status === 'ready' && !route && <Text style={s.heroSubtitle}>{t('passenger.directory.empty')}</Text>}
         </View>
@@ -73,7 +73,9 @@ const styles = StyleSheet.create({
   directory: { backgroundColor: color.paper, borderWidth: 1, borderColor: color.border, borderRadius: radius.lg, overflow: 'hidden' },
   routeHeader: { borderRadius: 0 },
   notice: { ...s.body, color: color.ink, backgroundColor: color.warningBg, padding: 16 },
-  itinerary: { padding: 20, gap: 12 },
+  cardBody: { padding: space.lg, gap: space.xs },
+  detailTitle: { ...type.headline, color: color.ink, flexShrink: 1, minWidth: 0 },
+  itinerary: { padding: space.lg, gap: 12 },
   stopName: { ...s.body, fontWeight: '700' },
-  refresh: { minHeight: tapTarget, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: color.border, flexDirection: 'row', gap: 8, alignItems: 'center' },
+  refresh: { minHeight: tapTarget, paddingHorizontal: space.lg, borderTopWidth: 1, borderTopColor: color.border, flexDirection: 'row', gap: 8, alignItems: 'center' },
 });
