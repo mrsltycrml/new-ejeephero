@@ -1,10 +1,11 @@
 import { buendiaOutbound, buendiaInbound, oneAyalaOutbound, oneAyalaInbound } from '../constants/route1ReferenceLines.ts';
+import { buendiaRoundTripOutbound, buendiaRoundTripInbound } from '../constants/route1RoundTrip.ts';
 import type { Point } from './locationQuality.ts';
 
 export const ROUTE1_OUTBOUND_ID = '550e8400-e29b-41d4-a716-446655440000';
 export const ROUTE1_INBOUND_ID = '550e8400-e29b-41d4-a716-446655440100';
 export type Route1Direction = 'outbound' | 'inbound';
-export type Route1VariantId = 'buendia_2022' | 'one_ayala_2026';
+export type Route1VariantId = 'buendia_roundtrip' | 'buendia_2022' | 'one_ayala_2026';
 
 export interface Route1Variant {
   id: Route1VariantId;
@@ -30,6 +31,12 @@ const osm = 'https://www.openstreetmap.org';
 const points = (vertices: [number, number][]): Point[] =>
   vertices.map(([longitude, latitude]) => ({ latitude, longitude }));
 
+export const route1RoundTrip: Route1Variant = {
+  id: 'buendia_roundtrip', label: 'MRT Buendia ↔ City Hall · Trip reference',
+  source: osm + '/way/755274680', returnSource: osm + '/way/96515841',
+  outbound: points(buendiaRoundTripOutbound), inbound: points(buendiaRoundTripInbound),
+};
+
 export const route1Variants: Route1Variant[] = [
   {
     id: 'buendia_2022', label: 'Buendia MRT via Rockwell · October 2022',
@@ -41,6 +48,7 @@ export const route1Variants: Route1Variant[] = [
     source: osm + '/relation/9236380/history/59', returnSource: osm + '/relation/11611024/history/29',
     outbound: points(oneAyalaOutbound), inbound: points(oneAyalaInbound),
   },
+  route1RoundTrip,
 ];
 
 // Catalog matches are suggestions for the original outbound record only.
@@ -75,4 +83,16 @@ export const route1Pins: Route1FieldPin[] = [
   { id: 'one-ayala', name: 'One Ayala terminal', kind: 'platform', variantId: 'one_ayala_2026',
     point: { latitude: 14.5509727, longitude: 121.0281821 }, source: osm + '/node/13260869023',
     note: 'The 2026 map lists pickup toward City Hall and drop-off on the return. Verify the bay and permitted use.' },
+  { id: 'roundtrip-buendia', name: 'MRT Buendia / Zodiac Street', kind: 'landmark', variantId: 'buendia_roundtrip',
+    point: { latitude: 14.555717, longitude: 121.0353314 }, source: osm + '/node/7700479986',
+    existingStopId: '550e8400-e29b-41d4-a716-446655440001', note: 'Approximate endpoint of both traces near MRT Buendia. Confirm the exact passenger curb.' },
+  { id: 'roundtrip-nicanor', name: 'Jupiter Street / Nicanor T. Garcia Street', kind: 'landmark', variantId: 'buendia_roundtrip',
+    point: { latitude: 14.5628661, longitude: 121.0222873 }, source: osm + '/node/6576451077',
+    note: 'Both legs turn here. The intersection marks the route, not a verified passenger stop.' },
+  { id: 'roundtrip-bridge', name: 'Makati–Mandaluyong Bridge', kind: 'landmark', variantId: 'buendia_roundtrip',
+    point: { latitude: 14.5695138, longitude: 121.0319153 }, source: osm + '/way/4263551',
+    note: 'Both legs cross the Pasig on this bridge. The pin is a map reference only.' },
+  { id: 'roundtrip-city-hall', name: 'Maysilo Circle / Mandaluyong City Hall', kind: 'landmark', variantId: 'buendia_roundtrip',
+    point: { latitude: 14.5781694, longitude: 121.0344662 }, source: osm + '/node/25584004',
+    existingStopId: '550e8400-e29b-41d4-a716-446655440006', note: 'The outbound trace circles City Hall. Confirm the curb used for each direction.' },
 ];

@@ -1,7 +1,7 @@
 import type { RouteData, TerminalData } from './offlineTransitService';
 import { activeRoute, verifiedRoute, verifiedStop } from './routeMap.ts';
 import { meters } from './passengerJourney.ts';
-import { ROUTE1_INBOUND_ID, ROUTE1_OUTBOUND_ID, route1Pins, route1Variants } from './route1FieldMap.ts';
+import { ROUTE1_INBOUND_ID, ROUTE1_OUTBOUND_ID, route1Pins, route1RoundTrip, route1Variants } from './route1FieldMap.ts';
 
 export const route1DirectionColors = { outbound: '#08795B', inbound: '#C34150' };
 
@@ -12,12 +12,11 @@ export function passengerMapOverview(routes: RouteData[], stops: TerminalData[],
   const selected = selectedRouteId === ROUTE1_INBOUND_ID ? inbound : outbound ?? inbound;
   if (!selected || (selectedRouteId && selectedRouteId !== selected.id)) return null;
 
-  const variant = route1Variants.find(v => v.id === (selected.route1_variant ?? 'buendia_2022'));
+  const variant = selected.route1_variant ? route1Variants.find(v => v.id === selected.route1_variant) : route1RoundTrip;
   if (!variant) return null;
   const directions = (['outbound', 'inbound'] as const).filter(direction => {
     const route = direction === 'outbound' ? outbound : inbound;
     if (selectedRouteId) return route?.id === selectedRouteId;
-    // The October map documents both directions before the supervisor chooses an alignment.
     return !!route || (!selected.route1_variant && !verifiedRoute(selected));
   });
   const referenceLines = directions.filter(direction => {

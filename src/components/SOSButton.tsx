@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Platform, Linking, StyleSheet } from 'react-native';
-import * as Location from 'expo-location';
 import * as SMS from 'expo-sms';
 import * as Crypto from 'expo-crypto';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,9 +9,8 @@ import { Colors } from '../constants/theme';
 import { BottomSheetModal, triggerHaptic } from './AppUI';
 import { passengerStyles as s } from './PassengerUI';
 import EmergencyHotlines from './EmergencyHotlines';
-import { buildEmergencyMessage, type PassengerFix } from '../services/passengerSafety';
-import { validPoint } from '../services/locationQuality';
-import { getBrowserPosition } from '../services/browserLocation';
+import { buildEmergencyMessage } from '../services/passengerSafety';
+import { requestEmergencyFix } from '../services/emergencyLocation';
 import { callEmergencyService, loadEmergencyContacts, type EmergencyContact } from '../services/emergencyService';
 
 type Props = {
@@ -20,13 +18,6 @@ type Props = {
   activeVehiclePlate?: string;
   activeVehicleBody?: string;
 };
-
-async function requestSosPosition() {
-  if (Platform.OS === 'web') return getBrowserPosition();
-  const permission = await Location.requestForegroundPermissionsAsync();
-  if (permission.status !== 'granted') return null;
-  return Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
-}
 
 export default function SOSButton({
   activeVehicleId,
@@ -79,39 +70,9 @@ export default function SOSButton({
     setMessage('');
     setContacts([]);
 
-    const gpsPromise = (async (): Promise<PassengerFix | null> => {
-      let timeout: ReturnType<typeof setTimeout> | undefined;
-      try {
-        const request = (async () => {
-          const point = await requestSosPosition();
-          if (!point || !validPoint(point.coords) || !Number.isFinite(point.timestamp) || Math.abs(Date.now() - point.timestamp) > 60_000) return null;
-          return {
-            latitude: point.coords.latitude,
-            longitude: point.coords.longitude,
-            accuracy: point.coords.accuracy,
-            timestamp: point.timestamp,
-          };
-        })();
-        return await Promise.race([
-          request,
-          new Promise<null>((resolve) => {
-            timeout = setTimeout(() => resolve(null), 15_000);
-          }),
-        ]);
-      } catch {
-        return null;
-      } finally {
-        if (timeout) clearTimeout(timeout);
-      }
-    })();
+    const gpsPromise = requestEmergencyFix();
 
-    const contactPromise = (async () => {
-      const list = user ? await loadEmergencyContacts(user.id) : [];
-      if (run.current === current) {
-        setContacts(list);
-      }
-      return list;
-    })();
+    const contactPromise = user ? loadEmergencyContacts(user.id) : Promise.resolve([]);
 
     const deadline = Date.now() + 5000;
     const dispatch = async () => {
@@ -122,56 +83,72 @@ export default function SOSButton({
       setStatus(t('passenger.sos.locating'));
       const [point, list] = await Promise.all([gpsPromise, contactPromise]);
       if (run.current !== current) return;
+      const prepareMessages = (recipients: EmergencyContact[]) => {
+        const firstPreset = recipients[0]?.preset_message.trim() ?? '';
+        const message = firstPreset && recipients.every(contact => contact.preset_message.trim() === firstPreset)
+          ? firstPreset : t('passenger.sos.message');
+        const text = point
+          ? buildEmergencyMessage({ message, fix: point, body: vehicle.body, plate: vehicle.plate })
+          : [message, vehicle.body && t('passenger.sos.body', { unit: vehicle.body }),
+            vehicle.plate && t('passenger.sos.plate', { plate: vehicle.plate })].filter(Boolean).join('\n');
+        setContacts(recipients);
+        setMessage(text);
+        return text;
+      };
       if (!point) {
-        setMessage([list[0]?.preset_message || t('passenger.sos.message'),
-          vehicle.body && t('passenger.sos.body', { unit: vehicle.body }), vehicle.plate && t('passenger.sos.plate', { plate: vehicle.plate })].filter(Boolean).join('\n'));
+        prepareMessages(list);
         setPhase('fallback');
         setStatus(t('passenger.sos.noLocation'));
         return;
       }
-      const text = buildEmergencyMessage({
-        message: list[0]?.preset_message,
-        fix: point,
-        body: vehicle.body,
-        plate: vehicle.plate,
-      });
-      setMessage(text);
       if (!list.length) {
+        prepareMessages(list);
         setPhase('fallback');
         setStatus(t('passenger.sos.noContacts'));
         return;
       }
       if (list.every((contact) => contact.localOnly)) {
-        await openMessages(list, text, current);
+        await openMessages(list, prepareMessages(list), current);
         return;
       }
       setStatus(t('passenger.sos.sending'));
-      try {
-        const token = await getAccessToken();
-        if (run.current !== current) return;
-        const result = await callEmergencyService(token, {
-          action: 'dispatch',
-          requestId: Crypto.randomUUID(),
-          fix: point,
-          vehicleBody: vehicle.body,
-          vehiclePlate: vehicle.plate,
-        });
-        if (run.current !== current) return;
-        if (result.accepted === list.length && result.total === list.length && !list.some((contact) => contact.localOnly)) {
+      const token = await getAccessToken().catch(() => null);
+      if (run.current !== current) return;
+      if (!token) {
+        prepareMessages(list);
+        setPhase('fallback');
+        setStatus(t('passenger.sos.notSent'));
+        return;
+      }
+      const requestId = Crypto.randomUUID();
+      const result = await callEmergencyService(token, {
+        action: 'dispatch', requestId, fix: point, vehicleBody: vehicle.body, vehiclePlate: vehicle.plate,
+      }).catch(() => run.current === current
+        ? callEmergencyService(token, { action: 'dispatch:status', requestId }).catch(() => null)
+        : null);
+      if (run.current !== current) return;
+      if (result?.status === 'unavailable') {
+        await openMessages(list, prepareMessages(list), current);
+        return;
+      }
+      const local = list.filter(contact => contact.localOnly);
+      const complete = result?.status === 'complete';
+      if ((complete || result?.status === undefined) && result?.accepted > 0 && result.accepted === result.total
+        && result.total === list.length - local.length) {
+        if (!local.length) {
           setPhase('accepted');
           setStatus(t('passenger.sos.accepted'));
           return;
         }
-      } catch (err: any) {
-        if (run.current !== current) return;
-        if (err?.status === 503) {
-          await openMessages(list, text, current);
-          return;
-        }
+        prepareMessages(local);
+        setPhase('fallback');
+        setStatus(t('passenger.sos.localPending'));
+        return;
       }
-      if (run.current !== current) return;
+      const notSent = complete && result.accepted === 0 && result.total > 0;
+      prepareMessages(notSent ? list : local);
       setPhase('fallback');
-      setStatus(t('passenger.sos.unconfirmed'));
+      setStatus(t(notSent ? 'passenger.sos.notSent' : 'passenger.sos.unconfirmed'));
     };
 
     timer.current = setInterval(() => {
@@ -210,7 +187,7 @@ export default function SOSButton({
     } catch {
       if (run.current === current) {
         setPhase('fallback');
-        setStatus(t('passenger.sos.unconfirmed'));
+        setStatus(t('passenger.sos.noMessages'));
       }
     }
   };

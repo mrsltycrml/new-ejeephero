@@ -35,9 +35,10 @@ Store submissions also need signed store accounts, privacy disclosures for locat
 
 ## Objective validation
 
-- Fare estimates use route-configured base fare, included distance, and per-kilometer rate. Walk & Save compares nearby downstream stops. Test these against the current operator/LTFRB fare matrices before describing them as official fares.
-- Geofencing uses configured stop circles and current device GPS accuracy. Confirm stop coordinates and boundary radii in the field; a circle around a stop does not identify every legal or prohibited loading area.
-- Trip-cut flags are created when a shift ends away from the route endpoint or without a GPS trail. A supervisor must confirm a flag; only the third confirmed flag suspends a driver.
-- Speed events are generated server-side only when a sourced speed zone has been configured. Red map markers mean a recent event, not a live legal determination.
-- Run `load-tests/supabase-read-load.js` with k6, a dedicated approved test account, and a production-like non-production project before claiming the 500-request-per-second target. Do not run load traffic against the live commuter database without operator approval.
+- Fares use effective route-specific matrices and sourced ride distances. Load operator-approved LTFRB matrices, ride segments, and walking links before testing the fare, nearby boarding, and Walk & Save flows.
+- Waiting alerts use repeated stationary foreground GPS fixes inside sourced no-loading zones. Measure zone boundaries and verify designated stop guidance in the field.
+- Fleet accident and breakdown reports require passenger consent to share a current GPS fix. Verify the supervisor inbox, acknowledge and dispatch actions, and the resolution flow using approved staging accounts.
+- At shift close, each measured departure is checked separately against verified stop order. Uncertain trails or interrupted runs go to supervisor review. Test the operator speed cap and any configured sourced speed zones with accurate device measurements.
+- HeroBot uses the current fare matrix and verified route and stop data. A live arrival estimate requires a fresh, accurate, moving GPS fix on the verified direction. Check arrival predictions against observed arrivals in both directions.
+- Run `load-tests/supabase-read-load.js` against the passenger fleet snapshot with k6, a dedicated approved test account, and a production-like non-production project before claiming the 500-request-per-second target. Do not run load traffic against the live commuter database without operator approval.
 - Conduct field GPS tests, SMS delivery tests on real devices, integration tests against the deployed Supabase schema, and UAT/SUS with actual commuters and supervisors. These require real devices, production-like service configuration, and participants and cannot be established by a local bundle build.

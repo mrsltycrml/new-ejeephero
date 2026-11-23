@@ -2,6 +2,8 @@ import type { RouteData, TerminalData } from './offlineTransitService';
 import { meters } from './passengerJourney.ts';
 import { validPoint, type Point } from './locationQuality.ts';
 import { verifiedStop, confirmedPassengerUse, permitsPassengerUse } from '../../supabase/functions/_shared/passengerStopUse.ts';
+import { projectOntoSegment } from '../../supabase/functions/_shared/routeProjection.ts';
+export { projectOntoSegment };
 export { verifiedStop, confirmedPassengerUse, permitsPassengerUse };
 
 /** Actual routing-provider geometry, never a straight-line estimate. */
@@ -45,14 +47,6 @@ export function reconcileJourneySelection(state: JourneySelection, routes: Route
   const empty = { ...route, boardingStop: null, alightingStop: null };
   const boarding = selectJourneyStop(empty, route.boardingStop, 'boarding', routes, stops);
   return selectJourneyStop(boarding, route.alightingStop, 'alighting', routes, stops);
-}
-
-export function projectOntoSegment(a: Point, b: Point, target: Point) {
-  const scale = Math.cos(target.latitude * Math.PI / 180);
-  const dx = (b.longitude - a.longitude) * scale, dy = b.latitude - a.latitude;
-  const fraction = Math.max(0, Math.min(1, ((target.longitude - a.longitude) * scale * dx + (target.latitude - a.latitude) * dy) / (dx * dx + dy * dy || 1)));
-  const point = { latitude: a.latitude + dy * fraction, longitude: a.longitude + (b.longitude - a.longitude) * fraction };
-  return { point, fraction };
 }
 
 function projectStop(coordinates: Point[], stop: Point) {

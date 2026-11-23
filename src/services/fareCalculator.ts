@@ -1,1 +1,1 @@
-export type FarePassengerType = 'regular' | 'student' | 'senior' | 'pwd';
+export type { FarePassengerType } from '../../supabase/functions/_shared/passengerFare.ts';

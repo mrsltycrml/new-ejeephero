@@ -35,8 +35,8 @@ export default function Route1ReviewMap({ variant, direction, pins, selectedPinI
     </View>
     <View style={styles.key}>
       <Text style={styles.label}>P · Platform     L · Landmark{draftCurb || pins.some(pin => pin.kind === 'curb') ? '     C · Stop curb' : ''}</Text>
-      <Pressable accessibilityRole="link" accessibilityLabel="Open the dated OpenStreetMap route record" onPress={() => void Linking.openURL(source)}>
-        <Text style={[styles.label, styles.source]}>© OpenStreetMap contributors · Route source</Text>
+      <Pressable accessibilityRole="link" accessibilityLabel={variant.id === 'buendia_roundtrip' ? 'Open the OpenStreetMap road reference' : 'Open the dated OpenStreetMap route record'} onPress={() => void Linking.openURL(source)}>
+        <Text style={[styles.label, styles.source]}>© OpenStreetMap contributors · {variant.id === 'buendia_roundtrip' ? 'Road reference' : 'Route source'}</Text>
       </Pressable>
     </View>
   </View>;

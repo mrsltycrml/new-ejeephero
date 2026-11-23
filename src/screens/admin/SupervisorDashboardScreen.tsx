@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
 import { operationsStyles as ops } from './operationsStyles';
 import SupervisorRouteManager from '../../components/SupervisorRouteManager';
+import FleetIncidentInbox from '../../components/FleetIncidentInbox';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/theme';
 import { offlineTransit } from '../../services/offlineTransitService';
@@ -459,6 +460,7 @@ export default function SupervisorDashboardScreen() {
         </View>
 
         {!!transitNotice && <Text accessibilityRole="alert" style={styles.rowSub}>{transitNotice}</Text>}
+        <FleetIncidentInbox />
 
         <View style={ops.panel}>
           <View style={styles.kpiGrid}>

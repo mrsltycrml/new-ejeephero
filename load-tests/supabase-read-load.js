@@ -24,9 +24,9 @@ export const options = {
 
 export default function () {
   if (!baseUrl || !anonKey || !accessToken) throw new Error('Set SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_TEST_JWT.');
-  const response = http.get(`${baseUrl}/rest/v1/vehicles?select=id,route_id,is_active&is_active=eq.true&limit=100`, {
+  const response = http.get(`${baseUrl}/rest/v1/rpc/get_passenger_fleet_snapshot`, {
     headers: { apikey: anonKey, Authorization: `Bearer ${accessToken}` },
-    tags: { endpoint: 'active-vehicles' },
+    tags: { endpoint: 'passenger-fleet-snapshot' },
   });
-  check(response, { 'active vehicle list returns 200': (r) => r.status === 200 });
+  check(response, { 'passenger fleet snapshot returns 200': (r) => r.status === 200 });
 }

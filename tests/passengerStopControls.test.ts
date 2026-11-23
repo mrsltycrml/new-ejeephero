@@ -11,6 +11,7 @@ import * as passengerMapOverview from '../src/services/passengerMapOverview.ts';
 import * as quality from '../src/services/locationQuality.ts';
 import * as safety from '../src/services/passengerSafety.ts';
 import * as fare from '../src/services/passengerFare.ts';
+import * as passengerTrip from '../src/services/passengerTrip.ts';
 import * as landmarks from '../src/services/stopLandmarks.ts';
 import { manilaDateKey } from '../src/utils/reportingPeriod.ts';
 
@@ -37,7 +38,7 @@ function screen(file: string, props: Record<string, any> = {}, journeyState: Rec
       if (!(i in slots)) slots[i] = initial;
       return [slots[i], (v: any) => { slots[i] = typeof v === 'function' ? v(slots[i]) : v; }];
     },
-    useMemo: (f: any) => f(), useRef: (current: any) => ({ current }),
+    useMemo: (f: any) => f(), useRef: (current: any) => (slots[cursor++] ??= { current }),
     useEffect(effect: () => unknown, deps: unknown[]) {
       if (!options.runEffects) return;
       const i = cursor++;
@@ -49,12 +50,13 @@ function screen(file: string, props: Record<string, any> = {}, journeyState: Rec
   };
   const modules: Record<string, any> = {
     'react-i18next': { useTranslation: () => ({ t: i18n.t, i18n }) },
+    '@react-navigation/native': { useIsFocused: () => true },
     react: { ...react, default: react }, 'react-native': { View: 'View', Text: 'Text', TouchableOpacity: 'Button',
       TextInput: 'Input', ScrollView: 'ScrollView', Platform: { OS: 'web' }, StyleSheet: { create: (s: any) => s }, useWindowDimensions: () => ({ width: 400 }) },
     PassengerUI: { PassengerSelect: 'Select', passengerStyles: {} }, AppUI: { FormScrollView: 'Scroll', triggerHaptic() {} },
     PassengerJourneyContext: { usePassengerJourney: () => journeyState }, NetworkContext: { useNetwork: () => ({ isConnected: true }) },
     AuthContext: { useAuth: () => ({}) }, LocationContext: { useLocation: () => ({ fix: null, now: Date.now() }) },
-    LeafletMap: { default: 'Map' }, theme: { Colors: {} }, passengerFare: fare, passengerSafety: safety,
+    LeafletMap: { default: 'Map' }, theme: { Colors: {} }, passengerFare: fare, passengerSafety: safety, passengerTrip,
     routeMap, passengerMapOverview, locationQuality: quality, stopLandmarks: landmarks, reportingPeriod: { manilaDateKey },
     esakayOperations: { LANDMARK_REFERENCE: { date: '', stops: [] } },
     transitStyles: { transitStyles: {} }, ...options.modules,
@@ -115,6 +117,51 @@ test('the home map keeps other routes visible after choosing a boarding stop unt
   assert.deepEqual(pins(), [vehicles[0]]);
   state.fleetRouteId = null;
   assert.deepEqual(pins(), vehicles);
+});
+
+test('the main passenger map warns after a verified no-loading wait on web and vibrates once per native entry', async t => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const zone = { id: 'restricted', kind: 'no_loading', name: 'Example crossing', radius_meters: 40,
+    latitude: 14.5, longitude: 121, source_url: 'https://example.test/zones', verified_at: '2024-01-01' };
+  for (const os of ['web', 'android']) {
+    let now = Date.now(), vibrations = 0;
+    let focused = true;
+    const device = { latitude: 14.5, longitude: 121, accuracy: 5, timestamp: now, speed: 0 };
+    const state: Record<string, any> = { ...journey };
+    const home = screen('../src/screens/passenger/HomeScreen.tsx', {}, state, { runEffects: true, modules: {
+      'react-native': { View: 'View', Text: 'Text', TouchableOpacity: 'Button', ScrollView: 'ScrollView',
+        StyleSheet: { create: (s: any) => s }, Platform: { OS: os }, useWindowDimensions: () => ({ width: 400, height: 800 }),
+        Vibration: { vibrate: () => { vibrations++; } } },
+      '@react-navigation/native': { useIsFocused: () => focused },
+      LocationContext: { useLocation: () => ({ fix: { ...device }, foreground: true, now, quality: 'live' }) },
+      passengerDataService: { loadLoadingZones: async () => [zone] },
+    } });
+    home(); await Promise.resolve();
+    const warning = () => {
+      home();
+      return home().find(node => node.props.accessibilityRole === 'alert' && node.children.includes('No loading in this area'));
+    };
+    const sample = (ms: number) => { now += ms; device.timestamp = now; return warning(); };
+    assert.equal(warning(), undefined);
+    assert.equal(sample(7000), undefined);
+    assert.ok(sample(8000));
+    assert.equal(vibrations, os === 'web' ? 0 : 1);
+    assert.ok(sample(1000));
+    assert.equal(vibrations, os === 'web' ? 0 : 1);
+    focused = false;
+    assert.equal(warning(), undefined);
+    focused = true;
+    device.longitude = 121.001;
+    assert.equal(sample(1000), undefined);
+    device.longitude = 121;
+    assert.equal(sample(1000), undefined);
+    assert.equal(sample(7000), undefined);
+    assert.ok(sample(8000));
+    assert.equal(vibrations, os === 'web' ? 0 : 2);
+    state.unit = { vehicle_id: 'vehicle', body_number: 'Fixture unit', route_id: 'r' };
+    assert.equal(sample(1000), undefined);
+    assert.equal(vibrations, os === 'web' ? 0 : 2);
+  }
 });
 
 function selectControl(props: Record<string, any>) {
@@ -201,10 +248,19 @@ test('the Fares tab quotes selected stops, changes category directly, and applie
     showWalk: (w: any) => { appliedWalk = w; return true; } };
   const render = screen('../src/screens/passenger/FareScreen.tsx', { navigation: { navigate: (tab: string) => { map = tab; } } }, state,
     { runEffects: true, modules: { passengerDataService: { loadPassengerFareMatrices: async () => [table],
-      loadPassengerRideSegments: async () => path, loadPassengerWalkLinks: async () => [walk] } } });
+      loadPassengerRideSegments: async () => path, loadPassengerWalkLinks: async () => [walk] },
+      LocationContext: { useLocation: () => ({ fix: { ...later, timestamp: Date.now(), accuracy: 5 }, now: Date.now(), foreground: true }) } } });
   render(); await Promise.resolve();
-  tapDirectOption(render(), 'Boarding stop', origin.name);
   tapDirectOption(render(), 'Alighting stop', exit.name);
+  const nearbyLabel = 'Use nearby boarding stop · ' + later.name;
+  const suggested = buttonWithText(render(), nearbyLabel);
+  assert.ok(suggested);
+  assert.equal(state.boardingStop, null);
+  suggested.props.onPress();
+  assert.equal(state.boardingStop.id, later.id);
+  assert.match(screenText(render()), /₱15\.00/);
+  tapDirectOption(render(), 'Boarding stop', origin.name);
+  assert.equal(buttonWithText(render(), nearbyLabel), undefined);
   assert.match(screenText(render()), /₱20\.00/);
   tapDirectOption(render(), 'Passenger category', 'Student');
   assert.match(screenText(render()), /₱16\.00/);

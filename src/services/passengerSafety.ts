@@ -1,4 +1,5 @@
 import { permitsPassengerUse } from '../../supabase/functions/_shared/passengerStopUse.ts';
+import { validSource } from '../../supabase/functions/walking-directions/contract.ts';
 import type { TerminalData } from './offlineTransitService';
 import type { TFunction } from 'i18next';
 
@@ -12,9 +13,11 @@ export type LoadingZone = {
 };
 export type PassengerFix = { latitude: number; longitude: number; accuracy: number | null; timestamp: number };
 export type BoardingStatus = { kind: 'unavailable' | 'uncertain' | 'allowed' | 'prohibited' | 'outside'; title: string; detail: string; zone?: LoadingZone };
+type WaitingFix = PassengerFix & { speed: number | null };
+export type NoLoadingWait = { zoneId: string; first: WaitingFix; last: WaitingFix; readings: number; waiting: boolean };
 
-export function isVerifiedLoadingZone(zone: LoadingZone) {
-  return /^https:\/\//.test(zone.source_url) && Number.isFinite(Date.parse(zone.verified_at))
+export function isVerifiedLoadingZone(zone: LoadingZone, now = Date.now()) {
+  return validSource(zone.source_url, zone.verified_at, now) && Date.parse(zone.verified_at) <= now
     && Number.isFinite(zone.latitude) && Math.abs(zone.latitude) <= 90
     && Number.isFinite(zone.longitude) && Math.abs(zone.longitude) <= 180
     && Number.isFinite(zone.radius_meters) && zone.radius_meters > 0 && zone.radius_meters <= 500;
@@ -25,6 +28,30 @@ export function distanceMeters(a: { latitude: number; longitude: number }, b: { 
   const h = Math.sin(rad(b.latitude - a.latitude) / 2) ** 2
     + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(rad(b.longitude - a.longitude) / 2) ** 2;
   return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function reliableWaitingFix(fix: WaitingFix | null, now: number): fix is WaitingFix & { accuracy: number } {
+  return !!fix && Number.isFinite(fix.latitude) && Math.abs(fix.latitude) <= 90 &&
+    Number.isFinite(fix.longitude) && Math.abs(fix.longitude) <= 180 &&
+    fix.accuracy != null && Number.isFinite(fix.accuracy) && fix.accuracy >= 0 && fix.accuracy <= 15 &&
+    Number.isFinite(fix.timestamp) && fix.timestamp >= now - 15_000 && fix.timestamp <= now + 5000;
+}
+
+export function outsideLoadingZone(zone: LoadingZone, fix: WaitingFix | null, now: number) {
+  return reliableWaitingFix(fix, now) && distanceMeters(fix, zone) - fix.accuracy > zone.radius_meters;
+}
+
+export function trackNoLoadingWait(previous: NoLoadingWait | null, zone: LoadingZone | null, fix: WaitingFix | null, now: number): NoLoadingWait | null {
+  if (!zone || zone.kind !== 'no_loading' || !isVerifiedLoadingZone(zone, now) || !reliableWaitingFix(fix, now) ||
+      distanceMeters(fix, zone) + fix.accuracy > zone.radius_meters ||
+      (fix.speed != null && (!Number.isFinite(fix.speed) || fix.speed < 0 || fix.speed > 1.5))) return null;
+  if (previous?.zoneId === zone.id && fix.timestamp <= previous.last.timestamp) return previous;
+  if (previous?.zoneId !== zone.id || fix.timestamp - previous.last.timestamp > 10_000 ||
+      distanceMeters(fix, previous.first) > 10) {
+    return { zoneId: zone.id, first: fix, last: fix, readings: 1, waiting: false };
+  }
+  const readings = previous.readings + 1;
+  return { ...previous, last: fix, readings, waiting: readings >= 3 && fix.timestamp - previous.first.timestamp >= 15_000 };
 }
 
 export function evaluateBoardingLocation(fix: PassengerFix | null, zones: LoadingZone[], now = Date.now(), stops: TerminalData[] = [], t?: TFunction): BoardingStatus {
@@ -42,7 +69,7 @@ function boardingAt(fix: PassengerFix | null, zones: LoadingZone[], now: number,
   if (!Number.isFinite(fix.latitude) || !Number.isFinite(fix.longitude) || Math.abs(fix.latitude) > 90 || Math.abs(fix.longitude) > 180 || fix.accuracy == null || !Number.isFinite(fix.accuracy) || fix.accuracy < 0 || fix.accuracy > 30) {
     return { kind: 'uncertain', title: 'Checking your location', detail: 'The GPS signal is not precise enough yet. Follow the signs at your stop.' };
   }
-  const verified = zones.filter(isVerifiedLoadingZone);
+  const verified = zones.filter(zone => isVerifiedLoadingZone(zone, now));
   if (!verified.length) return { kind: 'unavailable', title: 'Follow designated loading signs', detail: 'Loading-area coverage is not available here yet. Wait at a marked eSAKAY stop.' };
   const candidates = verified.map(zone => ({ zone, distance: distanceMeters(fix, zone) }));
   const prohibited = candidates.find(x => x.zone.kind === 'no_loading' && x.distance + fix.accuracy! <= x.zone.radius_meters);

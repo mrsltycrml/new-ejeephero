@@ -17,7 +17,7 @@ try {
       $$select current_setting('request.jwt.claims',true)::jsonb$$;
     create table public.profiles(id uuid primary key, clerk_id text, role text, status text, is_admin boolean);
   `);
-  for (const table of ['routes','terminals','vehicles','vehicle_positions','trip_violations']) {
+  for (const table of ['routes','terminals','vehicles','vehicle_positions','trip_violations','road_speed_limits','speed_events']) {
     const ddl = readiness.split('create table if not exists public.' + table + ' (')[1].split('\n);')[0];
     await db.exec('create table public.' + table + ' (' + ddl + '\n);');
   }
@@ -36,7 +36,9 @@ try {
     alter table trip_violations add column body_number text, add column plate_number text,
       add column missed_stops text[] not null default '{}', add column auto_confirmed boolean not null default false,
       add column violation_type text not null default 'trip_cutting';
-    alter table vehicle_positions add column accuracy double precision, add column captured_at timestamptz;
+    alter table speed_events alter speed_limit_id drop not null, add column route_id uuid, add column speed_limit_kph numeric,
+      add column body_number text, add column plate_number text, add column zone_label text,
+      add column zone_source_url text, add column policy_type text;
     alter table routes enable row level security;
     alter table terminals enable row level security;
     alter table vehicles enable row level security;
@@ -53,6 +55,9 @@ try {
     security.indexOf('grant select on public.speed_events')));
   const planning = read('../migrations/20261027130000_passenger_safety_and_fares.sql');
   await db.exec(planning.split('-- Emergency requests')[0]);
+  await db.exec(read('../migrations/20261118020000_measured_gps_quality.sql'));
+  await db.exec(`create trigger vehicle_positions_detect_speeding after insert on public.vehicle_positions
+    for each row execute function public.detect_speeding_position()`);
   await db.exec(read('../migrations/20261118030000_walking_directions.sql'));
   await db.exec(read('../migrations/20261118040000_live_route_deviations.sql'));
   await db.exec(read('../migrations/20261121010000_route_deviation_evidence_window.sql'));
@@ -70,6 +75,8 @@ try {
   await db.exec(`insert into routes(id,name) values ('550e8400-e29b-41d4-a716-446655440000','Existing Route 1')`);
   await db.exec(read('../migrations/20261121040000_route1_activation.sql'));
   await db.exec(read('../migrations/20261121050000_catalog_route_names.sql'));
+  await db.exec(read('../migrations/20261123040000_route1_buendia_roundtrip.sql'));
+  await db.exec(read('../migrations/20261123060000_directional_trip_compliance.sql'));
   await db.exec(read('./supervisor_catalog.sql'));
   await db.exec(read('./idempotent_catalog_create.sql'));
   await db.exec(read('./route1_activation.sql'));
@@ -91,6 +98,8 @@ try {
   await db.exec(read('./supervisor_controls.sql'));
   await db.exec(read('../migrations/20261122010000_positions_require_in_service_route.sql'));
   await db.exec(read('./position_route_status.sql'));
+  await db.exec(read('./driver_trip_compliance.sql'));
+  console.log('Measured trip cutting and speeding SQL regressions passed in isolated PostgreSQL.');
   console.log('Driver position route-status SQL regressions passed in isolated PostgreSQL.');
   console.log('Supervisor visibility and force-end SQL regressions passed in isolated PostgreSQL.');
   console.log('Supervisor catalog, idempotent create, Route 1 and duplicate route name SQL regressions passed in isolated PostgreSQL.');

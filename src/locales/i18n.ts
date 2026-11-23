@@ -45,9 +45,9 @@ export const initializeLanguage = async () => {
 // Function to change language and persist it
 export const changeLanguage = async (lang: string) => {
   if (lang !== 'en' && lang !== 'fil') return;
+  await AsyncStorage.setItem('app_language', lang);
   languageChosen = true;
   await i18next.changeLanguage(lang);
-  await AsyncStorage.setItem('app_language', lang);
 };
 
 export default i18next;

@@ -1,16 +1,9 @@
+import { manilaDateKey } from '../../supabase/functions/_shared/manilaDate.ts';
+export { manilaDateKey };
+
 export type ReportingPeriod = { mode: 'day' | 'week' | 'month' | 'year'; key: string };
 
-const MANILA_TIME_ZONE = 'Asia/Manila';
 const pad = (value: number) => String(value).padStart(2, '0');
-
-export function manilaDateKey(value: Date): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: MANILA_TIME_ZONE,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(value);
-  const part = (type: string) => parts.find((item) => item.type === type)?.value || '';
-  return `${part('year')}-${part('month')}-${part('day')}`;
-}
 
 export function weekStartKey(dateKey: string): string {
   const [year, month, day] = dateKey.split('-').map(Number);

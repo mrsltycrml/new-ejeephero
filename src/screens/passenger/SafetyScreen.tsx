@@ -7,6 +7,7 @@ import { passengerStyles as s } from '../../components/PassengerUI';
 import { BottomSheetModal, FormScrollView, triggerHaptic } from '../../components/AppUI';
 import EmergencyHotlines from '../../components/EmergencyHotlines';
 import SOSButton from '../../components/SOSButton';
+import FleetIncidentReporter from '../../components/FleetIncidentReporter';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { readEmergencyContacts, saveEmergencyContact, removeEmergencyContact, type EmergencyContact } from '../../services/emergencyService';
@@ -152,6 +153,7 @@ export default function SafetyScreen({ route }: { route?: { params?: { section?:
       <Text style={s.heroSubtitle}>{unit ? [t('passenger.safety.linked', { unit: unit.body_number }),
         unit.plate_number && t('passenger.safety.plate', { plate: unit.plate_number })].filter(Boolean).join(' · ') : t('passenger.safety.noUnit')}</Text>
     </View>
+    {user && <FleetIncidentReporter key={user.id} vehicleId={unit?.vehicle_id} />}
     {!contactsFirst && contacts}
     <View style={s.section}><EmergencyHotlines /></View>
   </FormScrollView>;

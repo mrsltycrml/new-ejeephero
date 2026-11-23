@@ -14,6 +14,7 @@ import { findVerifiedSavings, quotePassengerFare, validFareMatrix, verifiedRideD
 import type { FarePassengerType } from '../../services/fareCalculator';
 import { manilaDateKey } from '../../utils/reportingPeriod';
 import { passengerStopOptions } from '../../services/routeMap';
+import { nearbyFareBoardingStop } from '../../services/passengerTrip';
 
 const TYPES: FarePassengerType[] = ['regular', 'student', 'senior', 'pwd'];
 const peso = (amount: number) => `₱${amount.toFixed(2)}`;
@@ -34,7 +35,7 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
   const { transit, refreshTransit, selectedRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setAlightingStop, destinationPlace, showWalk, getJourneyVersion } = usePassengerJourney();
   const journeyVersion = getJourneyVersion();
   const { user } = useAuth();
-  const { now } = useLocation();
+  const { now, fix, foreground, errorMsg } = useLocation();
   const matrices = usePlanningRows(loadPassengerFareMatrices, transit, user?.id);
   const segments = usePlanningRows(loadPassengerRideSegments, transit, user?.id);
   const walks = usePlanningRows(loadPassengerWalkLinks, transit, user?.id);
@@ -57,6 +58,9 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
     : boardingStop && alightingStop && route && segments && boardingStop.sequence_order < alightingStop.sequence_order
       ? verifiedRideDistance(boardingStop.id, alightingStop.id, route.id, segments, stops) : null;
   const quote = route && km != null ? quotePassengerFare(km, type, route, matrix, today) : null;
+  const nearbyBoarding = mode === 'stops' && !boardingStop && alightingStop && segments &&
+    transit.status === 'ready' && !refreshing && foreground && !errorMsg
+    ? nearbyFareBoardingStop(fix, now, alightingStop, stops, segments) : null;
   const savings = !refreshing && mode === 'stops' && route && boardingStop && alightingStop && matrices && segments && walks
     ? findVerifiedSavings({ originId: boardingStop.id, destinationId: alightingStop.id, routeId: route.id, type, stops,
       segments, walks, matrix, stepFreeOnly: stepFree, maxWalkMeters: maxWalk, date: today }) : null;
@@ -155,6 +159,11 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
             <PassengerSelect label={t('passenger.home.dropStop')} value={alightingStop?.id || ''} inline={alightingOptions.length <= 3} emptyLabel={stopPrompt(false)}
               options={[...alightingOptions.map(stop => ({ value: stop.id, label: stop.name })), ...(alightingStop ? [{ value: '', label: t('passenger.fare.clearDrop') }] : [])]}
               onSelect={id => setAlightingStop(alightingOptions.find(stop => stop.id === id) || null)} />
+            {nearbyBoarding && <TouchableOpacity accessibilityRole="button" style={s.input}
+              onPress={() => setBoardingStop(nearbyBoarding.stop)}>
+              <Text style={s.label}>{t('passenger.fare.useNearbyBoarding', { stop: nearbyBoarding.stop.name })}</Text>
+              <Text style={s.muted}>{t('passenger.fare.nearbyStraightLine', { distance: Math.round(nearbyBoarding.distance) })}</Text>
+            </TouchableOpacity>}
             {destinationPlace && <Text style={s.muted}>{t('passenger.fare.destinationCoverage', { place: destinationPlace.name })}</Text>}
           </> : <View style={styles.field}>
             <Text style={s.label}>{t('passenger.fare.distanceKm')}</Text>

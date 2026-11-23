@@ -14,15 +14,17 @@ if (Platform.OS !== 'web') {
 }
 
 let accelerometerSubscription: { remove: () => void } | null = null;
+let sensorGeneration = 0;
 let lastAnomalyTimestamp = 0;
 const ANOMALY_COOLDOWN_MS = 15_000;
 
 export const startAnomalyDetection = async (vehicleId: string) => {
   if (Platform.OS === 'web' || accelerometerSubscription) return;
+  const generation = sensorGeneration;
 
   try {
     const available = await Accelerometer.isAvailableAsync();
-    if (!available || accelerometerSubscription) return;
+    if (!available || generation !== sensorGeneration || accelerometerSubscription) return;
 
     Accelerometer.setUpdateInterval(500);
     accelerometerSubscription = Accelerometer.addListener(async ({ x, y, z }) => {
@@ -41,6 +43,7 @@ export const startAnomalyDetection = async (vehicleId: string) => {
 };
 
 export const stopAnomalyDetection = () => {
+  sensorGeneration++;
   if (accelerometerSubscription) {
     accelerometerSubscription.remove();
     accelerometerSubscription = null;

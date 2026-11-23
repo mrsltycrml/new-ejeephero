@@ -14,6 +14,8 @@ let readOverride: ((table: string) => Promise<any>) | null = null;
 let serverPageSize = 1000;
 let writeOverride: (() => Promise<void>) | null = null;
 let fleet: any[] = [];
+let fleetSnapshot: unknown;
+const rpcNames: string[] = [];
 const published: any[] = [];
 const routeProjections:string[] = [];
 const storage = { getItem: async (key: string) => {
@@ -25,7 +27,11 @@ const storage = { getItem: async (key: string) => {
   cache.set(key, value);
 } };
 const database = {
-  rpc: async () => ({ data: failed ? null : fleet, error: failed ? { message: 'offline' } : null }),
+  rpc: async (name: string) => {
+    rpcNames.push(name);
+    return { data: failed ? null : name === 'get_passenger_fleet_snapshot' ? fleetSnapshot : fleet,
+      error: failed ? { message: 'offline' } : null };
+  },
   from(table: string) {
     let start = 0, end = Infinity, columns = '*';
     let maxRows = serverPageSize;
@@ -35,13 +41,6 @@ const database = {
     const filter = (predicate: (row: any) => boolean) => { filters.push(predicate); return query; };
     function rows() {
       let result = tables[table] ?? [];
-      if (table === 'vehicle_positions') {
-        result = result.map((row, i) => ({ id: String(i).padStart(6, '0'), ...row }));
-        if (columns.includes('vehicles!inner(*)')) {
-          const vehicles = new Map(tables.vehicles.map(v => [v.id, v]));
-          result = result.filter(row => vehicles.has(row.vehicle_id)).map(row => ({ ...row, vehicles: vehicles.get(row.vehicle_id) }));
-        }
-      }
       result = result.filter(row => filters.every(predicate => predicate(row)));
       if (sortKey) result.sort((a, b) => (a[sortKey] < b[sortKey] ? -1 : a[sortKey] > b[sortKey] ? 1 : 0) * (ascending ? 1 : -1));
       return result.slice(start, Math.min(end + 1, start + maxRows)).map(row =>
@@ -89,6 +88,8 @@ test.beforeEach(() => {
   offlineTransit = Reflect.construct(OfflineTransitService, []);
   cache.clear(); tables = {}; failed = false; cacheWriteFailed = false; cacheReadFailed = false;
   routeProjections.length=0;
+  fleetSnapshot = null;
+  rpcNames.length = 0;
   readOverride = null; writeOverride = null;
   serverPageSize = 1000;
 });
@@ -260,84 +261,22 @@ test('overlapping cache persistence is serialized and the final disk snapshot is
   }
 });
 
-test('live fleet excludes sample database vehicles and preserves missing telemetry as unknown', async () => {
-  tables = { routes:[route], vehicles: [{ id: 'real', route_id:route.id, is_active: true, body_number: 'REAL', plate_number: 'TEST-1' }, { id: 'sample', route_id:route.id, is_sample: true, is_active: true }], vehicle_positions: ['real', 'sample'].map(vehicle_id => ({ vehicle_id, latitude: 14.6, longitude: 121.1, speed: null, heading: null, timestamp: new Date().toISOString(), captured_at: new Date().toISOString() })) };
-  const result = await offlineTransit.getVehicles();
-  assert.deepEqual(result.map(row => row.vehicle_id), ['real']);
-  assert.equal(result[0].speed, null);
-  assert.equal(result[0].passenger_count, null);
-  assert.equal(result[0].status, null);
-  assert.equal(result[0].accuracy, null);
-  assert.equal(result[0].recorded_at, tables.vehicle_positions[0].captured_at);
-});
-
-test('vehicle loader retains capture accuracy and km/h but drops stale and legacy positions', async () => {
-  const captured_at = new Date(Date.now() - 5000).toISOString();
-  tables = { routes:[route], vehicles: [{ id: 'v', route_id:route.id, is_active: true }], vehicle_positions: [{ vehicle_id: 'v', latitude: 14.6, longitude: 121, speed: 18, heading: 90, accuracy: 7, timestamp: new Date().toISOString(), captured_at }] };
-  const [vehicle] = await offlineTransit.getVehicles();
-  assert.equal(vehicle.speed, 18);
-  assert.equal(vehicle.accuracy, 7);
-  assert.equal(vehicle.recorded_at, captured_at);
-  tables.vehicle_positions[0].captured_at = new Date(Date.now() - 60000).toISOString();
-  assert.deepEqual(await offlineTransit.getVehicles(), []);
-  delete tables.vehicle_positions[0].captured_at;
-  assert.deepEqual(await offlineTransit.getVehicles(), []);
-});
-
-test('a busy unit and server page caps cannot crowd other shifts off the passenger map', async () => {
-  const now = Date.now();
-  const stamp = new Date(now - 1000).toISOString();
-  const fix = { latitude: 14.6, longitude: 121, timestamp: stamp, captured_at: stamp };
-  const vehicles = Array.from({ length: 1001 }, (_, i) => ({ id: 'v' + i, is_active: true, route_id: i % 2 ? 'b' : route.id }));
-  const older = new Date(now - 5000).toISOString();
-  tables = {
-    routes: [route, { ...route, id: 'b' }], vehicles,
-    vehicle_positions: [
-      ...Array.from({ length: 320 }, () => ({ ...fix, vehicle_id: 'v0' })),
-      ...vehicles.map(v => ({ ...fix, vehicle_id: v.id, latitude: 14.5, captured_at: older })),
+test('passenger fleet uses one RPC, retains empty routes and preserves unknown measurements', async () => {
+  const recorded_at = '2026-11-23T00:00:00Z';
+  fleetSnapshot = {
+    route_ids: [route.id, 'empty-route'], catalog_version: '9007199254740993',
+    vehicles: [
+      { id: 'weak', route_id: route.id, latitude: 14.6, longitude: 121, recorded_at, accuracy: null, speed: null },
+      { id: 'live', route_id: route.id, latitude: 14.6, longitude: 121, recorded_at, accuracy: 7, speed: 18,
+        heading: 90, passenger_count: 9, max_capacity: 10 },
     ],
   };
-  serverPageSize = 200;
-  const result = await offlineTransit.getVehicles();
-  assert.deepEqual(new Set(result.map(v => v.id)), new Set(vehicles.map(v => v.id)));
-  assert.equal(result.length, vehicles.length);
-  assert.equal(result.find(v => v.id === 'v0')?.latitude, 14.6);
-});
-
-test('the next fleet read replaces moved units and drops ended, invalid, stale and sample-only fixes', async () => {
-  const now = Date.now();
-  const stamp = new Date(now - 5000).toISOString();
-  const ids = ['moving', 'ended', 'off', 'deleted', 'bad', 'old', 'future', 'sample-only'];
-  tables = {
-    routes: [route], vehicles: ids.map(id => ({ id, route_id: route.id, is_active: true })),
-    vehicle_positions: ids.map(vehicle_id => ({ vehicle_id, latitude: 14.6, longitude: 121, captured_at: stamp, timestamp: stamp })),
-  };
-  assert.equal((await offlineTransit.getVehicles()).length, ids.length);
-  const measured = new Date(now).toISOString();
-  tables.vehicle_positions.push({ ...tables.vehicle_positions[0], latitude: 14.61, captured_at: measured });
-  tables.vehicles[1].ended_at = measured;
-  tables.vehicles[2].is_active = false;
-  tables.vehicles[3].deleted_at = measured;
-  tables.vehicle_positions[4].longitude = 181;
-  tables.vehicle_positions[5].captured_at = new Date(now - 31_000).toISOString();
-  tables.vehicle_positions[6].captured_at = new Date(now + 60_000).toISOString();
-  tables.vehicle_positions[7].is_sample = true;
-  const result = await offlineTransit.getVehicles();
-  assert.deepEqual(result.map(v => [v.id, v.latitude, v.recorded_at]), [['moving', 14.61, measured]]);
-});
-
-test('the live fleet omits upcoming, archived and missing routes even with fresh vehicle positions',async()=>{
-  const stamp=new Date().toISOString();
-  const ids=['regular','upcoming','archived','missing'];
-  tables={
-    routes:ids.slice(0,3).map(id=>({...route,id,is_coming_soon:id==='upcoming',is_archived:id==='archived'})),
-    vehicles:ids.map(id=>({id,route_id:id,is_active:true})),
-    vehicle_positions:ids.map(vehicle_id=>({vehicle_id,latitude:14.6,longitude:121,accuracy:8,timestamp:stamp,captured_at:stamp})),
-  };
-  assert.deepEqual((await offlineTransit.getVehicles()).map(v=>v.id),['regular']);
-  tables.routes[0].is_coming_soon=true;
-  assert.deepEqual(await offlineTransit.getVehicles(),[]);
-  assert.deepEqual(routeProjections,['*','id,is_archived,is_coming_soon,is_active']);
+  const result = await offlineTransit.getPassengerFleetSnapshot();
+  assert.deepEqual(rpcNames, ['get_passenger_fleet_snapshot']);
+  assert.deepEqual([...result.routeIds], [route.id, 'empty-route']);
+  assert.equal(result.catalogVersion, '9007199254740993');
+  assert.deepEqual(result.vehicles.map(v => [v.id, v.speed, v.accuracy, v.passenger_count, v.status, v.recorded_at]),
+    [['weak', null, null, null, null, recorded_at], ['live', 18, 7, 9, 'Sakto', recorded_at]]);
 });
 
 test('service polling selects only available status fields and observes changes to optional publication flags',async()=>{
@@ -393,5 +332,10 @@ test('missing loading areas do not manufacture a legal zone', () => {
 
 test('failed live vehicle reads reject instead of reporting an empty success', async () => {
   failed = true;
-  await assert.rejects(offlineTransit.getVehicles(), /offline/);
+  await assert.rejects(offlineTransit.getPassengerFleetSnapshot(), /offline/);
+  failed = false;
+  fleetSnapshot = { route_ids: [], vehicles: [] };
+  await assert.rejects(offlineTransit.getPassengerFleetSnapshot(), /Could not read the passenger fleet/);
+  fleetSnapshot = { route_ids: [], catalog_version: '1', vehicles: [] };
+  assert.deepEqual(await offlineTransit.getPassengerFleetSnapshot(), { routeIds: new Set(), catalogVersion: '1', vehicles: [] });
 });

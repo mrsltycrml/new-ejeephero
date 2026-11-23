@@ -1,10 +1,20 @@
 import type { RouteData, TerminalData } from './offlineTransitService';
-import { validPoint, type Point } from './locationQuality.ts';
+import { locationQuality, validPoint, type MeasuredFix, type Point } from './locationQuality.ts';
 import { meters } from './passengerJourney.ts';
-import { rideLeg, verifiedRoute, permitsPassengerUse, type JourneySelection } from './routeMap.ts';
+import { rideLeg, verifiedRoute, permitsPassengerUse, passengerStopOptions, type JourneySelection } from './routeMap.ts';
+import { verifiedRideDistance, type RoadSegment } from './passengerFare.ts';
 
 export const STOP_SEARCH_METERS = 2000;
 export const DESTINATION_RADIUS_METERS = 30;
+
+export function nearbyFareBoardingStop(fix: MeasuredFix | null, now: number, drop: TerminalData, stops: TerminalData[], segments: RoadSegment[]) {
+  if (!fix || locationQuality(fix, now) !== 'live' || !permitsPassengerUse(drop, 'alight')) return null;
+  return passengerStopOptions(stops, 'board', drop)
+    .map(stop => ({ stop, distance: meters(fix, stop) }))
+    .filter(item => item.distance <= STOP_SEARCH_METERS)
+    .sort((a, b) => a.distance - b.distance || a.stop.id.localeCompare(b.stop.id))
+    .find(({ stop }) => verifiedRideDistance(stop.id, drop.id, drop.route_id, segments, stops) != null) ?? null;
+}
 
 export function atPassengerDestination(origin: Point | null, destination: Point) {
   return !!origin && validPoint(origin) && validPoint(destination) && meters(origin, destination) <= DESTINATION_RADIUS_METERS;

@@ -129,6 +129,7 @@ select pg_temp.expect(exists(select from passenger_route_segments) and exists(se
 
 -- Exercise the real end-shift trigger, including an inactive, unverified stop with the final active order.
 update routes set geometry_verified_at=now()-interval '1 day', geometry_source_url='https://example.invalid/line',
+  coordinates='[{"latitude":14.003,"longitude":121},{"latitude":14.02,"longitude":121}]',
   catalog_changed_at=now()-interval '1 day' where id=(select route from probe);
 update terminals set location_verified_at=case when is_active then now()-interval '1 day' end where route_id=(select route from probe);
 insert into terminals(route_id,name,latitude,longitude,sequence_order,is_sample,deleted_at)
@@ -136,12 +137,18 @@ select route,'Sample',14,121,1,true,null::timestamptz from probe
 union all select route,'Previously deleted',14,121,2,false,now() from probe;
 insert into vehicles(id,driver_id,route_id,is_active,created_at,body_number,plate_number)
 select vehicle,driver,route,true,now()-interval '10 minutes','Catalog test unit','CAT-001' from probe;
+insert into vehicle_positions(vehicle_id,latitude,longitude,speed,timestamp,captured_at,accuracy)
+select vehicle,14.003+n*0.001,121,15,now()-interval '5 minutes'+n*interval '15 seconds',now()-interval '5 minutes'+n*interval '15 seconds',5
+from probe,generate_series(0,1) n;
 update vehicles set is_active=false where id=(select vehicle from probe);
 select pg_temp.expect(count(*)=1,'retired unverified stop suppressed or contaminated missed-stop review')
-from trip_violations v join probe p on v.vehicle_id=p.vehicle where v.final_terminal_id=p.c and v.missed_stops=array['Alpha','Charlie']
+from trip_violations v join probe p on v.vehicle_id=p.vehicle where v.final_terminal_id=p.c and v.missed_stops=array['Charlie']
   and v.status='pending_review' and not v.auto_confirmed;
 insert into vehicles(driver_id,route_id,is_active,created_at,body_number,plate_number)
 select driver,route,true,now()-interval '5 minutes','Catalog test unit','CAT-001' from probe;
+insert into vehicle_positions(vehicle_id,latitude,longitude,speed,timestamp,captured_at,accuracy)
+select v.id,14.003+n*0.001,121,15,now()-interval '4 minutes'+n*interval '15 seconds',now()-interval '4 minutes'+n*interval '15 seconds',5
+from probe join vehicles v on v.driver_id=probe.driver and v.is_active cross join generate_series(0,1) n;
 select supervisor_save_stop(route,c,'{"sequence_order":1}') from probe;
 update vehicles set is_active=false where is_active;
 select pg_temp.expect(count(*)=1,'mid-shift reordering retroactively generated a penalty') from trip_violations;

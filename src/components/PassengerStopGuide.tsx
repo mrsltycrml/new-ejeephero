@@ -21,7 +21,7 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   useEffect(() => { if (openRequest || selectedStop) setOpen(true); }, [openRequest, selectedStop?.id]);
-  const stops = landmarks.filter(confirmedPassengerUse);
+  const stops = landmarks.filter(stop => confirmedPassengerUse(stop));
   const active = stops.find(stop => stop.id === selectedStop?.id) || null;
   const details = stopLandmarks(active);
   const boardingColor = boarding.kind === 'prohibited' ? Colors.primaryRed : boarding.kind === 'allowed' ? Colors.success : Colors.warning;

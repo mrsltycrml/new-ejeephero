@@ -64,6 +64,12 @@ export async function loadAdminOperations(): Promise<OperationsData> {
   return { shifts, drivers, routes, speedEvents: speedEventsResult, tripViolations: tripViolationsResult };
 }
 
+export async function loadRecentAdminViolationCount(): Promise<number> {
+  const { data, error } = await supabase.rpc('get_recent_admin_violation_count');
+  if (error || !Number.isSafeInteger(data) || data < 0) throw new Error('Alert count unavailable.');
+  return data;
+}
+
 export async function forceEndShift(vehicleId: string): Promise<void> {
   const { error } = await supabase.rpc('admin_force_end_shift', { target_vehicle_id: vehicleId });
   if (error) throw new Error(error.message);

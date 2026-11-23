@@ -38,14 +38,17 @@ let read: () => Promise<any> = async () => catalog;
 let liveRoutes = new Set<string>(), fleet:any[]=[], device:any=null;
 let readFleet = async () => fleet;
 let connected = true;
+let foreground = true, catalogVersion = '1';
 Object.assign(globalThis, { __journeyReact: react, __journeyRead: () => read(), __journeyRoutes:()=>new Set(liveRoutes),
-  __journeyFleet:()=>readFleet(), __journeyLocation:()=>device, __journeyConnected:()=>connected });
+  __journeyFleet:()=>readFleet(), __journeyLocation:()=>device, __journeyConnected:()=>connected,
+  __journeyForeground:()=>foreground,
+  __journeySnapshot:async()=>({ routeIds: new Set(liveRoutes), catalogVersion, vehicles: await readFleet() }) });
 const fixtures: Record<string, string> = {
   react: 'const r=globalThis.__journeyReact; export default r; export const {createContext,useContext,useState,useRef,useCallback,useMemo,useEffect}=r;',
   './AuthContext': 'export const useAuth=()=>({user:{id:"passenger"}});',
   './NetworkContext': 'export const useNetwork=()=>({isConnected:globalThis.__journeyConnected()});',
-  './LocationContext': 'export const useLocation=()=>({location:globalThis.__journeyLocation(),errorMsg:null,foreground:true});',
-  '/services/offlineTransitService': 'export const offlineTransit={getTransitData:()=>globalThis.__journeyRead(),getInServiceRouteIds:async()=>globalThis.__journeyRoutes(),getVehicles:async()=>globalThis.__journeyFleet()};',
+  './LocationContext': 'export const useLocation=()=>({location:globalThis.__journeyLocation(),errorMsg:null,foreground:globalThis.__journeyForeground()});',
+  '/services/offlineTransitService': 'export const offlineTransit={getTransitData:()=>globalThis.__journeyRead(),getInServiceRouteIds:async()=>globalThis.__journeyRoutes(),getVehicles:async()=>globalThis.__journeyFleet(),getPassengerFleetSnapshot:()=>globalThis.__journeySnapshot()};',
 };
 const hooks = registerHooks({
   resolve(specifier, context, next) {
@@ -123,6 +126,10 @@ test('a newly active route appears without clearing the passenger walk, and stal
     assert.equal(journey.alightingStop.id, stops[2].id);
     assert.ok(journey.vehicleRouteIds.has('s'));
     assert.equal(journey.fleetRouteId, null);
+    catalogVersion = '2';
+    t.mock.timers.tick(5000); journey = await settle();
+    assert.equal(journey.transit.routes.length, 2);
+    assert.equal(journey.walk, walk, 'a revised unrelated route preserves current guidance');
     await journey.refreshTransit(); journey = await settle();
     assert.equal(journey.walk, null, 'manual catalog refresh still invalidates the walk');
     journey.setSelectedRouteId('s'); journey = await settle();
@@ -143,7 +150,7 @@ test('a newly active route appears without clearing the passenger walk, and stal
     assert.deepEqual(journey.vehicles.map((v: any) => v.id), ['s']);
   } finally {
     hooksState.forEach(slot => slot?.cleanup?.());
-    hooksState.length = 0; mounted = false; fleet = []; connected = true; readFleet = async () => fleet;
+    hooksState.length = 0; mounted = false; fleet = []; connected = true; catalogVersion = '1'; readFleet = async () => fleet;
     t.mock.timers.reset();
   }
 });
@@ -167,6 +174,95 @@ test('applying a walking choice preserves its path after boarding changes and re
   await journey.refreshTransit(); journey = render();
   assert.equal(journey.boardingStop, null); assert.equal(journey.alightingStop, null);
   assert.equal(journey.walk, null); assert.deepEqual(journey.walkingRoutes, []);
+});
+
+test('an automatic foreground recheck preserves unchanged walking guidance', async t => {
+  states = []; refs = []; mounted = true;
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: Date.now() });
+  let reads = 0;
+  read = async () => ({ ...structuredClone(catalog), syncedAt: new Date(Date.now() + ++reads).toISOString() });
+  try {
+    let journey = await settle();
+    journey.setRideStops(stops[0], stops[2]);
+    journey.showWalk(path, 'a', 'b');
+    journey = await settle();
+    const { walk } = journey;
+    assert.ok(walk);
+    foreground = false; await settle();
+    const before = reads;
+    foreground = true; journey = await settle();
+    assert.equal(reads, before + 1);
+    assert.equal(journey.walk, walk);
+    assert.equal(journey.boardingStop.id, 'a');
+  } finally {
+    hooksState.forEach(slot => slot?.cleanup?.()); hooksState.length = 0; mounted = false; foreground = true;
+    t.mock.timers.reset();
+  }
+});
+
+test('a changed fleet catalog revision invalidates revoked boarding and an older in-flight catalog read', async t => {
+  states = []; refs = []; mounted = true; catalogVersion = '1';
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: Date.now() });
+  read = async () => catalog;
+  try {
+    let journey = await settle();
+    journey.setRideStops(stops[0], stops[2]);
+    journey.showWalk(path, 'a', 'b');
+    journey = await settle();
+    const oldVersion = journey.getJourneyVersion();
+    let finishOld!: (value: typeof catalog) => void;
+    read = () => new Promise(resolve => { finishOld = resolve; });
+    const old = journey.refreshTransit();
+    catalogVersion = '2';
+    let finishCurrent!: (value: typeof catalog) => void;
+    read = () => new Promise(resolve => { finishCurrent = resolve; });
+    t.mock.timers.tick(5_000);
+    journey = await settle();
+    assert.equal(journey.transit.status, 'unavailable');
+    assert.deepEqual(journey.transit.terminals, []);
+    assert.equal(journey.boardingStop, null);
+    assert.equal(journey.walk, null);
+    journey.setBoardingStop(stops[1]);
+    assert.equal(journey.showWalk(path, 'a', 'b', oldVersion), false);
+    finishCurrent({ ...catalog, terminals: [{ ...stops[0], passenger_use: 'alight' }, ...stops.slice(1)] } as typeof catalog);
+    journey = await settle();
+    assert.equal(journey.boardingStop, null);
+    assert.equal(journey.alightingStop.id, 'c');
+    assert.equal(journey.walk, null);
+    assert.equal(journey.showWalk(path, 'a', 'b', oldVersion), false);
+    finishOld(catalog);
+    await old; journey = await settle();
+    assert.equal(journey.boardingStop, null);
+    assert.equal(journey.transit.terminals[0].passenger_use, 'alight');
+  } finally {
+    hooksState.forEach(slot => slot?.cleanup?.()); hooksState.length = 0; mounted = false; catalogVersion = '1';
+    t.mock.timers.reset();
+  }
+});
+
+test('a newer revision suppresses stale cached stops until a verified catalog arrives', async t => {
+  states = []; refs = []; mounted = true; catalogVersion = '1';
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: Date.now() });
+  read = async () => catalog;
+  try {
+    let journey = await settle();
+    journey.setRideStops(stops[0], stops[2]);
+    journey.showWalk(path, 'a', 'b');
+    catalogVersion = '2';
+    read = async () => ({ ...catalog, status: 'cached', error: 'Catalog read failed', isFromCache: true });
+    t.mock.timers.tick(5_000); journey = await settle();
+    assert.equal(journey.transit.status, 'unavailable');
+    assert.deepEqual(journey.transit.terminals, []);
+    assert.equal(journey.boardingStop, null);
+    assert.equal(journey.walk, null);
+    read = async () => ({ ...catalog, terminals: stops.slice(1) });
+    t.mock.timers.tick(5_000); journey = await settle();
+    assert.equal(journey.transit.status, 'ready');
+    assert.deepEqual(journey.transit.terminals.map((stop: any) => stop.id), ['b', 'c']);
+  } finally {
+    hooksState.forEach(slot => slot?.cleanup?.()); hooksState.length = 0; mounted = false; catalogVersion = '1';
+    t.mock.timers.reset();
+  }
 });
 
 test('a slower old catalog refresh cannot restore records removed by a newer successful read', async () => {

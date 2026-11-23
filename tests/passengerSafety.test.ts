@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateBoardingLocation, buildEmergencyMessage, normalizeEmergencyPhone, type LoadingZone } from '../src/services/passengerSafety.ts';
+import { evaluateBoardingLocation, buildEmergencyMessage, normalizeEmergencyPhone, trackNoLoadingWait, outsideLoadingZone, type LoadingZone, type NoLoadingWait } from '../src/services/passengerSafety.ts';
 import { findVerifiedSavings, quotePassengerFare, verifiedRideDistance, type RoadSegment, type FareMatrix } from '../src/services/passengerFare.ts';
 const now = Date.parse('2026-10-27T04:00:00Z');
 const fix = { latitude: 14.56, longitude: 121.03, accuracy: 5, timestamp: now };
@@ -19,6 +19,37 @@ test('loading warning needs a verified zone and a fresh precise GPS fix', () => 
 test('GPS uncertainty overlapping a boundary does not declare the zone safe or prohibited', () => {
   assert.equal(evaluateBoardingLocation({ ...fix, longitude: fix.longitude + 0.00035, accuracy: 20 }, [zone], now).kind, 'uncertain');
   assert.equal(evaluateBoardingLocation({ ...fix, longitude: fix.longitude + 0.002 }, [{ ...zone, kind: 'loading' }], now, stops).kind, 'outside');
+});
+test('future zone verification does not determine boarding permission', () => {
+  const verified_at = new Date(now + 1000).toISOString();
+  assert.equal(evaluateBoardingLocation(fix, [{ ...zone, verified_at }], now).kind, 'unavailable');
+  assert.equal(evaluateBoardingLocation(fix, [{ ...zone, kind: 'loading', verified_at }], now, stops).kind, 'unavailable');
+});
+test('a no-loading waiting alert needs three distinct, accurate stationary fixes across 15 seconds', () => {
+  const point = (after: number) => ({ ...fix, timestamp: now + after, speed: 0 });
+  let wait = trackNoLoadingWait(null, zone, point(0), now);
+  assert.equal(wait?.waiting, false);
+  wait = trackNoLoadingWait(wait, zone, point(0), now + 7_000);
+  assert.equal(wait?.waiting, false);
+  wait = trackNoLoadingWait(wait, zone, point(7_000), now + 7_000);
+  assert.equal(wait?.waiting, false);
+  wait = trackNoLoadingWait(wait, zone, point(15_000), now + 15_000);
+  assert.equal(wait?.waiting, true);
+  assert.equal(trackNoLoadingWait(wait, zone, point(15_000), now + 31_000), null);
+  assert.equal(trackNoLoadingWait(wait, null, point(15_000), now + 15_000), null);
+});
+test('movement, uncertain GPS and sampling gaps do not establish waiting or rearm a zone warning', () => {
+  let wait: NoLoadingWait | null = null;
+  for (const after of [0, 7_000, 15_000]) {
+    wait = trackNoLoadingWait(wait, zone, { ...fix, timestamp: now + after, speed: 8 }, now + after);
+    assert.equal(wait, null);
+  }
+  wait = trackNoLoadingWait(null, zone, { ...fix, speed: null }, now);
+  assert.equal(trackNoLoadingWait(wait, zone, { ...fix, accuracy: 25, speed: null }, now), null);
+  assert.equal(trackNoLoadingWait(wait, zone, { ...fix, speed: null, timestamp: now + 15_000 }, now + 15_000)?.waiting, false);
+  const boundary = { ...fix, speed: null, longitude: fix.longitude + .00037 };
+  assert.equal(outsideLoadingZone(zone, boundary, now), false);
+  assert.equal(outsideLoadingZone(zone, { ...fix, longitude: fix.longitude + .001 }, now), true);
 });
 test('designated-bay status requires valid source metadata and never overrides a no-loading zone', () => {
   const allowed: LoadingZone = { ...zone, kind: 'loading' };

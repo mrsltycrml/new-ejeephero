@@ -39,6 +39,10 @@ An ordinary pedestrian route may have unconfirmed accessibility, which must be s
 
 ## User-supplied landmark reference
 
+The two activity-map screenshots supplied for the Buendia round trip are the default Route 1 map reference when no alignment has been published. The lines follow connected [OpenStreetMap roads](https://www.openstreetmap.org/copyright). Both legs use Jupiter Street, Nicanor T. Garcia Street, the Makati–Mandaluyong Bridge, Coronado Street and San Francisco Avenue. The City Hall leg uses Kalayaan Avenue and includes the Maysilo Circle turnaround. The Buendia leg returns via J.P. Rizal Street. The screenshots show the travel path but do not identify surveyed curbs, boarding permissions, measured ride distances or fares.
+
+To publish the round trip, a supervisor selects **MRT Buendia ↔ City Hall · Trip reference** under **Route 1 review**, confirms both directions against an operator source, and activates them together. The database keeps any existing published alignment until this action. The October 2022 Buendia and One Ayala records remain available for comparison.
+
 The photographed sheet is dated **3 October 2022**. These labels and printed kilometre values are useful reference text, not surveyed stop locations or current journey distances:
 
 | Printed km | Landmark on the sheet |
@@ -95,6 +99,8 @@ The redesigned web app was deployed on 18 November 2026 at [ejeephero.carlosbusu
 Operators can use the [route data workbook](eSAKAY-route-data.xlsx) to submit verified stop pins, route lines, measured distances and fare charts for each direction.
 
 Redeploy `herobot-chat` with its updated context builder before using the assistant in production. It no longer supplies default fares, unsourced safety labels or active-shift counts as current GPS information. The chat directs operational quotations and navigation to the sourced Fare and Map screens; its generated prose is not a new source of verified operational data.
+
+The Route 1 round trip and audit fixes require migrations `20261123010000` through `20261123040000`. Apply them in order, then deploy `herobot-chat` and `emergency-dispatch` before publishing the new app. HeroBot creates fresh Botpress sessions. Revoke the legacy Botpress credentials with the provider, since deleting the profile columns does not revoke credentials already issued. Activate the round trip separately after operator review.
 
 See [walking directions setup](walking-directions-setup.md) for the additional migration, server-only routing configuration, authentication, quota limits and exact source-data fields.
 

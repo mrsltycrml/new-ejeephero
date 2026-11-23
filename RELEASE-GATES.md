@@ -20,6 +20,7 @@ Record evidence for each gate before enabling production service. A checked box 
 
 - [ ] Verify the five-second cancellation window, current GPS, vehicle identifiers, and timestamp with consenting test contacts.
 - [ ] Test real SMS delivery and failures, including missing location, connectivity, provider configuration, and account balance. Confirm the Messages fallback.
+- [ ] In staging, test accident and breakdown reports with and without a vehicle, GPS consent, retry, supervisor-only access, dispatch and resolution.
 - [ ] Obtain explicit operator sign-off before enabling automatic production SMS. Do not use real commuter contacts for test messages.
 
 ## Performance and release
@@ -30,4 +31,4 @@ Record evidence for each gate before enabling production service. A checked box 
 - [ ] Complete Android and iOS device smoke tests for passenger, driver, and supervisor roles.
 - [ ] Record approvals and evidence for all gates before production deployment.
 
-Current gaps: separate EAS environments must be populated with distinct Supabase projects and checked before release. Automatic SOS must be configured and validated with consenting test contacts. The existing k6 script covers only active vehicle reads and defaults to 500 requests per second.
+Current gaps: separate EAS environments must be populated with distinct Supabase projects and checked before release. Automatic SOS must be configured and validated with consenting test contacts. The k6 script reads the passenger fleet snapshot and defaults to 500 requests per second.

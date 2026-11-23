@@ -110,6 +110,7 @@ select driver,inbound,true,'Catalog test unit','CAT-001' from pair;
 set local role authenticated;
 select pg_temp.activate('buendia_2022',null);
 select pg_temp.r1_reject('select pg_temp.activate(''one_ayala_2026'',''buendia_2022'')','55000');
+select pg_temp.r1_reject('select pg_temp.activate(''buendia_roundtrip'',''buendia_2022'')','55000');
 select pg_temp.r1_check(exists(select from passenger_route_segments join pair on route_id=outbound)
   and exists(select from passenger_fare_matrices join pair on route_id=outbound)
   and exists(select from terminals join pair on id=c where passenger_use='both'), 'current evidence hidden or shift block changed it');
@@ -124,7 +125,14 @@ select pg_temp.r1_check((select count(*) from routes where id in (outbound,inbou
   and not exists(select from passenger_route_segments where route_id=outbound)
   and not exists(select from passenger_fare_matrices where route_id=outbound),'switch leaked old evidence') from pair;
 select pg_temp.r1_reject('select supervisor_create_catalog_item(request_id,''stop'',inbound,''{"expected_route1_variant":"buendia_2022"}'') from pair','40001');
-select pg_temp.activate('buendia_2022','one_ayala_2026');
+select pg_temp.activate('buendia_roundtrip','one_ayala_2026');
+select pg_temp.r1_check((select count(*) from routes where id in (outbound,inbound)
+  and route1_variant='buendia_roundtrip' and route1_activated_at>activated and geometry_source_url=source
+  and case id when outbound then coordinates=forward_line and name='Route 1: MRT Buendia → Mandaluyong City Hall'
+                     else coordinates=return_line and name='Route 1: Mandaluyong City Hall → MRT Buendia' end)=2,
+  'MRT Buendia round trip did not publish both directions on the existing route pair') from pair;
+select pg_temp.r1_reject('select pg_temp.activate(''buendia_2022'',''one_ayala_2026'')','40001');
+select pg_temp.activate('buendia_2022','buendia_roundtrip');
 select pg_temp.r1_check(not exists(select from passenger_fare_matrices join pair on route_id=outbound)
   and not exists(select from passenger_route_segments join pair on route_id=outbound), 'switching back revived an earlier fare or segment');
 reset role;

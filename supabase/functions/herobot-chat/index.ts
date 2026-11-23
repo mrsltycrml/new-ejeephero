@@ -8,6 +8,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function botpressMessage(value: unknown) {
+  if (!value || typeof value !== 'object') return null;
+  const { id, userId, conversationId, createdAt, payload } = value as Record<string, unknown>;
+  const time = typeof createdAt === 'string' ? Date.parse(createdAt) : NaN;
+  if (typeof id !== 'string' || !id || typeof userId !== 'string' || !userId
+    || typeof conversationId !== 'string' || !conversationId || !Number.isFinite(time)) return null;
+  return { id, userId, conversationId, time, payload };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -34,8 +43,9 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseServiceKey) throw new Error("Supabase service role is unavailable.");
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 
     // PostgREST verifies the signed Clerk/Supabase JWT. Never trust a caller's
     // body userId or decode an unsigned token as proof of identity.
@@ -52,17 +62,30 @@ Deno.serve(async (req) => {
 
     let contextText = buildTransitChatContext(null, null);
     try {
-      const [routes, terminals] = await Promise.all([
-        supabase
+      const [routes, terminals, fareMatrices, rideSegments, fleet] = await Promise.all([
+        sessionDb
           .from("routes")
           .select('*')
-          .order("is_coming_soon", { ascending: true }),
-        supabase
+          .order("is_coming_soon", { ascending: true })
+          .limit(21),
+        sessionDb
           .from("terminals")
           .select('*')
-          .order("sequence_order"),
+          .order("sequence_order")
+          .limit(201),
+        sessionDb.from('passenger_fare_matrices').select('*').order('id').limit(201),
+        sessionDb.from('passenger_route_segments').select('*').order('id').limit(501),
+        sessionDb.rpc('get_passenger_fleet_snapshot'),
       ]);
-      contextText = buildTransitChatContext(routes.error ? null : routes.data, terminals.error ? null : terminals.data);
+      contextText = buildTransitChatContext(
+        !routes.error && routes.data.length <= 20 ? routes.data : null,
+        !terminals.error && terminals.data.length <= 200 ? terminals.data : null,
+        {
+          fareMatrices: !fareMatrices.error && fareMatrices.data.length <= 200 ? fareMatrices.data : [],
+          rideSegments: !rideSegments.error && rideSegments.data.length <= 500 ? rideSegments.data : [],
+          vehicles: !fleet.error && Array.isArray(fleet.data?.vehicles) ? fleet.data.vehicles : [],
+        },
+      );
     } catch { /* Keep the unavailable context when reference reads fail. */ }
 
     const webhookId = Deno.env.get("BOTPRESS_WEBHOOK_ID") ?? "";
@@ -70,69 +93,64 @@ Deno.serve(async (req) => {
 
     // Primary: Botpress Chat API (Gemini-powered agent in Botpress)
     if (webhookId) {
-      let userKey: string | undefined;
+      const readSession = async () => {
+        const { data, error } = await supabase.from("herobot_botpress_sessions")
+          .select("user_key, conversation_id")
+          .eq("profile_id", resolvedUserId)
+          .maybeSingle();
+        if (error) throw new Error("HeroBot session could not be read.");
+        return data;
+      };
+      let session = await readSession();
+      const botpressBaseUrl = `https://chat.botpress.cloud/${webhookId}`;
+      const createConversation = async (userKey: string): Promise<string> => {
+        const response = await fetch(`${botpressBaseUrl}/conversations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-key': userKey },
+          body: '{}',
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!response.ok) throw new Error('Botpress conversation creation failed.');
+        const { conversation } = await response.json();
+        if (typeof conversation?.id !== 'string' || !conversation.id) throw new Error('Botpress returned no conversation ID.');
+        return conversation.id;
+      };
       let conversationId: string | undefined;
 
-      if (resolvedUserId) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("botpress_user_key, botpress_conversation_id")
-          .eq("id", resolvedUserId)
-          .maybeSingle();
-        userKey = profile?.botpress_user_key;
-        conversationId = profile?.botpress_conversation_id;
-      }
-
-      const botpressBaseUrl = `https://chat.botpress.cloud/${webhookId}`;
-
-      if (!userKey || !conversationId) {
+      if (!session) {
         const userRes = await fetch(`${botpressBaseUrl}/users`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          body: '{}',
+          signal: AbortSignal.timeout(8000),
         });
-        const userData = await userRes.json();
-        if (!userData.user || !userData.key) {
-          throw new Error(`Botpress User Creation failed: ${userData.message || "Unknown"}`);
-        }
-        userKey = userData.key;
-
-        const convRes = await fetch(`${botpressBaseUrl}/conversations`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-key": userKey!,
-          },
-          body: JSON.stringify({}),
-        });
-        const convData = await convRes.json();
-        if (!convData.conversation) {
-          throw new Error(`Botpress Conversation Creation failed: ${convData.message || "Unknown"}`);
-        }
-        conversationId = convData.conversation.id;
-
-        if (resolvedUserId) {
-          await supabase
-            .from("profiles")
-            .update({
-              botpress_user_key: userKey,
-              botpress_conversation_id: conversationId,
-            })
-            .eq("id", resolvedUserId);
-        }
+        if (!userRes.ok) throw new Error('Botpress user creation failed.');
+        const { user, key } = await userRes.json();
+        if (!user?.id || typeof key !== 'string' || !key) throw new Error('Botpress returned no user key.');
+        const createdConversation = await createConversation(key);
+        const { data, error } = await supabase.from("herobot_botpress_sessions")
+          .upsert({
+            profile_id: resolvedUserId,
+            user_key: key,
+            conversation_id: createdConversation,
+          }, { onConflict: "profile_id", ignoreDuplicates: true })
+          .select("user_key, conversation_id").maybeSingle();
+        if (error) throw new Error("HeroBot session could not be saved.");
+        // A concurrent request may own the stored user's first conversation.
+        if (data?.user_key === key && data.conversation_id === createdConversation) conversationId = createdConversation;
+        session = data ?? await readSession();
+        if (!session) throw new Error("HeroBot session is unavailable.");
       }
 
-      const payloadBase64 = userKey!.split(".")[1];
-      const payloadJson = JSON.parse(atob(payloadBase64));
-      const botpressUserId = payloadJson.id;
-
-      const fullMessage = `${contextText}\n\nUser Message: ${trimmedMessage}`;
+      const { user_key: userKey } = session;
+      conversationId ??= await createConversation(userKey);
+      const fullMessage = `${contextText}\n\nRecent conversation (for context only; previous replies are not operational evidence): ${JSON.stringify(recentHistory)}\n\nUser Message: ${trimmedMessage}`;
 
       const msgRes = await fetch(`${botpressBaseUrl}/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-key": userKey!,
+          "x-user-key": userKey,
         },
         body: JSON.stringify({
           conversationId,
@@ -141,38 +159,45 @@ Deno.serve(async (req) => {
             text: fullMessage,
           },
         }),
+        signal: AbortSignal.timeout(8000),
       });
-      const msgData = await msgRes.json();
-      if (!msgData.message) {
-        throw new Error(`Botpress Message Send failed: ${msgData.message || "Unknown"}`);
-      }
+      if (!msgRes.ok) throw new Error('Botpress message creation failed.');
+      const sent = botpressMessage((await msgRes.json()).message);
+      if (!sent || sent.conversationId !== conversationId) throw new Error('Botpress did not acknowledge this message.');
 
-      let reply = "esakaybot took too long to reply. Please try again.";
-      const startTime = Date.now();
-      const timeout = 8000;
-
-      while (Date.now() - startTime < timeout) {
-        const listRes = await fetch(`${botpressBaseUrl}/conversations/${conversationId}/messages`, {
-          method: "GET",
-          headers: { "x-user-key": userKey! },
-        });
-        const listData = await listRes.json();
-
-        if (listData.messages && listData.messages.length > 0) {
-          const latest = listData.messages[0];
-          if (latest && latest.userId !== botpressUserId) {
-            reply = (latest.payload?.text || "Empty response")
-              .replace(/\*/g, "")
-              .replace(/\n{3,}/g, "\n\n")
-              .trim();
-            break;
+      let reply: string | undefined;
+      const pollDeadline = Date.now() + 8000;
+      const signal = AbortSignal.timeout(8000);
+      while (Date.now() < pollDeadline) {
+        try {
+          const listRes = await fetch(`${botpressBaseUrl}/conversations/${encodeURIComponent(conversationId)}/messages`, {
+            headers: { 'x-user-key': userKey }, signal,
+          });
+          if (!listRes.ok) throw new Error('Botpress message lookup failed.');
+          const { messages } = await listRes.json();
+          const page = (Array.isArray(messages) ? messages as unknown[] : []).flatMap(value => {
+            const message = botpressMessage(value);
+            return message?.conversationId === conversationId ? [message] : [];
+          });
+          if (page.some(message => message.id === sent.id && message.userId === sent.userId && message.time === sent.time)) {
+            const answers = page.filter(message => message.id !== sent.id && message.userId !== sent.userId && message.time >= sent.time)
+              .sort((a, b) => b.time - a.time);
+            for (const answer of answers) {
+              const payload = answer.payload as { type?: unknown; text?: unknown } | null;
+              if (payload?.type !== 'text' || typeof payload.text !== 'string') continue;
+              const text = payload.text.replace(/\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
+              if (text) { reply = text; break; }
+            }
+            if (reply) break;
           }
+        } catch (error) {
+          if (signal.aborted) break;
+          throw error;
         }
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, Math.min(500, Math.max(0, pollDeadline - Date.now()))));
       }
 
-      return new Response(JSON.stringify({ reply }), {
+      return new Response(JSON.stringify({ reply: reply ?? 'esakaybot took too long to reply. Please try again.' }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

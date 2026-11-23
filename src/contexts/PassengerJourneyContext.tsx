@@ -17,7 +17,7 @@ type JourneyState = {
   alightingStop: TerminalData | null; setAlightingStop: (stop: TerminalData | null) => void;
   setRideStops: (boarding: TerminalData, alighting: TerminalData) => void;
   destinationPlace: PassengerPlace | null; setDestinationPlace: (place: PassengerPlace | null) => void;
-  walkingRoutes: WalkingRouteGeometry[]; setWalkingRoutes: (routes: WalkingRouteGeometry[]) => void;
+  walkingRoutes: WalkingRouteGeometry[];
   transit: TransitResult;
   refreshTransit: () => Promise<TransitResult>;
   walk: { route: WalkingRoute; fromLabel: string; toLabel: string } | null;
@@ -26,43 +26,60 @@ type JourneyState = {
   unit: PassengerUnit | null; setUnit: (unit: PassengerUnit | null) => void;
   destination: TerminalData | null; setDestination: (stop: TerminalData | null) => void;
   place: PassengerPlace | null; setPlace: (place: PassengerPlace | null) => void;
-  vehicles: VehicleData[]; vehicleError: string; nearby: VehicleData[]; signal: string; endRide: () => void;
+  vehicles: VehicleData[]; vehicleError: string; nearby: VehicleData[]; endRide: () => void;
   vehicleRouteIds: ReadonlySet<string>;
 };
 const emptySelection: JourneySelection & { fleetRouteId?: string | null } = { selectedRouteId: null, boardingStop: null, alightingStop: null };
 const emptyRouteIds: ReadonlySet<string> = new Set();
 const emptyTransit: TransitResult = { routes: [], terminals: [], status: 'unavailable', error: 'Loading routes…', syncedAt: null, latencyMs: 0, isFromCache: false };
-const Journey = createContext<JourneyState>({ ...emptySelection, fleetRouteId: null, setSelectedRouteId: () => {}, setBoardingStop: () => {}, setAlightingStop: () => {}, setRideStops: () => {}, destinationPlace: null, setDestinationPlace: () => {}, walkingRoutes: [], setWalkingRoutes: () => {}, transit: emptyTransit, refreshTransit: async () => emptyTransit, walk: null, showWalk: () => false, getJourneyVersion: () => 0, unit: null, setUnit: () => {}, destination: null, setDestination: () => {}, place: null, setPlace: () => {}, vehicles: [], vehicleRouteIds: new Set(), vehicleError: '', nearby: [], signal: '', endRide: () => {} });
+const unverifiedTransit = { ...emptyTransit, error: 'Current routes and stops could not be verified.' };
+const catalogData = ({ routes, terminals }: TransitResult, routeId: string | null = null) => JSON.stringify(routeId
+  ? [routes.find(route => route.id === routeId), terminals.filter(stop => stop.route_id === routeId)]
+  : [routes, terminals]);
+const Journey = createContext<JourneyState>({ ...emptySelection, fleetRouteId: null, setSelectedRouteId: () => {}, setBoardingStop: () => {}, setAlightingStop: () => {}, setRideStops: () => {}, destinationPlace: null, setDestinationPlace: () => {}, walkingRoutes: [], transit: emptyTransit, refreshTransit: async () => emptyTransit, walk: null, showWalk: () => false, getJourneyVersion: () => 0, unit: null, setUnit: () => {}, destination: null, setDestination: () => {}, place: null, setPlace: () => {}, vehicles: [], vehicleRouteIds: new Set(), vehicleError: '', nearby: [], endRide: () => {} });
 export function PassengerJourneyProvider({ children }: { children: React.ReactNode }) {
   const { location, errorMsg, foreground } = useLocation();
   const { isConnected } = useNetwork();
   const { user } = useAuth();
   const [matchedUnit, updateUnit] = useState<PassengerUnit | null>(null);
   const [selection, setSelection] = useState(emptySelection);
-  const destination = selection.alightingStop;
+  const [catalogPending, setCatalogPending] = useState(false);
+  const activeSelection = catalogPending ? emptySelection : selection;
+  const destination = activeSelection.alightingStop;
   const [place, updatePlace] = useState<PassengerPlace | null>(null);
   const [walkingRoutes, setWalkingRoutes] = useState<WalkingRouteGeometry[]>([]);
   const [transit, setTransit] = useState<TransitResult>(emptyTransit);
   const currentTransit = useRef(emptyTransit);
+  const currentRoute = useRef(selection.selectedRouteId);
+  currentRoute.current = selection.selectedRouteId;
+  const observedVersion = useRef<string | null>(null);
+  const confirmedVersion = useRef<string | null>(null);
+  const isCurrentCatalog = useCallback(() => observedVersion.current === confirmedVersion.current, []);
   const [walk, setWalk] = useState<JourneyState['walk']>(null);
   const journeyVersion = useRef(0);
   const getJourneyVersion = useCallback(() => journeyVersion.current, []);
   const clearWalk = useCallback(() => { journeyVersion.current++; setWalk(null); setWalkingRoutes([]); }, []);
   const showWalk = useCallback((route: WalkingRoute, fromLabel: string, toLabel: string, expectedVersion?: number) => {
-    if (expectedVersion !== undefined && expectedVersion !== journeyVersion.current) return false;
+    if (!isCurrentCatalog() ||
+        (expectedVersion !== undefined && expectedVersion !== journeyVersion.current)) return false;
     setWalk({ route, fromLabel, toLabel });
     setWalkingRoutes([{ id: `${fromLabel}:${toLabel}`, coordinates: route.coordinates, source: route.source_url, generatedAt: route.verified_at }]);
     return true;
-  }, []);
+  }, [isCurrentCatalog]);
   const setPlace = useCallback((value: PassengerPlace | null) => { updatePlace(value); clearWalk(); }, [clearWalk]);
   const setSelectedRouteId = useCallback((id: string | null) => {
+    if (id && !isCurrentCatalog()) return;
     setSelection(state => {
       const next = selectJourneyRoute(state, id, currentTransit.current.routes);
       return { ...next, fleetRouteId: next.selectedRouteId };
     });
     clearWalk();
-  }, [clearWalk]);
-  const setBoardingStop = useCallback((stop: TerminalData | null) => { setSelection(state => selectJourneyStop(state, stop, 'boarding', currentTransit.current.routes, currentTransit.current.terminals)); clearWalk(); }, [clearWalk]);
+  }, [clearWalk, isCurrentCatalog]);
+  const setBoardingStop = useCallback((stop: TerminalData | null) => {
+    if (stop && !isCurrentCatalog()) return;
+    setSelection(state => selectJourneyStop(state, stop, 'boarding', currentTransit.current.routes, currentTransit.current.terminals));
+    clearWalk();
+  }, [clearWalk, isCurrentCatalog]);
   const [fleet, setFleet] = useState<VehicleData[]>([]);
   const [inService, setInService] = useState<ReadonlySet<string> | null>(null);
   const vehicleRouteIds = inService ?? emptyRouteIds;
@@ -74,19 +91,26 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     ['live', 'weak'].includes(locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now))), [fleet, vehicleRouteIds, now]);
   const unit = matchedUnit && rideRouteIds.has(matchedUnit.route_id) ? matchedUnit : null;
   const [vehicleError, setVehicleError] = useState('');
-  const [signal, setSignal] = useState('Choose your destination to find a unit.');
   const evidence = useRef<RideEvidence | null>(null);
   const lastMatch = useRef(0);
   const separated = useRef(0);
   const lastSeparationFix = useRef(0);
   const ignoredUntil = useRef(0);
   const setUnit = useCallback((value: PassengerUnit | null) => {
+    if (value && !isCurrentCatalog()) return;
     evidence.current = null; separated.current = 0; lastMatch.current = Date.now();
     updateUnit(value && rideRouteIds.has(value.route_id) ? { ...value, source: value.source || 'confirmed', matchedAt: Date.now() } : null);
-  }, [rideRouteIds]);
-  const endRide = useCallback(() => { setUnit(null); setPlace(null); ignoredUntil.current = Date.now() + 60_000; setSelection(emptySelection); setSignal('Ride ended. Choose your next destination.'); }, [setUnit, setPlace]);
-  const setDestination = useCallback((stop: TerminalData | null) => { evidence.current = null; ignoredUntil.current = 0; setSelection(state => selectJourneyStop(state, stop, 'alighting', currentTransit.current.routes, currentTransit.current.terminals)); clearWalk(); }, [clearWalk]);
+  }, [rideRouteIds, isCurrentCatalog]);
+  const endRide = useCallback(() => { setUnit(null); setPlace(null); ignoredUntil.current = Date.now() + 60_000; setSelection(emptySelection); }, [setUnit, setPlace]);
+  const setDestination = useCallback((stop: TerminalData | null) => {
+    if (stop && !isCurrentCatalog()) return;
+    evidence.current = null;
+    ignoredUntil.current = 0;
+    setSelection(state => selectJourneyStop(state, stop, 'alighting', currentTransit.current.routes, currentTransit.current.terminals));
+    clearWalk();
+  }, [clearWalk, isCurrentCatalog]);
   const setRideStops = useCallback((boarding: TerminalData, alighting: TerminalData) => {
+    if (!isCurrentCatalog()) return;
     const { routes, terminals } = currentTransit.current;
     const next = reconcileJourneySelection({ selectedRouteId: boarding.route_id, boardingStop: boarding, alightingStop: alighting }, routes, terminals);
     if (!next.boardingStop || !next.alightingStop) return;
@@ -94,7 +118,7 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     ignoredUntil.current = 0;
     setSelection(state => ({ ...next, fleetRouteId: state.fleetRouteId === next.selectedRouteId ? state.fleetRouteId : null }));
     clearWalk();
-  }, [clearWalk]);
+  }, [clearWalk, isCurrentCatalog]);
   useEffect(() => { updateUnit(null); setSelection(emptySelection); setPlace(null); evidence.current = null; }, [user?.id]);
   useEffect(() => {
     if (!matchedUnit) return;
@@ -104,46 +128,74 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     }
   }, [matchedUnit, inService, transit]);
   const transitRequest = useRef(0);
-  const refreshTransit = useCallback(async () => {
+  const loadTransit = useCallback(async (manual: boolean, verify: boolean) => {
     const request = ++transitRequest.current;
+    const version = observedVersion.current;
     const data = await offlineTransit.getTransitData();
-    if (request === transitRequest.current) {
-      currentTransit.current = data;
-      setTransit(data);
-      setSelection(state => {
-        const next = reconcileJourneySelection(state, data.routes, data.terminals);
-        return { ...next, fleetRouteId: state.fleetRouteId === next.selectedRouteId ? state.fleetRouteId : null };
-      });
-      clearWalk();
+    if (request !== transitRequest.current || version !== observedVersion.current) return data;
+    if (verify && version !== null && data.status === 'ready') {
+      // Separate route and stop reads can overlap an operator edit.
+      const confirmed = await offlineTransit.getPassengerFleetSnapshot().then(snapshot => snapshot.catalogVersion, () => null);
+      if (request !== transitRequest.current || version !== observedVersion.current) return data;
+      if (confirmed === version) confirmedVersion.current = confirmed;
+      else {
+        if (confirmed !== null) observedVersion.current = confirmed;
+        confirmedVersion.current = null;
+      }
     }
+    if (!isCurrentCatalog()) {
+      setCatalogPending(true);
+      return unverifiedTransit;
+    }
+    setCatalogPending(false);
+    const previous = currentTransit.current;
+    const changed = catalogData(previous) !== catalogData(data);
+    if (!manual && !changed && previous.status === data.status && previous.error === data.error) return previous;
+    currentTransit.current = data;
+    setTransit(data);
+    setSelection(state => {
+      const next = reconcileJourneySelection(state, data.routes, data.terminals);
+      return { ...next, fleetRouteId: state.fleetRouteId === next.selectedRouteId ? state.fleetRouteId : null };
+    });
+    if (manual || (changed && catalogData(previous, currentRoute.current) !== catalogData(data, currentRoute.current))) clearWalk();
     return data;
-  }, [clearWalk]);
+  }, [clearWalk, isCurrentCatalog]);
+  const refreshTransit = useCallback(() => loadTransit(true, foreground && isConnected), [loadTransit, foreground, isConnected]);
   useEffect(() => {
-    void refreshTransit();
-    return () => { transitRequest.current++; };
-  }, [isConnected, user?.id, refreshTransit]);
-  useEffect(() => {
-    if (!foreground || !isConnected || !user?.id) return;
-    let active = true, pending = false;
+    if (!foreground) return;
+    if (!isConnected || !user?.id) {
+      void loadTransit(false, false);
+      return () => { transitRequest.current++; };
+    }
+    let active = true, pending = false, first = true;
+    let checking: string | null = null;
     const refresh = async () => {
       setNow(Date.now()); if (pending) return;
       pending = true;
       try {
-        const ids = await offlineTransit.getInServiceRouteIds().catch(() => null);
+        const { routeIds, catalogVersion, vehicles } = await offlineTransit.getPassengerFleetSnapshot();
         if (!active) return;
-        setInService(ids);
-        if (!ids) { setFleet([]); setVehicleError('Vehicle routes could not be confirmed.'); return; }
-        const data = await offlineTransit.getVehicles(ids);
-        if (!active) return;
-        setNow(Date.now()); setFleet(data); setVehicleError('');
+        setInService(routeIds);
+        setNow(Date.now()); setFleet(vehicles); setVehicleError('');
+        observedVersion.current = catalogVersion;
+        if (!isCurrentCatalog()) setCatalogPending(true);
+        if ((first || confirmedVersion.current !== catalogVersion) && checking !== catalogVersion) {
+          first = false;
+          checking = catalogVersion;
+          void loadTransit(false, true).finally(() => { if (checking === catalogVersion) checking = null; });
+        }
       }
-      catch { if (active) { setFleet([]); setVehicleError('Vehicle locations unavailable.'); } }
+      catch {
+        if (!active) return;
+        setFleet([]); setInService(null); setVehicleError('Vehicle locations unavailable.');
+        if (first) { first = false; void loadTransit(false, false); }
+      }
       finally { pending = false; }
     };
     void refresh();
     const timer = setInterval(() => { void refresh(); }, 5000);
-    return () => { active = false; clearInterval(timer); setFleet([]); setInService(null); };
-  }, [foreground, isConnected, user?.id]);
+    return () => { active = false; transitRequest.current++; clearInterval(timer); setFleet([]); setInService(null); };
+  }, [foreground, isConnected, user?.id, loadTransit, isCurrentCatalog]);
   const fix = useMemo(() => location && foreground && !errorMsg ? { ...location.coords, timestamp: location.timestamp } : null,
     [location, foreground, errorMsg]);
   const candidates = useMemo(() => nearbyRideUnits(fix, isConnected ? vehicles.filter(v => rideRouteIds.has(v.route_id) && (!selection.selectedRouteId || v.route_id === selection.selectedRouteId)) : [], now),
@@ -152,12 +204,11 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
   useEffect(() => {
     if (unit) {
       const matching = candidates.find(c => c.vehicle.vehicle_id === unit.vehicle_id && c.distance <= 35);
-      if (matching) { lastMatch.current = now; separated.current = 0; setSignal(unit.source === 'gps' ? 'Unit matched from your shared GPS movement.' : 'Unit confirmed. GPS is monitoring this ride.'); }
+      if (matching) { lastMatch.current = now; separated.current = 0; }
       else {
         const tracked = isConnected && vehicles.find(v => v.vehicle_id === unit.vehicle_id && locationQuality({ ...v, timestamp: Date.parse(v.recorded_at || '') }, now) === 'live' && now - Date.parse(v.recorded_at || '') <= 20_000);
         if (fix && now - fix.timestamp <= 15_000 && fix.accuracy != null && fix.accuracy <= 20 && tracked && meters(fix, tracked) > 80 && fix.timestamp !== lastSeparationFix.current) { separated.current++; lastSeparationFix.current = fix.timestamp; }
-        setSignal('Checking your ride connection…');
-        if (now - lastMatch.current > 90_000 || separated.current >= 3) { setUnit(null); ignoredUntil.current = now + 30_000; setSignal('Ride connection lost. Unit details cleared until a fresh match.'); }
+        if (now - lastMatch.current > 90_000 || separated.current >= 3) { setUnit(null); ignoredUntil.current = now + 30_000; }
       }
       return;
     }
@@ -165,8 +216,7 @@ export function PassengerJourneyProvider({ children }: { children: React.ReactNo
     const result = detectRide(evidence.current, fix, candidates.map(c => c.vehicle), now);
     evidence.current = result.evidence;
     if (result.unit) setUnit({ vehicle_id: result.unit.vehicle_id, route_id: result.unit.route_id, body_number: result.unit.body_number, plate_number: result.unit.plate_number, source: 'gps' });
-    setSignal(result.unit ? 'Unit detected. Emergency details are ready.' : result.nearby.length > 1 ? 'Several units are nearby. Tap the one you boarded to confirm.' : !fix || now - fix.timestamp > 15_000 ? 'Waiting for a fresh GPS location.' : result.evidence ? 'Checking which unit is moving with you…' : 'Your unit will be matched when you travel together.');
   }, [fix, candidates, vehicles, now, unit, destination, setUnit, isConnected]);
-  return <Journey.Provider value={{ ...selection, fleetRouteId: selection.fleetRouteId ?? null, setSelectedRouteId, setBoardingStop, setAlightingStop: setDestination, setRideStops, destinationPlace: place, setDestinationPlace: setPlace, walkingRoutes, setWalkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion, unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleRouteIds, vehicleError, nearby, signal, endRide }}>{children}</Journey.Provider>;
+  return <Journey.Provider value={{ ...activeSelection, fleetRouteId: activeSelection.fleetRouteId ?? null, setSelectedRouteId, setBoardingStop, setAlightingStop: setDestination, setRideStops, destinationPlace: place, setDestinationPlace: setPlace, walkingRoutes: catalogPending ? [] : walkingRoutes, transit: catalogPending ? unverifiedTransit : transit, refreshTransit, walk: catalogPending ? null : walk, showWalk, getJourneyVersion, unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleRouteIds, vehicleError, nearby, endRide }}>{children}</Journey.Provider>;
 }
 export const usePassengerJourney = () => useContext(Journey);

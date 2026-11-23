@@ -9,6 +9,7 @@ const { devices, webkit } = require('playwright-core');
 const dist = path.resolve(process.argv[2] || 'dist');
 const origin = 'https://esakay.test';
 const profile = { id: 'layout-fixture', role: 'passenger', status: 'approved', full_name: 'Layout fixture' };
+const route1 = { id: '550e8400-e29b-41d4-a716-446655440000', name: 'Route 1', coordinates: [], is_coming_soon: false };
 const failures = [];
 
 function near(label, actual, expected) {
@@ -44,6 +45,13 @@ async function main() {
       const url = new URL(route.request().url());
       if (url.protocol === 'blob:') return route.continue();
       if (url.origin === 'https://fixture.supabase.invalid') {
+        if (url.pathname === '/rest/v1/routes') {
+          return route.fulfill({ json: Number(url.searchParams.get('offset')) === 0 ? [route1] : [],
+            headers: { 'content-range': '0-0/1', 'access-control-expose-headers': 'content-range' } });
+        }
+        if (url.pathname === '/rest/v1/rpc/get_passenger_fleet_snapshot') {
+          return route.fulfill({ json: { route_ids: [route1.id], catalog_version: '1', vehicles: [] } });
+        }
         return route.fulfill({ json: url.pathname === '/rest/v1/profiles' ? profile : [] });
       }
       if (url.origin !== origin) return route.abort();
@@ -166,6 +174,9 @@ async function main() {
     await page.getByRole('textbox', { name: 'Search destination' }).waitFor();
     assert.deepEqual(await page.evaluate(() => [document.documentElement.lang, localStorage.getItem('app_language')]), ['en', 'en']);
     console.log('English and Tagalog: auth back, keyboard-open taps, passenger navigation and reload persistence passed');
+    await page.getByText('To City Hall', { exact: true }).waitFor({ timeout: 8000 });
+    await page.getByText('To Makati', { exact: true }).waitFor({ timeout: 8000 });
+    console.log('Route 1: both reference directions render before operator confirmation');
     const bar = tabs.locator('..');
     const more = page.getByRole('tab', { name: /More/ });
     const search = page.getByRole('textbox', { name: 'Search destination' });

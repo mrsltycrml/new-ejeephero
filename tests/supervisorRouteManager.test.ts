@@ -247,6 +247,9 @@ test('previewing either alignment and selecting map or list pins never writes; p
     throw Error('Reply lost');
   },true);
   assert.ok(ui.nodes().includes('No alignment confirmed'));
+  assert.equal(ui.control('Select','Preview alignment').value,'buendia_roundtrip');
+  assert.ok(ui.map().pins.some((p:Row)=>p.id==='roundtrip-bridge'));
+  ui.select('Preview alignment','buendia_2022');
   assert.ok(ui.nodes().some(n=>typeof n==='string' && n.includes('doubles back on Jupiter')));
   assert.deepEqual(ui.map().pins.map((p:Row)=>p.id),['buendia','jupiter','bridge','school','tivoli','maysilo-circle']);
   ui.control('Pressable','Open the dated OpenStreetMap route record').onPress();

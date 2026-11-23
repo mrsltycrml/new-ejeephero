@@ -14,8 +14,7 @@ test('route line import keeps GeoJSON longitude, latitude and travel order', () 
 });
 
 test('Route 1 review keeps both dated directional traces continuous and the later Tivoli platforms distinct', () => {
-  assert.equal(route1Variants.length, 2);
-  for (const variant of route1Variants) {
+  for (const variant of route1Variants.filter(route => route.id !== 'buendia_roundtrip')) {
     assert.notEqual(variant.source, variant.returnSource);
     for (const direction of ['outbound', 'inbound'] as const) {
       const points = variant[direction];

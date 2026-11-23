@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useIsFocused } from '@react-navigation/native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Linking, Platform, Vibration, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +16,7 @@ import { type TerminalData, type VehicleData } from '../../services/offlineTrans
 import { loadLoadingZones, loadPassengerFareData } from '../../services/passengerDataService';
 import { quotePassengerFare, validFareMatrix, verifiedRideDistance } from '../../services/passengerFare';
 import { DESTINATION_RADIUS_METERS, STOP_SEARCH_METERS, atPassengerDestination, passengerPlanRide } from '../../services/passengerTrip';
-import { distanceMeters, evaluateBoardingLocation, type LoadingZone } from '../../services/passengerSafety';
+import { distanceMeters, evaluateBoardingLocation, outsideLoadingZone, trackNoLoadingWait, type LoadingZone, type NoLoadingWait } from '../../services/passengerSafety';
 import { getWalkingDirections, type WalkingRoute } from '../../services/walkingDirections';
 import PassengerDestinationSearch from '../../components/PassengerDestinationSearch';
 import { type PassengerPlace } from '../../services/passengerPlaces';
@@ -27,7 +28,8 @@ import { passengerMapOverview } from '../../services/passengerMapOverview';
 
 export default function PassengerHomeScreen({ route, navigation }: any) {
   const { t } = useTranslation();
-  const { fix, quality, errorMsg, foreground, enableLocation } = useLocation();
+  const focused = useIsFocused();
+  const { fix, quality, errorMsg, foreground, now: locationNow, enableLocation } = useLocation();
   const { isConnected } = useNetwork();
   const { user, getAccessToken } = useAuth();
   const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleRouteIds, vehicleError, nearby, endRide, selectedRouteId, fleetRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setRideStops, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
@@ -83,7 +85,6 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     }
   };
 
-  const lastWarning = useRef<string | null>(null);
   useEffect(() => {
     const request = ++zoneRequest.current;
     let active = true;
@@ -113,14 +114,23 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     .sort((a, b) => a.sequence_order - b.sequence_order), [stops, selectedRouteId]);
   const boardingOptions = passengerStopOptions(routeStops, 'board', alightingStop);
   const alightingOptions = passengerStopOptions(routeStops, 'alight', boardingStop);
-  const boarding = evaluateBoardingLocation(foreground && !errorMsg ? fix : null, zonesError ? [] : zones, now, routeStops, t);
-  const warningKey = boarding.kind === 'prohibited' ? boarding.zone!.id : null;
+  const boarding = evaluateBoardingLocation(foreground && !errorMsg ? fix : null, zonesError ? [] : zones, locationNow, routeStops, t);
+  const focusedFix = focused && foreground && !errorMsg ? fix : null;
+  const restrictedZone = boarding.kind === 'prohibited' ? boarding.zone ?? null : null;
+  const waiting = useRef<NoLoadingWait | null>(null);
+  const [warningZoneId, setWarningZoneId] = useState<string | null>(null);
+  const notifiedZones = useRef(new Map<string, LoadingZone>());
   useEffect(() => {
-    if (warningKey && lastWarning.current !== warningKey) {
-      if (Platform.OS !== 'web') Vibration.vibrate([0, 150, 100, 150]);
+    waiting.current = trackNoLoadingWait(waiting.current, restrictedZone, unit ? null : focusedFix, locationNow);
+    for (const [id, zone] of notifiedZones.current) {
+      if (outsideLoadingZone(zone, focusedFix, locationNow)) notifiedZones.current.delete(id);
     }
-    lastWarning.current = warningKey;
-  }, [warningKey]);
+    setWarningZoneId(waiting.current?.waiting ? waiting.current.zoneId : null);
+    if (!waiting.current?.waiting || !restrictedZone || notifiedZones.current.has(restrictedZone.id)) return;
+    notifiedZones.current.set(restrictedZone.id, restrictedZone);
+    if (Platform.OS !== 'web') Vibration.vibrate([0, 150, 100, 150]);
+  }, [restrictedZone, focusedFix, locationNow, unit]);
+  const waitingWarning = !!(focusedFix && !unit && restrictedZone && warningZoneId === restrictedZone.id);
 
   const activeStop = routeStops.find(stop => stop.id === inspectedStop?.id) ?? null;
   const stopBadgeCode = boardingStop && permitsPassengerUse(boardingStop, 'board') ? t('passenger.home.boardingConfirmed') : t('passenger.home.noBoarding');
@@ -358,7 +368,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     {(!tripApplied || unit) && walkingFeedback}
     {(boardingOpen || !!activeStop) && <PassengerStopGuide boarding={boarding} landmarks={routeStops} selectedStop={activeStop} onSelectStop={chooseDestination}
       onWalk={stop => void requestWalk(stop)} walkingBusy={walkingBusy} onRefresh={refreshZones} loading={zonesLoading}
-      loadError={zonesError || transit.status !== 'ready'} openRequest={route?.params?.showStopGuide} />}
+      loadError={zonesError || transit.status !== 'ready'} openRequest={route?.params?.showStopGuide ?? (boardingOpen ? 1 : undefined)} />}
   </View>;
   const journeyMapProps = { preferMapcn: true, routes, terminals: locatedStops, selectedRouteId, boardingStop, alightingStop, walkingRoutes,
     passengerOverview: overview, selectedTerminal: inspectedStop, onSelectTerminal: chooseDestination, vehicleSelectionKey: selected?.id ?? null,
@@ -457,7 +467,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             color={isProhibited ? Colors.primaryRed : Colors.brandGreen}
           />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowTitle, isProhibited && { color: Colors.primaryRed }]}>
+            <Text accessibilityRole={waitingWarning ? 'alert' : undefined} style={[styles.rowTitle, isProhibited && { color: Colors.primaryRed }]}>
               {boarding.title}
             </Text>
             <Text style={styles.rowSubtitle}>
@@ -603,6 +613,16 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
       <View style={styles.layout}>
         <PassengerDestinationSearch key={user?.id} scope={searchScope} selectedName={place?.name || destination?.name || ''} online={isConnected} onSelect={choosePlace} />
         <View style={styles.mapColumn}>
+          {!!waitingWarning && <View style={[styles.boardingStatusRow, styles.boardingStatusDanger]}>
+            <Ionicons aria-hidden name="warning" size={22} color={Colors.primaryRed} />
+            <View style={{ flex: 1 }}>
+              <Text accessibilityRole="alert" style={[styles.rowTitle, { color: Colors.primaryRed }]}>{boarding.title}</Text>
+              <Text style={styles.rowSubtitle}>{boarding.detail}</Text>
+              <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={() => setBoardingOpen(true)}>
+                <Text style={styles.mapLink}>{t('passenger.home.safeBoarding')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>}
           <View style={[styles.mapContainer, { height: width >= 860 ? 400 : Math.min(380, Math.max(240, (height || 700) * 0.40)) }]}>
             <LeafletMap ref={map} destinationPlace={place} hideOccupancy {...journeyMapProps}
               vehicles={displayed} userLocation={locationFresh ? fix : null}

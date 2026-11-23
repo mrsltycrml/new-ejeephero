@@ -35,15 +35,25 @@ const ended: any[] = [];
 let rollbackError = false;
 const published: any[] = [];
 let restoredShift: any = null, driverId = 'driver';
-const countWrites: Array<{ id: string; count: number; resolve: (value: any) => void; reject: (error: Error) => void }> = [];
-const database = { from() { let row: any, id: string; const query: any = {
-  select: () => query, eq: (key: string, value: string) => { if (key === 'id') id = value; return query; }, order: () => query, limit: () => query,
-  maybeSingle: async () => ({ data: restoredShift, error: null }),
+let shiftStatus: { data: { is_active: boolean } | null; error: unknown };
+let sensorStops = 0;
+const countWrites: Array<{ id: string; activeOnly: boolean; count: number; resolve: (value: any) => void; reject: (error: Error) => void }> = [];
+const database = { from() { let row: any, id: string, columns: string, activeOnly = false; const query: any = {
+  select: (value: string) => { columns = value; return query; },
+  eq: (key: string, value: string | boolean) => {
+    if (key === 'id') id = String(value);
+    if (key === 'is_active') activeOnly = value === true;
+    return query;
+  }, order: () => query, limit: () => query,
+  maybeSingle: async () => {
+    if (row) return await query;
+    return columns === 'is_active' ? shiftStatus : { data: restoredShift, error: null };
+  },
   update: (value: any) => { row = value; return query; },
   insert: () => { inserted++; return query; },
   single: async () => ({ data: { id: 'shift', created_at: new Date().toISOString(), max_capacity: 22 }, error: null }),
   then: (resolve: any, reject: any) => row && row.is_active === undefined
-    ? new Promise((done, fail) => countWrites.push({ id, count: row.passenger_count, resolve: done, reject: fail })).then(resolve, reject)
+    ? new Promise((done, fail) => countWrites.push({ id, activeOnly, count: row.passenger_count, resolve: done, reject: fail })).then(resolve, reject)
     : Promise.resolve({ data: [], error: null }).then(result => {
         if (row?.is_active === false) {
           ended.push(id);
@@ -57,6 +67,7 @@ const service = { getTransitData: async () => ({ routes: [{ id: 'route', name: '
   getInServiceRouteIds: () => readServiceIds(),
   publishPosition: async (id: string, fix: any) => published.push(positionPayload(id, fix)) };
 Object.assign(globalThis, { __shiftReact: react, __shiftDb: database, __shiftTransit: service, __shiftLocation: () => locationState,
+  __shiftStopSensor: () => { sensorStops++; },
   __shiftUser: () => ({ user: { id: driverId } }),
   __shiftPlatform: platform,
   __shiftDevice: { Accuracy: { High: 1 },
@@ -76,7 +87,7 @@ const fixtures: Record<string, string> = {
   '/contexts/LocationContext': 'export const useLocation=globalThis.__shiftLocation;',
   '/services/offlineTransitService': 'export const offlineTransit=globalThis.__shiftTransit;',
   '/services/fleetRegistryService': 'export const loadActiveFleetUnits=async()=>[{body_number:"Unit",plate_number:"TEST"}];',
-  '/services/anomalyDetector': 'export const startAnomalyDetection=()=>{},stopAnomalyDetection=()=>{};',
+  '/services/anomalyDetector': 'export const startAnomalyDetection=()=>{},stopAnomalyDetection=globalThis.__shiftStopSensor;',
   '/components/LeafletMap': 'export default "Map";',
   '/components/AppUI': 'export const BottomSheetModal="Sheet",triggerHaptic=()=>{};',
 };
@@ -101,6 +112,8 @@ const reset = () => {
   readServiceIds = async () => new Set(['route']);
   ended.length = 0;
   rollbackError = false;
+  shiftStatus = { data: { is_active: true }, error: null };
+  sensorStops = 0;
   states = []; refs = []; effectSlots = []; callbackSlots = []; countWrites.length = 0; restoredShift = null; driverId = 'driver';
   platform.OS = 'android'; permission = 'granted'; servicesEnabled = true; deviceCalls.length = 0; inserted = 0; published.length = 0;
 };
@@ -348,7 +361,7 @@ test('actual passenger count handler blocks same-frame taps and disables control
       assert.equal(countButton(tree, direction).props.disabled, true);
       assert.equal(countButton(tree, direction).props.accessibilityState.disabled, true);
     }
-    countWrites.shift()!.resolve({ error: null });
+    countWrites.shift()!.resolve({ data: { id: 'shift-a' }, error: null });
     await Promise.all(pending);
     tree = render();
     assert.equal(countValue(tree), 4);
@@ -356,7 +369,7 @@ test('actual passenger count handler blocks same-frame taps and disables control
     pending.push(countButton(tree).props.onPress());
     await setImmediate();
     assert.equal(countWrites[0].count, 5);
-    countWrites.shift()!.resolve({ error: null });
+    countWrites.shift()!.resolve({ data: { id: 'shift-a' }, error: null });
     await Promise.all(pending);
     assert.equal(countValue(render()), 5);
   } finally { countWrites.splice(0).forEach(write => write.resolve({ error: null })); await Promise.allSettled(pending); cleanupEffects(); }
@@ -377,7 +390,7 @@ test('actual passenger count handler retains count and unlocks retry on returned
       assert.equal(countButton(failed).props.disabled, false);
       const retry = countButton(failed).props.onPress();
       await setImmediate();
-      countWrites.shift()!.resolve({ error: null });
+      countWrites.shift()!.resolve({ data: { id: 'shift-a' }, error: null });
       await retry;
       assert.equal(countValue(render()), 4);
       assert.doesNotMatch(textOf(render()), /Passenger count could not be saved/);
@@ -402,4 +415,41 @@ test('passenger count responses from an old shift cannot change the newly restor
       assert.equal(countButton(render()).props.disabled, false);
     } finally { countWrites.splice(0).forEach(write => write.resolve({ error: null })); cleanupEffects(); }
   }
+});
+
+test('a supervisor ending the shift stops the sensor and GPS publication on refresh', async t => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const active = await mountCount();
+  try {
+    assert.match(textOf(active), /On duty/);
+    shiftStatus = { data: null, error: new Error('Offline') };
+    t.mock.timers.tick(15_000);
+    await setImmediate();
+    assert.match(textOf(render()), /On duty/);
+
+    shiftStatus = { data: { is_active: false }, error: null };
+    t.mock.timers.tick(15_000);
+    await setImmediate();
+    assert.match(textOf(render()), /This shift has ended/);
+    assert.equal(sensorStops, 1);
+    assert.equal(countButton(render()).props.disabled, true);
+    locationState = { ...locationState, fix: { ...accepted, timestamp: Date.now() } };
+    render(); flushEffects(); await setImmediate();
+    assert.equal(published.length, 0);
+  } finally { cleanupEffects(); t.mock.timers.reset(); }
+});
+
+test('passenger count writes require an active shift and cannot succeed after it ends', async () => {
+  const active = await mountCount();
+  const pending = countButton(active).props.onPress();
+  await setImmediate();
+  const write = countWrites.shift()!;
+  try {
+    assert.equal(write.activeOnly, true);
+    shiftStatus = { data: { is_active: false }, error: null };
+    write.resolve({ data: null, error: null });
+    await pending;
+    assert.match(textOf(render()), /This shift has ended/);
+    assert.equal(countButton(render()).props.disabled, true);
+  } finally { write.resolve({ data: null, error: null }); await pending; cleanupEffects(); }
 });

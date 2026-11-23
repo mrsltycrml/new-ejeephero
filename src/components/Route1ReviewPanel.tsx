@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Linking, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../lib/supabase';
 import type { RouteData, TerminalData } from '../services/offlineTransitService';
-import { ROUTE1_INBOUND_ID, ROUTE1_OUTBOUND_ID, route1Pins, route1Variants } from '../services/route1FieldMap';
+import { ROUTE1_INBOUND_ID, ROUTE1_OUTBOUND_ID, route1Pins, route1RoundTrip, route1Variants } from '../services/route1FieldMap';
 import { https } from '../services/supervisorCatalogForm';
 import { activeRoute, confirmedPassengerUse, passengerUseLabel } from '../services/routeMap';
 import { PassengerSelect, passengerStyles as s } from './PassengerUI';
@@ -16,7 +16,7 @@ export function route1Direction(id: string) {
   return id === ROUTE1_OUTBOUND_ID ? 'outbound' : id === ROUTE1_INBOUND_ID ? 'inbound' : null;
 }
 export function previewVariant(id?: string | null) {
-  return route1Variants.find(v => v.id === id) ?? route1Variants[0];
+  return route1Variants.find(v => v.id === id) ?? route1RoundTrip;
 }
 export function variantPins(id: Variant['id'], direction: ReviewSelection['direction']) {
   return route1Pins.filter(p => (!p.variantId || p.variantId === id) && (!p.direction || p.direction === direction));
@@ -112,6 +112,9 @@ export default function Route1ReviewPanel({ routes, stops, selection, onChange, 
         ? activeRoute(route) ? 'In service' : route.is_archived ? 'Archived · out of service' : 'Out of service'
         : 'No route record'}</Text>
       {variant.id === 'buendia_2022' && <Text style={s.muted}>The archived return path doubles back on Jupiter after reaching Buendia. Check both directions before activation.</Text>}
+      {variant.id === 'buendia_roundtrip' && <Text style={s.muted}>{direction === 'outbound'
+        ? 'Via Kalayaan Avenue to City Hall, including the Maysilo Circle turnaround.'
+        : 'From City Hall via J.P. Rizal Street back to MRT Buendia.'} Confirm the street trace before activation.</Text>}
       <Route1ReviewMap variant={variant} direction={direction} pins={[...pins, ...saved.map(entry => entry.pin)]}
         selectedPinId={pin?.id ?? null} onSelectPin={selectMapPin}/>
       {active && (saved.length

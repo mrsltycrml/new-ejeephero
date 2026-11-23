@@ -1,5 +1,5 @@
-import { loadAdminOperations } from '../services/adminOperationsService';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { loadRecentAdminViolationCount } from '../services/adminOperationsService';
+import React, { useEffect, useState } from 'react';
 import { Keyboard, Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitch from '../components/LanguageSwitch';
@@ -289,39 +289,44 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
   const [alertCount, setAlertCount] = useState(0);
   const [notice, setNotice] = useState('');
   const [activePanel, setActivePanel] = useState<AdminPanel>(null);
-  const previousCount = useRef<number | null>(null);
-  const loadAlertCount = useCallback(async () => {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    let operations;
-    try { operations = await loadAdminOperations(); }
-    catch { setNotice('Alert count unavailable.'); return; }
-    if (!operations.speedEvents || !operations.tripViolations) { setNotice('Alert count unavailable.'); return; }
-    const total = operations.speedEvents.filter(event => event.created_at >= since).length
-      + operations.tripViolations.filter(event => event.created_at >= since && event.status !== 'dismissed').length;
-    if (previousCount.current !== null && total > previousCount.current)
-      setNotice(`${total - previousCount.current} new driver violation${total - previousCount.current === 1 ? '' : 's'} recorded`);
-    previousCount.current = total;
-    setAlertCount(total);
-  }, []);
   useEffect(() => {
+    let active = true;
+    let pending = false;
+    let refreshAgain = false;
+    let previousCount: number | null = null;
+    const loadAlertCount = async () => {
+      if (!active) return;
+      if (pending) { refreshAgain = true; return; }
+      pending = true;
+      try {
+        const total = await loadRecentAdminViolationCount();
+        if (!active) return;
+        if (previousCount !== null && total > previousCount) {
+          const added = total - previousCount;
+          setNotice(`${added} new driver violation${added === 1 ? '' : 's'} recorded`);
+        }
+        previousCount = total;
+        setAlertCount(total);
+      } catch {
+        if (active) setNotice('Alert count unavailable.');
+      } finally {
+        pending = false;
+        if (refreshAgain) { refreshAgain = false; void loadAlertCount(); }
+      }
+    };
     void loadAlertCount();
-    const timer = setInterval(() => {
-      void loadAlertCount();
-    }, 15000);
+    const timer = setInterval(() => void loadAlertCount(), 15000);
     const channel = supabase
       .channel('admin-header-violations')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'speed_events' }, () => {
-        void loadAlertCount();
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trip_violations' }, () => {
-        void loadAlertCount();
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'speed_events' }, () => void loadAlertCount())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_violations' }, () => void loadAlertCount())
       .subscribe();
     return () => {
+      active = false;
       clearInterval(timer);
       void supabase.removeChannel(channel);
     };
-  }, [loadAlertCount]);
+  }, []);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(''), 6500);

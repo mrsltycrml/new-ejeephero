@@ -12,11 +12,24 @@ const route: any = { id: 'r-any', name: '</script><b>Route</b>', coordinates: [a
 const stop = (id: string, point: typeof a, order: number, route_id = route.id): any => ({ id, ...point, route_id, sequence_order: order, name: id, location_verified_at: '2026-11-01', location_source_url: 'https://example.test/stops',
   passenger_use: 'both', passenger_use_verified_at: '2026-11-01', passenger_use_source_url: 'https://example.test/operations' });
 const origin = stop('a', a, 1), end = stop('c', c, 3);
-test('Route 1 map shows the dated street lines and landmark pins before operational confirmation', () => {
+test('Route 1 map defaults to the recorded round trip without authorizing boarding', () => {
   const buendia = { ...route, id: ROUTE1_OUTBOUND_ID, geometry_verified_at: null, coordinates: [] };
   const overview = passengerMapOverview([buendia], [])!;
+  assert.equal(overview.variant.id, 'buendia_roundtrip');
   assert.deepEqual(overview.referenceLines.map(l => l.referenceDirection), ['outbound', 'inbound']);
   assert.ok(overview.referenceLines.every(l => l.coordinates.length > 20));
+  const [outbound, inbound] = overview.referenceLines.map(l => l.coordinates);
+  const near = (points: typeof outbound, latitude: number, longitude: number) => points.some(point =>
+    Math.hypot(point.latitude - latitude, point.longitude - longitude) < 0.00025);
+  assert.deepEqual(outbound[0], inbound.at(-1), 'both legs meet at Buendia');
+  assert.deepEqual(outbound.at(-1), inbound[0], 'the Maysilo turnaround joins the return');
+  assert.ok(near(outbound, 14.56665, 121.02358), 'outbound turns at Nicanor Garcia and Kalayaan');
+  assert.ok(!near(outbound, 14.56962, 121.02459), 'outbound does not go as far north as J.P. Rizal');
+  assert.ok(near(inbound, 14.56962, 121.02459), 'return turns from J.P. Rizal onto Nicanor Garcia');
+  assert.ok(near(outbound, 14.57842, 121.03391), 'outbound completes the City Hall circle');
+  assert.ok(!near(inbound, 14.57842, 121.03391), 'return does not loop through City Hall again');
+  assert.ok(overview.landmarks.every(p => p.kind === 'landmark'));
+  assert.ok(overview.landmarks.some(p => p.id === 'roundtrip-bridge'));
   assert.ok(overview.landmarks.some(p => p.id === 'jupiter'));
   const jupiter = overview.landmarks.find(p => p.id === 'jupiter')!;
   const surveyed = { ...origin, id: 'surveyed-junction', route_id: buendia.id, ...jupiter.point };

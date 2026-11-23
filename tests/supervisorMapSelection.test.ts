@@ -33,6 +33,7 @@ const fixtures: Record<string, string> = {
   '/services/offlineTransitService': 'export const offlineTransit={getTransitData:async()=>({routes:[],terminals:[],status:"ready"})};',
   '/components/LeafletMap': 'export default "Map";',
   '/components/SupervisorRouteManager': 'export default "RouteManager";',
+  '/components/FleetIncidentInbox': 'export default "IncidentInbox";',
   '/components/AppUI': 'export const BottomSheetModal="Sheet",ScreenSkeleton="Skeleton",triggerHaptic=()=>{};',
   '/passenger/DirectoryScreen': 'export default "Directory";',
 };
@@ -118,6 +119,15 @@ test('Fleet opens Route 1 review in one tap and returns to the monitor', async (
     assert.equal(add.props.initialPage,'add');
     add.props.onBack();
     assert.ok(find(render(),'Map'));
+  } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); }
+});
+
+test('Fleet monitor puts the incident inbox on the supervisor landing screen', async () => {
+  states.length = 0;
+  render(); const cleanup = effects.map(effect => effect());
+  try {
+    await setImmediate();
+    assert.ok(find(render(), 'IncidentInbox'));
   } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); }
 });
 

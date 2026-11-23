@@ -88,13 +88,40 @@ export default function DashboardScreen() {
   const canSharePosition = routeInService && !closingUnconfirmed;
   const canStartShift = locationReady && routeInService && !starting;
 
+  const clearShift = useCallback((message = '') => {
+    activeVehicle.current = null;
+    stopAnomalyDetection();
+    setVehicleId(null);
+    setPublishedAt(null);
+    setPassengerCount(0);
+    setTelemetryError('');
+    setPassengerSheetOpen(false);
+    setEndShiftSheetOpen(false);
+    setIsActive(false);
+    setClosingUnconfirmed(false);
+    setShiftError(message);
+  }, []);
+
+  const checkActiveShift = useCallback(async (id: string) => {
+    try {
+      const { data, error } = await supabase.from('vehicles').select('is_active').eq('id', id).maybeSingle();
+      if (!error && data?.is_active === false && activeVehicle.current === id) clearShift('This shift has ended.');
+    } catch {
+      // A failed read cannot confirm the shift ended. The next refresh retries it.
+    }
+  }, [clearShift]);
+
   useEffect(() => {
     setServiceIds(null);
     if (!foreground || !isConnected || !user?.id) return;
-    void checkService();
-    const timer = isActive ? setInterval(() => { void checkService(); }, 15_000) : undefined;
+    const refresh = () => {
+      void checkService();
+      if (isActive && vehicleId) void checkActiveShift(vehicleId);
+    };
+    refresh();
+    const timer = isActive ? setInterval(refresh, 15_000) : undefined;
     return () => { clearInterval(timer); serviceRequest.current = null; };
-  }, [foreground, isConnected, user?.id, isActive, vehicleId, checkService]);
+  }, [foreground, isConnected, user?.id, isActive, vehicleId, checkService, checkActiveShift]);
 
   const checkNativePermission = useCallback(async () => {
     try {
@@ -279,8 +306,13 @@ export default function DashboardScreen() {
     setSavingPassengerCount(true);
     setShiftError('');
     try {
-      const { error } = await supabase.from('vehicles').update({ passenger_count: clamped }).eq('id', vehicleId);
+      const { data, error } = await supabase.from('vehicles').update({ passenger_count: clamped })
+        .eq('id', vehicleId).eq('is_active', true).select('id').maybeSingle();
       if (error) throw error;
+      if (!data) {
+        await checkActiveShift(vehicleId);
+        throw new Error('Passenger count could not be saved.');
+      }
       if (activeVehicle.current === vehicleId) setPassengerCount(clamped);
     } catch {
       if (activeVehicle.current === vehicleId) setShiftError('Passenger count could not be saved.');
@@ -303,14 +335,7 @@ export default function DashboardScreen() {
           .update({ is_active: false, passenger_count: 0 })
           .eq('id', vehicleId);
         if (error) throw new Error(error.message);
-        stopAnomalyDetection();
-        setVehicleId(null);
-        setPublishedAt(null);
-        setPassengerCount(0);
-        setTelemetryError('');
-        setEndShiftSheetOpen(false);
-        setIsActive(false);
-        setClosingUnconfirmed(false);
+        clearShift();
         triggerHaptic('medium');
         return;
       }

@@ -53,7 +53,7 @@ test('a missing scope fails closed and an activated route becomes searchable reg
 
 test('dated reference streets and pins follow the selected variant and direction, and approved geometry supersedes a reference', async (t) => {
   clock(t);
-  const outbound = { ...route, id: ROUTE1_OUTBOUND_ID, coordinates: [], geometry_verified_at: null };
+  const outbound = { ...route, id: ROUTE1_OUTBOUND_ID, coordinates: [], geometry_verified_at: null, route1_variant: 'buendia_2022' };
   const dated = { routes: [outbound], stops: [], selectedRouteId: outbound.id };
   const jupiter = searchLocalPassengerPlaces('jup mak', dated)[0];
   assert.equal(jupiter.id, 'landmark:jupiter');

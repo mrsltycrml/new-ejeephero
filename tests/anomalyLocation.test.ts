@@ -40,3 +40,15 @@ test('crash events survive missing GPS while stale, unknown-accuracy and legacy 
     assert.equal(events.length, 5);
   } finally { Date.now = clock; stopAnomalyDetection(); }
 });
+
+test('stopping a shift invalidates a pending sensor start', async t => {
+  let sensorAvailable!: (available: boolean) => void;
+  t.mock.method(sensor, 'isAvailableAsync', () => new Promise<boolean>(resolve => { sensorAvailable = resolve; }));
+  const starting = startAnomalyDetection('ended');
+  try {
+    stopAnomalyDetection();
+    sensorAvailable(true);
+    await starting;
+    assert.equal(listener, null);
+  } finally { stopAnomalyDetection(); }
+});

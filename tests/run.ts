@@ -26,8 +26,10 @@ import './supervisorRouteManager.test.ts';
 import './supervisorCatalogForm.test.ts';
 // Module-hook fixtures must finish importing before the next hook is installed.
 await import('./mapHtmlSerialization.test.ts');
+await import('./herobotBotpress.test.ts');
 await import('./anomalyLocation.test.ts');
 await import('./driverShiftStart.test.ts');
+await import('./languagePreference.test.ts');
 await import('./sosLocation.test.ts');
 await import('./supervisorMapSelection.test.ts');
 await import('./passengerJourneyState.test.ts');
