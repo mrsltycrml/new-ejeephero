@@ -52,7 +52,18 @@ const hooks = registerHooks({
 });
 const { default: SupervisorDashboardScreen } = await import('../src/screens/admin/SupervisorDashboardScreen.tsx');
 hooks.deregister();
-const render = () => { index = 0; effects = []; return SupervisorDashboardScreen(); };
+let expectedHooks: number | null = null;
+const render = () => {
+  if (states.length === 0) expectedHooks = null;
+  index = 0;
+  effects = [];
+  const tree = SupervisorDashboardScreen();
+  if (expectedHooks == null) expectedHooks = index;
+  else if (index !== expectedHooks) {
+    throw new Error(`Rendered ${index} hooks, expected ${expectedHooks}`);
+  }
+  return tree;
+};
 const find = (node: any, type: string, label?: string): any => node?.type === type && (!label || node.props.accessibilityLabel === label)
   ? node : (node?.props?.children || []).flat(Infinity).map((child: any) => find(child, type, label)).find(Boolean);
 const identity = (props: any) => props.vehicleSelectionKey === undefined ? props.selectedVehicle?.id ?? null : props.vehicleSelectionKey;
@@ -148,4 +159,19 @@ test('actual supervisor Live units KPI expires by wall clock without a completed
     assert.equal(liveKpi(tree), 0);
     await setImmediate();
   } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); t.mock.timers.reset(); }
+});
+
+test('supervisor fleet can go from the loading skeleton to the loaded map without a hook-order crash', async () => {
+  states.length = 0;
+  const loading = render();
+  assert.equal(loading.type, 'Skeleton');
+  const hooksWhileLoading = expectedHooks;
+  const cleanup = effects.map(effect => effect());
+  try {
+    await setImmediate();
+    const loaded = render();
+    assert.equal(expectedHooks, hooksWhileLoading, 'loading and loaded renders must call the same hooks');
+    assert.ok(find(loaded, 'Map'), 'loaded fleet monitor should show the map');
+    assert.ok(find(loaded, 'PeekSheet'), 'loaded fleet monitor should show the peek sheet');
+  } finally { cleanup.forEach(fn => { if (typeof fn === 'function') fn(); }); }
 });

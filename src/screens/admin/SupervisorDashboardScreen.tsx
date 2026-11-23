@@ -162,6 +162,7 @@ export default function SupervisorDashboardScreen() {
 
   const [manageMode, setManageMode] = useState<'none' | 'list' | 'route1' | 'add'>('none');
   const { width } = useWindowDimensions();
+  const [sheetInset, setSheetInset] = useState<number>(sheetSnap.peek);
   const [dataError, setDataError] = useState('');
   const [transitNotice, setTransitNotice] = useState('');
 
@@ -451,7 +452,6 @@ export default function SupervisorDashboardScreen() {
   };
 
   const wideMap = width >= 860;
-  const [sheetInset, setSheetInset] = useState<number>(sheetSnap.peek);
   return (
     <>
       <View style={styles.homeFill}>
