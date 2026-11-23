@@ -143,7 +143,7 @@ export default function SafetyScreen({ route }: { route?: { params?: { section?:
   useFocusEffect(useCallback(() => {
     if (contactsFirst) scroll.current?.scrollTo({ y: 0, animated: false });
   }, [contactsFirst]));
-  const contacts = <TrustedContacts key={user?.id || 'signed-out'} userId={user?.id} />;
+  const contacts = <TrustedContacts key={`contacts-${user?.id || 'signed-out'}`} userId={user?.id} />;
   return <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]} keyboardShouldPersistTaps="always">
     {contactsFirst && contacts}
     <View style={s.heroBanner}>
@@ -153,7 +153,7 @@ export default function SafetyScreen({ route }: { route?: { params?: { section?:
       <Text style={s.heroSubtitle}>{unit ? [t('passenger.safety.linked', { unit: unit.body_number }),
         unit.plate_number && t('passenger.safety.plate', { plate: unit.plate_number })].filter(Boolean).join(' · ') : t('passenger.safety.noUnit')}</Text>
     </View>
-    {user && <FleetIncidentReporter key={user.id} vehicleId={unit?.vehicle_id} />}
+    {user && <FleetIncidentReporter key={`incident-${user.id}`} vehicleId={unit?.vehicle_id} />}
     {!contactsFirst && contacts}
     <View style={s.section}><EmergencyHotlines /></View>
   </FormScrollView>;

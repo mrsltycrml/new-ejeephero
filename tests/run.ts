@@ -36,3 +36,4 @@ await import('./supervisorMapSelection.test.ts');
 await import('./passengerJourneyState.test.ts');
 await import('./passengerPlanningData.test.ts');
 await import('./makeoverReviewFixes.test.ts');
+await import('./safetyReportCard.test.ts');
