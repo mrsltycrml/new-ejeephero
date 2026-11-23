@@ -218,6 +218,16 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
 
   useEffect(() => {
     if (!view) return;
+    const el = view.map.getContainer();
+    const resize = () => { try { view.map.resize(); } catch { /* map already removed */ } };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
+    observer?.observe(el);
+    resize();
+    return () => observer?.disconnect();
+  }, [view]);
+
+  useEffect(() => {
+    if (!view) return;
     const identity = vehicleSelectionKey === undefined ? selectedVehicleId : vehicleSelectionKey;
     const key = identity ? JSON.stringify([identity, vehicleFocusRequestId]) : null;
     if (key !== vehicleFocus.current.key) vehicleFocus.current = { key, pending: key != null };

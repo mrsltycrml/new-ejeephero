@@ -62,6 +62,8 @@ export interface LeafletMapProps {
   moveButtonStyle?: StyleProp<ViewStyle>;
   mapControlsCorner?: 'bottom-left' | 'top-right';
   mapControlsOffsetTop?: number;
+  /** Reserve space so attribution and bottom controls sit above a covering sheet. */
+  bottomInset?: number;
 }
 
 const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
@@ -92,6 +94,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   moveButtonStyle,
   mapControlsCorner = 'bottom-left',
   mapControlsOffsetTop = 0,
+  bottomInset = 0,
 }, ref) => {
   const webViewRef = useRef<any>(null);
   const NativeWebView = WebView as React.ComponentType<any>;
@@ -788,7 +791,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, bottomInset ? { paddingBottom: bottomInset } : null]}>
       {showMapcn ? (
         <MapcnPassengerMap data={mapData} controls={mapcnControls} onFailure={onMapcnFailure} onSelect={handleRawMessage} onPickCurb={fieldReview?.onPickCurb} />
       ) : isWeb ? (

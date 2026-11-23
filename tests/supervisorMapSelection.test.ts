@@ -26,7 +26,7 @@ const database = { channel: () => channel, removeChannel() {}, from(table: strin
 Object.assign(globalThis, { __monitorReact: react, __monitorDb: database, __monitorRoute: route });
 const fixtures: Record<string, string> = {
   react: 'const r=globalThis.__monitorReact; export default r; export const {useState,useEffect,useMemo,useCallback}=r;',
-  'react-native': 'export const View="View",Text="Text",TextInput="Input",TouchableOpacity="Button",ScrollView="Scroll",RefreshControl="Refresh",Alert={alert(){}}; export const StyleSheet={create:s=>s};',
+  'react-native': 'export const View="View",Text="Text",TextInput="Input",TouchableOpacity="Button",ScrollView="Scroll",RefreshControl="Refresh",Alert={alert(){}}; export const StyleSheet={create:s=>s,absoluteFill:{position:"absolute",top:0,left:0,right:0,bottom:0}}; export const Platform={OS:"web"}; export const useWindowDimensions=()=>({width:400,height:800});',
   '@expo/vector-icons': 'export const Ionicons="Icon";',
   '@react-navigation/native': 'export const useRoute=()=>globalThis.__monitorRoute;',
   '/lib/supabase': 'export const supabase=globalThis.__monitorDb;',
@@ -35,6 +35,7 @@ const fixtures: Record<string, string> = {
   '/components/SupervisorRouteManager': 'export default "RouteManager";',
   '/components/FleetIncidentInbox': 'export default "IncidentInbox";',
   '/components/AppUI': 'export const BottomSheetModal="Sheet",ScreenSkeleton="Skeleton",triggerHaptic=()=>{};',
+  '/components/ui/PeekSheet': 'export default "PeekSheet";',
   '/passenger/DirectoryScreen': 'export default "Directory";',
 };
 const hooks = registerHooks({

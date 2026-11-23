@@ -8,7 +8,7 @@ import PassengerStopGuide from '../../components/PassengerStopGuide';
 import { passengerStyles as s, PassengerSelect } from '../../components/PassengerUI';
 import WalkingDirectionsPanel from '../../components/WalkingDirectionsPanel';
 import { triggerHaptic } from '../../components/AppUI';
-import { PeekSheet } from '../../components/ui';
+import PeekSheet from '../../components/ui/PeekSheet';
 import { useLocation } from '../../contexts/LocationContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,7 +23,7 @@ import PassengerDestinationSearch from '../../components/PassengerDestinationSea
 import { type PassengerPlace } from '../../services/passengerPlaces';
 import { locationDescription, locationQuality, vehicleTelemetryReadout } from '../../services/locationQuality';
 import { rideLeg, selectJourneyStop, confirmedPassengerUse, permitsPassengerUse, passengerStopOptions, passengerUseLabel } from '../../services/routeMap';
-import { color, elevation, radius, tapTarget } from '../../constants/theme';
+import { color, elevation, radius, sheetSnap, tapTarget } from '../../constants/theme';
 import { manilaDateKey } from '../../utils/reportingPeriod';
 import { passengerMapOverview } from '../../services/passengerMapOverview';
 
@@ -36,7 +36,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   const { unit, setUnit, destination, setDestination, place, setPlace, vehicles, vehicleRouteIds, vehicleError, nearby, endRide, selectedRouteId, fleetRouteId, setSelectedRouteId, boardingStop, setBoardingStop, alightingStop, setRideStops, walkingRoutes, transit, refreshTransit, walk, showWalk, getJourneyVersion } = usePassengerJourney();
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const map = useRef<LeafletMapRef>(null);
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const [sheetInset, setSheetInset] = useState<number>(sheetSnap.peek);
   const pendingPlace = useRef<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
 
@@ -425,6 +426,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     moveButtonStyle: wideMap ? styles.mapMoveButtonWide : styles.mapMoveButton,
     mapControlsCorner: (wideMap ? 'bottom-left' : 'top-right') as 'bottom-left' | 'top-right',
     mapControlsOffsetTop: wideMap ? 0 : 88,
+    bottomInset: wideMap ? 0 : sheetInset,
   };
 
   // 2) WHERE TO BOARD VIEW (Board 02 left)
@@ -468,6 +470,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
         <PeekSheet
           peekHeight={210}
           wide={wideMap}
+          onSnapChange={(_snap, height) => setSheetInset(height)}
           expandAccessibilityLabel={t('passenger.home.whereToBoard')}
           collapseAccessibilityLabel={t('passenger.home.back')}
           peek={
@@ -552,6 +555,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
         <PeekSheet
           peekHeight={200}
           wide={wideMap}
+          onSnapChange={(_snap, height) => setSheetInset(height)}
           expandAccessibilityLabel={t('passenger.home.yourRide')}
           collapseAccessibilityLabel={t('passenger.home.yourRide')}
           peek={
@@ -650,6 +654,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
       <PeekSheet
         peekHeight={168}
         wide={wideMap}
+        onSnapChange={(_snap, height) => setSheetInset(height)}
         expandAccessibilityLabel={t('passenger.home.safeBoarding')}
         collapseAccessibilityLabel={t('passenger.home.safeBoarding')}
         peek={

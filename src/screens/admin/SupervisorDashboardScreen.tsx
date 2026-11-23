@@ -6,16 +6,18 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { BottomSheetModal, ScreenSkeleton, triggerHaptic } from '../../components/AppUI';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
+import PeekSheet from '../../components/ui/PeekSheet';
 import { operationsStyles as ops } from './operationsStyles';
 import SupervisorRouteManager from '../../components/SupervisorRouteManager';
 import FleetIncidentInbox from '../../components/FleetIncidentInbox';
 import { supabase } from '../../lib/supabase';
-import { color, radius, tapTarget } from '../../constants/theme';
+import { color, radius, tapTarget, sheetSnap } from '../../constants/theme';
 import { offlineTransit } from '../../services/offlineTransitService';
 import type { RouteData, TerminalData, VehicleData } from '../../services/offlineTransitService';
 import { useRoute } from '@react-navigation/native';
@@ -159,6 +161,7 @@ export default function SupervisorDashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [manageMode, setManageMode] = useState<'none' | 'list' | 'route1' | 'add'>('none');
+  const { width } = useWindowDimensions();
   const [dataError, setDataError] = useState('');
   const [transitNotice, setTransitNotice] = useState('');
 
@@ -447,8 +450,40 @@ export default function SupervisorDashboardScreen() {
     cuts: 'Route flags',
   };
 
+  const wideMap = width >= 860;
+  const [sheetInset, setSheetInset] = useState<number>(sheetSnap.peek);
   return (
     <>
+      <View style={styles.homeFill}>
+        <View style={styles.mapFill}>
+          <LeafletMap
+            routes={mapRoutes}
+            terminals={mapTerminals}
+            vehicles={mapVehicles}
+            selectedVehicle={selectedMapVehicle}
+            vehicleSelectionKey={mapUnitFilter === 'all' ? null : mapUnitFilter}
+            vehicleFocusRequestId={vehicleFocusRequestId}
+            selectedRouteId={mapRouteFilter === 'all' ? null : mapRouteFilter}
+            fleetMode
+            defaultMovable
+            mapControlsCorner={wideMap ? 'bottom-left' : 'top-right'}
+            mapControlsOffsetTop={wideMap ? 0 : 12}
+            bottomInset={wideMap ? 0 : sheetInset}
+          />
+        </View>
+        <PeekSheet
+          peekHeight={168}
+          wide={wideMap}
+          onSnapChange={(_snap, height) => setSheetInset(height)}
+          expandAccessibilityLabel="Fleet details"
+          collapseAccessibilityLabel="Hide fleet details"
+          peek={
+            <>
+              <Text accessibilityRole="header" style={styles.rowTitle}>Fleet monitor</Text>
+              <Text style={styles.rowSub}>Live units {currentLiveUnits.length - gpsIssueCount}</Text>
+            </>
+          }
+        >
       <ScrollView
         style={ops.page}
         contentContainerStyle={ops.content}
@@ -620,18 +655,6 @@ export default function SupervisorDashboardScreen() {
                   ))}
                 </View>
               )}
-              <View style={styles.mapFrame}>
-                <LeafletMap
-                  routes={mapRoutes}
-                  terminals={mapTerminals}
-                  vehicles={mapVehicles}
-                  selectedVehicle={selectedMapVehicle}
-                  vehicleSelectionKey={mapUnitFilter === 'all' ? null : mapUnitFilter}
-                  vehicleFocusRequestId={vehicleFocusRequestId}
-                  selectedRouteId={mapRouteFilter === 'all' ? null : mapRouteFilter}
-                  fleetMode
-                />
-              </View>
             </View>
 
             <View style={styles.mapActions}>
@@ -859,6 +882,8 @@ export default function SupervisorDashboardScreen() {
           </View>
         )}
       </ScrollView>
+        </PeekSheet>
+      </View>
 
       <BottomSheetModal
         visible={Boolean(selectedViolation)}
@@ -1015,6 +1040,8 @@ const styles = StyleSheet.create({
   mapLayout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 12 },
   mapColumn: { flexBasis: 510, flexGrow: 3, flexShrink: 1, minWidth: 0 },
   mapActions: { flexBasis: 260, flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 10 },
+  homeFill: { flex: 1, backgroundColor: color.canvas },
+  mapFill: { ...StyleSheet.absoluteFill },
   mapFrame: { height: 300, overflow: 'hidden', borderTopWidth: 1, borderColor: color.border, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
   mapFrameSmall: {
     height: 170,

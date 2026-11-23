@@ -89,6 +89,7 @@ const fixtures: Record<string, string> = {
   '/services/fleetRegistryService': 'export const loadActiveFleetUnits=async()=>[{body_number:"Unit",plate_number:"TEST"}];',
   '/services/anomalyDetector': 'export const startAnomalyDetection=()=>{},stopAnomalyDetection=globalThis.__shiftStopSensor;',
   '/components/LeafletMap': 'export default "Map";',
+  '/components/ui/PeekSheet': 'export default "PeekSheet";',
   '/components/AppUI': 'export const BottomSheetModal="Sheet",triggerHaptic=()=>{};',
 };
 const hooks = registerHooks({

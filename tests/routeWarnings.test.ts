@@ -12,6 +12,7 @@ const themeTokens = {
   type: new Proxy({}, { get: () => ({}) }),
   space: new Proxy({}, { get: () => 8 }),
   tapTarget: 48,
+  sheetSnap: { peek: 160, halfRatio: 0.42, expandedRatio: 0.88 },
 };
 
 // Exercise the actual TSX with isolated hook state and query responses.

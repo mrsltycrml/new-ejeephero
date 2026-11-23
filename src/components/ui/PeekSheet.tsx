@@ -23,7 +23,7 @@ type Props = {
   expandAccessibilityLabel: string;
   collapseAccessibilityLabel: string;
   style?: StyleProp<ViewStyle>;
-  onSnapChange?: (snap: SheetSnap) => void;
+  onSnapChange?: (snap: SheetSnap, height: number) => void;
 };
 
 /** Bottom sheet with peek, half, and expanded snaps. Only the sheet captures touches. */
@@ -53,12 +53,13 @@ export default function PeekSheet({
       bounciness: 0,
       speed: 18,
     }).start();
+    onSnapChange?.(snapRef.current, heights[snapRef.current]);
   }, [animated, heights]);
 
   const goTo = (next: SheetSnap) => {
     snapRef.current = next;
     setSnap(next);
-    onSnapChange?.(next);
+    onSnapChange?.(next, heightsRef.current[next]);
     Animated.spring(animated, {
       toValue: heightsRef.current[next],
       useNativeDriver: false,

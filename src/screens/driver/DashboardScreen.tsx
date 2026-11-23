@@ -24,10 +24,11 @@ import {
   type VehicleData,
 } from '../../services/offlineTransitService';
 import { ESAKAY_OPERATIONS } from '../../constants/esakayOperations';
-import { color, elevation, radius, tapTarget } from '../../constants/theme';
+import { color, elevation, radius, tapTarget, sheetSnap } from '../../constants/theme';
 import { transitStyles } from '../../constants/transitStyles';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/LeafletMap';
+import PeekSheet from '../../components/ui/PeekSheet';
 import { BottomSheetModal, triggerHaptic } from '../../components/AppUI';
 import { loadActiveFleetUnits } from '../../services/fleetRegistryService';
 
@@ -59,6 +60,7 @@ export default function DashboardScreen() {
   const [mapTerminals, setMapTerminals] = useState<TerminalData[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(false);
+  const [sheetInset, setSheetInset] = useState<number>(sheetSnap.peek);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [bodyNumber, setBodyNumber] = useState('');
   const [plateNumber, setPlateNumber] = useState('');
@@ -617,7 +619,43 @@ export default function DashboardScreen() {
           </View>
         </>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.homeFill}>
+          <View style={styles.mapFill}>
+            <LeafletMap
+              routes={routes}
+              terminals={mapTerminals}
+              vehicles={liveVehicle ? [liveVehicle] : []}
+              selectedVehicle={liveVehicle}
+              vehicleSelectionKey={vehicleId}
+              selectedRouteId={selectedRoute}
+              fleetMode
+              defaultMovable
+              mapControlsCorner="top-right"
+              mapControlsOffsetTop={12}
+              bottomInset={sheetInset}
+            />
+          </View>
+          <PeekSheet
+            peekHeight={188}
+            onSnapChange={(_snap, height) => setSheetInset(height)}
+            expandAccessibilityLabel="Shift details"
+            collapseAccessibilityLabel="Hide shift details"
+            peek={
+              <>
+                <Text style={styles.shiftActiveText}>On duty</Text>
+                <Text style={styles.mastheadDescription}>{bodyNumber} · {currentRouteName}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Update passenger count"
+                  accessibilityValue={{ text: `${passengerCount ?? 'Unavailable'} · ${seatStatus || 'Occupancy unavailable'}` }}
+                  onPress={() => setPassengerSheetOpen(true)}
+                  style={styles.peekAction}
+                >
+                  <Text style={styles.peekActionText}>Update count</Text>
+                </TouchableOpacity>
+              </>
+            }
+          >
           <View style={styles.masthead}>
             <View style={styles.onDutyHeaderRow}>
               <Text style={styles.shiftActiveText}>On duty</Text>
@@ -662,17 +700,6 @@ export default function DashboardScreen() {
             </View>
             {overLimit && <Text accessibilityRole="alert" style={styles.shiftError}>{t('passenger.driverSpeed.high')}</Text>}
             {speed?.estimated && <Text style={styles.fieldHelper}>{t('passenger.driverSpeed.estimated')}</Text>}
-            <View style={styles.mapFrame}>
-              <LeafletMap
-                routes={routes}
-                terminals={mapTerminals}
-                vehicles={liveVehicle ? [liveVehicle] : []}
-                selectedVehicle={liveVehicle}
-                vehicleSelectionKey={vehicleId}
-                selectedRouteId={selectedRoute}
-                fleetMode
-              />
-            </View>
             <View style={styles.gpsCaption}>
               <Ionicons name="locate-outline" size={16} color={gpsUsable ? color.success : color.inkMuted} />
               <Text style={styles.gpsText}>{gpsUsable && currentPosition ? t('passenger.driverSpeed.precision', { meters: Math.round(currentPosition.accuracy!) }) : t('passenger.driverSpeed.waiting')}</Text>
@@ -704,7 +731,8 @@ export default function DashboardScreen() {
           >
             <Text style={styles.endShiftOutlineText}>End shift</Text>
           </TouchableOpacity>
-        </ScrollView>
+          </PeekSheet>
+        </View>
       )}
 
       <BottomSheetModal
@@ -838,6 +866,10 @@ const styles = StyleSheet.create({
   container: transitStyles.page,
   scrollContent: transitStyles.content,
   masthead: transitStyles.masthead,
+  homeFill: { flex: 1, backgroundColor: color.canvas },
+  mapFill: { ...StyleSheet.absoluteFill },
+  peekAction: { minHeight: 48, borderRadius: 14, backgroundColor: color.action, alignItems: 'center', justifyContent: 'center' },
+  peekActionText: { color: color.onDark, fontSize: 16, fontWeight: '700' },
   setupHeader: { ...transitStyles.masthead, borderRadius: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   routeFields: { padding: 16, gap: 8 },
   mastheadDescription: transitStyles.description,
