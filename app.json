@@ -17,7 +17,7 @@
     "android": {
       "package": "com.ejeephero.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#13263F",
+        "backgroundColor": "#10241B",
         "foregroundImage": "./assets/ejeephero-app-icon.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -32,8 +32,8 @@
       "favicon": "./assets/ejeephero-app-icon.png",
       "name": "eJeepHero",
       "shortName": "eJeepHero",
-      "themeColor": "#13263F",
-      "backgroundColor": "#F5F4EF"
+      "themeColor": "#0A7A58",
+      "backgroundColor": "#E8F6EE"
     },
     "plugins": [
       "./plugins/withWorkDatabaseConstructor",

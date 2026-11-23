@@ -12,7 +12,7 @@
         margin: 0;
         overflow: hidden;
         overscroll-behavior: none;
-        background: #F5F4EF;
+        background: #E8F6EE;
       }
       /* RN Web renders modal dialogs outside #root. Both follow the visible viewport. */
       #root, body [aria-modal="true"] {
@@ -29,16 +29,16 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        background: #13263F;
+        background: #E8F6EE;
       }
-      input, textarea { font-size: 16px !important; caret-color: #164BB6; }
-      ::selection { background: #E9F0FF; color: #13263F; }
+      input, textarea { font-size: 16px !important; caret-color: #0A7A58; }
+      ::selection { background: #CFF5DC; color: #10241B; }
       :is(button, [role="button"], [role="tab"], a):focus-visible {
-        outline: 2px solid #164BB6;
+        outline: 2px solid #0A7A58;
         outline-offset: -2px;
       }
       @media (max-width: 1099px) {
-        [role="tab"][aria-selected="true"]:focus-visible { outline-color: white; }
+        [role="tab"][aria-selected="true"]:focus-visible { outline-color: #0A7A58; }
       }
       @media (hover: hover) and (pointer: fine) {
         button, [role="button"] { transition: opacity 120ms cubic-bezier(.23,1,.32,1); }
