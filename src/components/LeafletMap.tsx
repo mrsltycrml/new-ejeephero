@@ -11,7 +11,7 @@ import MapcnPassengerMap from './MapcnPassengerMap';
 import type { PassengerMapOverview } from '../services/passengerMapOverview';
 import type { Route1FieldPin } from '../services/route1FieldMap';
 
-const mapText = ['eSAKAY street map', 'Loading street map…', 'Offline — map tiles may be unavailable',
+const mapText = ['eJeepHero street map', 'Loading street map…', 'Offline — map tiles may be unavailable',
   'Field reference points', 'Stops and landmarks', 'Board', 'Alight', 'Stop', 'Landmark', 'Curb', 'Platform',
   'Boarding only', 'Alighting only', 'Boarding and alighting', 'Passenger use unconfirmed', 'Walk', 'Vehicle',
   'Weak GPS', 'Current GPS', 'Your location', 'Destination', 'GPS position', 'Weak GPS · accuracy unknown or poor',
@@ -785,7 +785,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
           referrerPolicy="strict-origin-when-cross-origin"
           onLoad={pushLatestData}
           style={{ width: '100%', height: '100%', border: 'none' }}
-          title={labels['eSAKAY street map']}
+          title={labels['eJeepHero street map']}
         />
       ) : (
         <NativeWebView

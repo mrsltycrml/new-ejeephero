@@ -130,7 +130,7 @@ async function main() {
     assert.ok(await email.evaluate(el => el === document.activeElement), 'resizing preserved input focus');
     await email.evaluate(el => el.blur());
     await visibleViewport(page, 844);
-    await button(/Install eSAKAY on your phone/).click();
+    await button(/Install eJeepHero on your phone/).click();
     const dialog = page.getByRole('dialog');
     await button('Close installation guide').waitFor();
     await visibleViewport(page, 496, 24);

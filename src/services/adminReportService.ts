@@ -40,11 +40,11 @@ function jpegDimensions(jpeg: Uint8Array): { width: number; height: number } {
     if ([0xc0, 0xc1, 0xc2, 0xc3].includes(marker)) return { height: (jpeg[cursor + 5] << 8) | jpeg[cursor + 6], width: (jpeg[cursor + 7] << 8) | jpeg[cursor + 8] };
     cursor += 2 + length;
   }
-  throw new Error('Could not read the eSAKAY logo image.');
+  throw new Error('Could not read the eJeepHero logo image.');
 }
 
 async function logoBytes() {
-  const uri = Asset.fromModule(require('../../assets/esakay-official-logo.jpeg')).uri;
+  const uri = Asset.fromModule(require('../../assets/ejeephero-wordmark.jpeg')).uri;
   const response = await fetch(uri);
   if (!response.ok) throw new Error('Could not load the official logo for the report.');
   const jpeg = new Uint8Array(await response.arrayBuffer());
@@ -86,7 +86,7 @@ export async function openAdminPeriodReport(period: ReportingPeriod, liveUnits: 
   report.table(['Unit', 'Plate', 'Route', 'Assigned driver', 'Notes'], [80, 75, 160, 95, 100], activeUnitRegistry.map((entry) => [entry.body_number, entry.plate_number || '-', entry.route_name, entry.assigned_driver || '-', entry.notes || '-']));
 
   report.section('Service and route context');
-  report.paragraph(`eSAKAY speed policy: ${ESAKAY_OPERATIONS.operatorSpeedCapKph} km/h. Current fare matrix and operating timetable are not included in this report. Fleet counts above use the registry and recorded shifts.`);
+  report.paragraph(`eJeepHero speed policy: ${ESAKAY_OPERATIONS.operatorSpeedCapKph} km/h. Current fare matrix and operating timetable are not included in this report. Fleet counts above use the registry and recorded shifts.`);
   report.paragraph(`Landmark reference from the photographed sheet dated ${LANDMARK_REFERENCE.date}. Printed kilometres are historical labels, not verified stop coordinates or current ride distances.`);
   report.table(['Printed km', 'Landmark reference'], [75, 435], LANDMARK_REFERENCE.stops.map(stop => [String(stop.printedKm), stop.name]));
 
@@ -111,7 +111,7 @@ export async function openAdminPeriodReport(period: ReportingPeriod, liveUnits: 
 
   report.section('Speeding offenses');
   report.paragraph('Recorded phone GPS alerts. Review each GPS trail before taking action.');
-  report.table(['Time', 'Driver', 'Unit', 'Speed / limit', 'Road or policy'], [110, 110, 105, 85, 105], speeds.map((event) => [dateTime(event.created_at), driverName(event.driver_id), unit(event.body_number, event.plate_number), `${Math.round(Number(event.speed_kph))} / ${Math.round(Number(event.limit_kph))} km/h`, event.zone_label || 'eSAKAY limit']));
+  report.table(['Time', 'Driver', 'Unit', 'Speed / limit', 'Road or policy'], [110, 110, 105, 85, 105], speeds.map((event) => [dateTime(event.created_at), driverName(event.driver_id), unit(event.body_number, event.plate_number), `${Math.round(Number(event.speed_kph))} / ${Math.round(Number(event.limit_kph))} km/h`, event.zone_label || 'eJeepHero limit']));
 
   report.section('Trip-cutting records');
   report.paragraph('Three confirmed route cuts trigger suspension under the current rule.');
@@ -126,7 +126,7 @@ export async function openAdminPeriodReport(period: ReportingPeriod, liveUnits: 
   const pdf = report.toBytes();
   const blob = new Blob([new Uint8Array(pdf)], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
-  return { url, filename: `eSAKAY-operations-${period.key}-${period.mode}.pdf`, periodKey: period.key, periodMode: period.mode };
+  return { url, filename: `eJeepHero-operations-${period.key}-${period.mode}.pdf`, periodKey: period.key, periodMode: period.mode };
 }
 
 export function downloadAdminPeriodReport(report: PreparedAdminReport): void {

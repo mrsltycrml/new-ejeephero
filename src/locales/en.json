@@ -1,6 +1,6 @@
 {
   "common": {
-    "ejeephero": "eSAKAY",
+    "ejeephero": "eJeepHero",
     "ok": "OK",
     "cancel": "Cancel",
     "save": "Save",
@@ -24,7 +24,7 @@
     "units": "Units",
     "drivers": "Drivers",
     "directory": "Routes & Fares",
-    "herobot": "esakaybot",
+    "herobot": "HeroBot",
     "weather": "Weather",
     "contacts": "SOS Contacts",
     "profile": "Profile"
@@ -38,7 +38,7 @@
     "noAccount": "Don't have an account?",
     "alreadyHaveAccount": "Already have an account?",
     "createAccount": "Create Account",
-    "joinNetwork": "Join the Makati e-Sakay Commuter & Driver Network",
+    "joinNetwork": "Join the Makati eJeepHero Commuter & Driver Network",
     "email": "Email Address",
     "emailPlaceholder": "Enter your email address",
     "password": "Password",
@@ -64,7 +64,7 @@
     "pendingApproval": "Account Pending",
     "pendingDesc": "Your account is not ready yet. Tap below to check its status.",
     "registrationRejected": "Registration Not Approved",
-    "rejectedDesc": "Your account is unavailable. Please contact Makati e-Sakay support if you need assistance.",
+    "rejectedDesc": "Your account is unavailable. Please contact Makati eJeepHero support if you need assistance.",
     "checkStatus": "Check Approval Status",
     "registerAsDriver": "Register as Driver",
     "registerAsPassenger": "Register as Passenger"
@@ -132,7 +132,7 @@
     "suitableForTravel": "Good weather for commuting across Makati.",
     "caution": "Commuter Weather Caution",
     "heavyRainDetected": "Rain detected in Makati — bring an umbrella and expect slower traffic.",
-    "thunderstormWarning": "Thunderstorm alert — wait inside covered e-Sakay hubs.",
+    "thunderstormWarning": "Thunderstorm alert — wait inside covered eJeepHero hubs.",
     "extremeHeat": "High heat index — stay hydrated while commuting.",
     "strongWinds": "Strong winds reported — exercise caution at open stops.",
     "poorVisibility": "Low visibility reported along Makati corridors.",
@@ -156,7 +156,7 @@
     "noContactConfigured": "No emergency contacts saved yet",
     "pleaseSelectContactBelow": "Add a contact manually or pick from your phonebook below.",
     "permissionDenied": "Permission Denied",
-    "contactsPermission": "eSAKAY needs contacts permission to let you select an emergency contact.",
+    "contactsPermission": "eJeepHero needs contacts permission to let you select an emergency contact.",
     "contactsPermissionMsg": "Please grant contacts permission or add a contact manually using the form.",
     "presetMessage": "Preset Emergency Message",
     "presetSosMessage": "Preset SOS Message",
@@ -204,17 +204,17 @@
     "aboutUs": "About Us",
     "version": "Version",
     "logout": "Log Out",
-    "confirmLogout": "Are you sure you want to log out of eSAKAY?",
+    "confirmLogout": "Are you sure you want to log out of eJeepHero?",
     "yes": "Log Out",
     "no": "Cancel"
   },
   "herobot": {
-    "herobot": "esakaybot",
-    "greeting": "Kumusta! I’m esakaybot. Ask me about routes, fare estimates, boarding guidance, or using eSAKAY.",
-    "herobot_welcome": "Kumusta! I am esakaybot, your e-Jeepney AI assistant. 🚌",
+    "herobot": "HeroBot",
+    "greeting": "Kumusta! I’m HeroBot. Ask me about routes, fare estimates, boarding guidance, or using eJeepHero.",
+    "herobot_welcome": "Kumusta! I am HeroBot, your e-Jeepney AI assistant. 🚌",
     "herobot_ask": "Ask me about routes, terminals, or fares in Makati!",
     "inputPlaceholder": "Ask about routes, fares, or nearest stops...",
-    "thinking": "esakaybot is thinking...",
+    "thinking": "HeroBot is thinking...",
     "suggestionMakatiLoop": "What are the stops on Route 1?",
     "suggestionFareInfo": "How much is the e-Jeepney fare?",
     "suggestionNearestTerminal": "Where is the MRT Buendia terminal?",
@@ -351,7 +351,7 @@
         "Location permission denied. Enable it in device settings.": "Location permission denied. Enable it in device settings.",
         "Location permission unavailable.": "Location permission unavailable.",
         "Waiting for a fresh, valid GPS reading.": "Waiting for a fresh, valid GPS reading.",
-        "Tracking paused. Reopen eSAKAY to resume GPS.": "Tracking paused. Reopen eSAKAY to resume GPS.",
+        "Tracking paused. Reopen eJeepHero to resume GPS.": "Tracking paused. Reopen eJeepHero to resume GPS.",
         "Tracking paused. Keep the app open; tracking is foreground only.": "Tracking paused. Keep the app open; tracking is foreground only.",
         "Location access needed.": "Location access needed.",
         "Location services are disabled. Enable device location.": "Location services are disabled. Enable device location.",
@@ -369,7 +369,7 @@
     "map": {
       "centerOnLocation": "Center on my location",
       "labels": {
-        "eSAKAY street map": "eSAKAY street map",
+        "eJeepHero street map": "eJeepHero street map",
         "Loading street map…": "Loading street map…",
         "Offline — map tiles may be unavailable": "Offline — map tiles may be unavailable",
         "Field reference points": "Field reference points",
@@ -499,7 +499,7 @@
     "nav": {
       "fare": "Fare",
       "profile": "Profile",
-      "about": "About eSAKAY",
+      "about": "About eJeepHero",
       "map": "Map",
       "more": "More",
       "safety": "Safety",
@@ -530,7 +530,7 @@
       "refresh": "Refresh stops and routes",
       "reference": "Historical landmark reference",
       "referenceNote": "Distances are printed labels from the photographed sheet. Current travel distances, coordinates, boarding sides and entrances require separate verification.",
-      "education": "eSAKAY supports Makati’s transport modernization and strict loading rules. Board and alight only at designated stops. Keep crossings and traffic lanes clear."
+      "education": "eJeepHero supports Makati’s transport modernization and strict loading rules. Board and alight only at designated stops. Keep crossings and traffic lanes clear."
     },
     "notice": {
       "close": "Close boarding notices",
@@ -588,7 +588,7 @@
       "retry": "Please try again.",
       "close": "Close account menu",
       "account": "Your account",
-      "confirmLogout": "Sign out of eSAKAY?",
+      "confirmLogout": "Sign out of eJeepHero?",
       "signOut": "Sign out"
     },
     "authLogin": {
@@ -614,10 +614,10 @@
       "checkCredentials": "Check your email and password. If you have not registered yet, create an account first.",
       "connection": "Check your connection and try again.",
       "welcome": "Welcome back",
-      "subtitle": "Sign in to your eSAKAY account.",
-      "newHere": "New to eSAKAY?",
+      "subtitle": "Sign in to your eJeepHero account.",
+      "newHere": "New to eJeepHero?",
       "create": "Create account",
-      "install": "Install eSAKAY on your phone"
+      "install": "Install eJeepHero on your phone"
     },
     "authSignup": {
       "driver": "Driver",
@@ -716,7 +716,7 @@
       "fareDetail": "Check sourced regular, student, senior and PWD fares.",
       "safetyDetail": "Manage trusted contacts and prepare an SOS with your location and ride details.",
       "assistantDetail": "Ask about routes, stops and using the service.",
-      "report": "Meralco sustainability report (PDF)"
+      "report": "eJeepHero is an independent wayfinding app for Makati commuters, drivers, and fleet supervisors."
     },
     "assistant": {
       "board": "Where do I board at MRT Buendia?",
@@ -724,7 +724,7 @@
       "student": "How do I check the student fare?",
       "stops": "How do I find stops on a route?",
       "sos": "How does Emergency SOS work?",
-      "intro": "Ask me about using eSAKAY. Check Map for available stops and current vehicle locations, and Fare for a sourced fare quote. Missing information will be shown as unavailable.",
+      "intro": "Ask me about using eJeepHero. Check Map for available stops and current vehicle locations, and Fare for a sourced fare quote. Missing information will be shown as unavailable.",
       "unavailable": "The commuter assistant is unavailable. Please try again shortly.",
       "you": "You",
       "waiting": "Waiting for a reply…",
@@ -735,11 +735,11 @@
     },
     "install": {
       "failed": "The download could not open. Check your connection and try again.",
-      "title": "Install eSAKAY",
+      "title": "Install eJeepHero",
       "close": "Close installation guide",
       "androidHelp": "Open the downloaded APK on your phone. If Android prompts you, allow installation from this source.",
       "download": "Download Android app",
-      "safari": "Open eSAKAY in Safari. Tap <menu>Share</menu>, then <menu>Add to Home Screen</menu>."
+      "safari": "Open eJeepHero in Safari. Tap <menu>Share</menu>, then <menu>Add to Home Screen</menu>."
     },
     "boarding": {
       "labels": {
@@ -748,7 +748,7 @@
         "Checking your location": "Checking your location",
         "The GPS signal is not precise enough yet. Follow the signs at your stop.": "The GPS signal is not precise enough yet. Follow the signs at your stop.",
         "Follow designated loading signs": "Follow designated loading signs",
-        "Loading-area coverage is not available here yet. Wait at a marked eSAKAY stop.": "Loading-area coverage is not available here yet. Wait at a marked eSAKAY stop.",
+        "Loading-area coverage is not available here yet. Wait at a marked eJeepHero stop.": "Loading-area coverage is not available here yet. Wait at a marked eJeepHero stop.",
         "No loading in this area": "No loading in this area",
         "Near a no-loading boundary": "Near a no-loading boundary",
         "Check the posted loading signs before boarding.": "Check the posted loading signs before boarding.",

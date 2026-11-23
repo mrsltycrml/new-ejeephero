@@ -1213,7 +1213,7 @@ export function AdminReportsScreen() {
 
         <View style={styles.pdfSheetCard}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.ink }}>eSAKAY</Text>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.ink }}>eJeepHero</Text>
             <Text style={styles.rowSub}>{period.key}</Text>
           </View>
           <Text style={[styles.rowTitle, { fontSize: 18 }]}>Fleet report</Text>

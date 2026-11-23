@@ -214,7 +214,7 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
   }, [view, vehicles, selectedVehicleId, vehicleSelectionKey, vehicleFocusRequestId]);
 
   return <div style={{ position: 'absolute', inset: 0, background: '#edf1f3' }}>
-    <div ref={containerRef} role="region" aria-label={label('eSAKAY street map')} style={{ width: '100%', height: '100%' }} />
+    <div ref={containerRef} role="region" aria-label={label('eJeepHero street map')} style={{ width: '100%', height: '100%' }} />
     {!view && <span role="status" style={{ position: 'absolute', bottom: 12, left: 12 }}>{label('Loading street map…')}</span>}
   </div>;
 }

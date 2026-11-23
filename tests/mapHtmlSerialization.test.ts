@@ -29,7 +29,7 @@ hooks.deregister();
 
 test('the web map renders before translations are available', () => {
   const markup = renderToStaticMarkup(React.createElement(MapcnPassengerMap, { data: {} } as any));
-  assert.match(markup, /aria-label="eSAKAY street map"/);
+  assert.match(markup, /aria-label="eJeepHero street map"/);
   assert.match(markup, /Loading street map…/);
 });
 
@@ -56,7 +56,7 @@ test('the passenger web map defaults to mapcn and keeps Leaflet available offlin
   assert.match(online, /Mapcn: City Hall/);
   assert.match(online, />Move map</);
   const offline = renderToStaticMarkup(React.createElement(LeafletMap, { ...props, isOffline: true }));
-  assert.match(offline, /title="eSAKAY street map"/);
+  assert.match(offline, /title="eJeepHero street map"/);
 });
 
 test('serialized map executes safely, frames journeys, preserves camera on telemetry and dispatches stop clicks', () => {

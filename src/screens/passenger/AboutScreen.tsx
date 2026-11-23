@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import ESakayLogo from '../../components/ESakayLogo';
+import EJeepHeroLogo from '../../components/EJeepHeroLogo';
 import { passengerStyles as s } from '../../components/PassengerUI';
 import { Colors } from '../../constants/theme';
 import { BOARDING_EDUCATION } from '../../services/passengerSafety';
@@ -12,7 +12,7 @@ export default function AboutScreen() {
   return (
     <ScrollView style={s.screen} contentContainerStyle={[s.content, { maxWidth: 640 }]}>
       <View style={s.heroBanner}>
-        <ESakayLogo />
+        <EJeepHeroLogo />
         <Text accessibilityRole="header" style={s.heroTitle}>{t('passenger.about.service')}</Text>
         <Text style={s.heroSubtitle}>{t('passenger.about.route')}</Text>
       </View>
@@ -41,12 +41,7 @@ export default function AboutScreen() {
         ))}
       </View>
 
-      <TouchableOpacity accessibilityRole="link"
-        onPress={() => Linking.openURL('https://meralcomain.s3.ap-southeast-1.amazonaws.com/2020-04/mer_sustainabilityreport2019_final.pdf')}
-        style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text style={[s.link, { flexShrink: 1 }]}>{t('passenger.about.report')}</Text>
-        <Ionicons aria-hidden name="open-outline" size={16} color={Colors.brandGreen} />
-      </TouchableOpacity>
+      <Text style={s.body}>{t('passenger.about.report')}</Text>
     </ScrollView>
   );
 }

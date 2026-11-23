@@ -42,4 +42,4 @@ if (fs.existsSync(releaseApk)) {
   wrangler('r2','object','put',apkKey,'--file',releaseApk,'--content-type','application/vnd.android.package-archive','--remote');
 }
 
-console.log('[upload:r2] Versioned assets uploaded. Existing objects were preserved; files are served by the eSAKAY Worker.');
+console.log('[upload:r2] Versioned assets uploaded. Existing objects were preserved; files are served by the eJeepHero Worker.');

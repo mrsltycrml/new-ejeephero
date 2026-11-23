@@ -57,7 +57,7 @@ export const LocationProvider = ({ children }: { children: React.ReactNode }) =>
       setErrorMsg(null);
     };
     if (Platform.OS === 'web') {
-      if (!foreground) { setErrorMsg('Tracking paused. Reopen eSAKAY to resume GPS.'); return; }
+      if (!foreground) { setErrorMsg('Tracking paused. Reopen eJeepHero to resume GPS.'); return; }
       const watch = browserLocationWatch(onPosition, message => {
         setLocation(null);
         setErrorMsg(message);

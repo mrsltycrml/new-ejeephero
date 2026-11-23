@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { SimplePdf } from '../src/utils/simplePdf.ts';
 
 test('supervisor PDF includes official logo, pages, and prepared-by section', () => {
-  const logo = new Uint8Array(readFileSync(new URL('../assets/esakay-official-logo.jpeg', import.meta.url)));
+  const logo = new Uint8Array(readFileSync(new URL('../assets/ejeephero-wordmark.jpeg', import.meta.url)));
   const pdf = new SimplePdf(logo, 514, 156, 'Operations report', 'October 27, 2026 / Daily');
   pdf.metrics([{ value: 1, label: 'Live units' }, { value: 12, label: 'Shifts' }]);
   pdf.section('Shift history');

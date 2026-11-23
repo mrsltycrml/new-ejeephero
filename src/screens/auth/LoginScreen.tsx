@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSignIn } from '@clerk/clerk-expo';
-import { Ionicons } from '@expo/vector-icons';
 import { isSupabaseConfigured, supabaseAuth } from '../../lib/supabase';
 import { isClerkConfigured } from '../../lib/clerk';
-import { Colors } from '../../constants/theme';
+import { color } from '../../constants/theme';
 import AppDownloadModal from '../../components/AppDownloadModal';
+import { ListRow } from '../../components/ui';
 import { AuthAction, AuthField, AuthLink, AuthNotice, AuthPage, authStyles } from './AuthUI';
 
 type CredentialsProps = {
@@ -177,7 +177,7 @@ function ClerkSignInForm({ navigation }: { navigation: any }) {
       <AuthNotice message={errorMessage} error />
       {!isLoaded && (
         <View style={styles.connecting} accessibilityLiveRegion="polite">
-          <ActivityIndicator size="small" color={Colors.action} />
+          <ActivityIndicator size="small" color={color.action} />
           <Text style={authStyles.body}>{t('passenger.authLogin.connecting')}</Text>
         </View>
       )}
@@ -241,11 +241,12 @@ export default function LoginScreen({ navigation }: any) {
           <Text style={authStyles.body}>{t('passenger.authLogin.newHere')}</Text>
           <AuthLink label={t('passenger.authLogin.create')} onPress={() => navigation.navigate('Register')} />
         </View>
-        <TouchableOpacity accessibilityRole="button" onPress={() => setDownloadModalVisible(true)} style={styles.install}>
-          <Ionicons aria-hidden name="phone-portrait-outline" size={20} color={Colors.ink} />
-          <Text style={styles.installText}>{t('passenger.authLogin.install')}</Text>
-          <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
-        </TouchableOpacity>
+        <ListRow
+          label={t('passenger.authLogin.install')}
+          icon="phone-portrait-outline"
+          onPress={() => setDownloadModalVisible(true)}
+          style={{ marginTop: 10 }}
+        />
       </View>
       <AppDownloadModal visible={downloadModalVisible} onClose={() => setDownloadModalVisible(false)} />
     </AuthPage>
@@ -255,7 +256,4 @@ export default function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   forgot: { alignItems: 'flex-end', marginVertical: -10 },
   connecting: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  install: { marginTop: 10, minHeight: 48, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8,
-    backgroundColor: Colors.canvas, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  installText: { flex: 1, color: Colors.ink, fontSize: 14, fontWeight: '600' },
 });

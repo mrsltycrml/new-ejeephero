@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
-import { Colors } from '../../constants/theme';
+import { color, radius } from '../../constants/theme';
 import { AuthAction, AuthLink, AuthPage, authStyles } from './AuthUI';
 
 export default function PendingApprovalScreen() {
@@ -38,7 +38,7 @@ export default function PendingApprovalScreen() {
       <View style={authStyles.form}>
         <View style={[styles.status, isBlocked && styles.blocked]} accessibilityLiveRegion="polite">
           <Ionicons aria-hidden name={isBlocked ? 'close-circle-outline' : 'time-outline'}
-            size={24} color={isBlocked ? Colors.primaryRed : Colors.warning} />
+            size={24} color={isBlocked ? color.ember : color.warning} />
           <Text accessibilityRole="header" style={styles.heading}>{heading}</Text>
         </View>
         <Text style={authStyles.body}>{description}</Text>
@@ -56,10 +56,10 @@ export default function PendingApprovalScreen() {
 }
 
 const styles = StyleSheet.create({
-  status: { flexDirection: 'row', alignItems: 'center', gap: 10, borderLeftWidth: 4, borderColor: Colors.warning,
-    backgroundColor: Colors.warningBg, paddingHorizontal: 14, paddingVertical: 16 },
-  blocked: { borderColor: Colors.primaryRed, backgroundColor: Colors.dangerBg },
-  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: Colors.ink },
-  identity: { borderTopWidth: 1, borderColor: Colors.border, gap: 6, paddingVertical: 16 },
-  email: { color: Colors.ink, fontSize: 16 },
+  status: { flexDirection: 'row', alignItems: 'center', gap: 10, borderLeftWidth: 4, borderColor: color.warning,
+    backgroundColor: color.warningBg, paddingHorizontal: 14, paddingVertical: 16, borderRadius: radius.md },
+  blocked: { borderColor: color.ember, backgroundColor: color.dangerBg },
+  heading: { flex: 1, fontSize: 20, fontWeight: '700', color: color.ink },
+  identity: { borderTopWidth: 1, borderColor: color.border, gap: 6, paddingVertical: 16 },
+  email: { color: color.ink, fontSize: 16 },
 });

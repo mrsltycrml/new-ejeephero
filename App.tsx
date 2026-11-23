@@ -29,7 +29,7 @@ export default function App() {
         <NetworkProvider>
           <AuthProvider>
             <LocationProvider>
-              <NavigationContainer theme={navigationTheme} documentTitle={{ formatter: options => options?.title ?? 'eSAKAY' }}>
+              <NavigationContainer theme={navigationTheme} documentTitle={{ formatter: options => options?.title ?? 'eJeepHero' }}>
                 <AppNavigator />
               </NavigationContainer>
             </LocationProvider>

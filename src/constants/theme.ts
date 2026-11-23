@@ -1,39 +1,125 @@
-export const Colors = {
-  midnight: '#13263F',
+import { Platform, type TextStyle, type ViewStyle } from 'react-native';
+
+/** Core brand and UI color tokens. Prefer these in new UI. */
+export const color = {
+  ink: '#13263F',
+  inkMuted: '#3E4C5C',
+  onDark: '#FFFFFF',
+  onDarkMuted: '#D5DFEC',
   action: '#164BB6',
+  actionPressed: '#103A8C',
   actionTint: '#E9F0FF',
   signal: '#FFD454',
-  onDark: '#FFFFFF',
-  onDarkMuted: '#C5D4E9',
-  primaryRed: '#B42318',
-  primaryYellow: '#B45309',
-  white: '#FFFFFF',
-  offWhite: '#F5F4EF',
-  darkText: '#13263F',
-  subtleGray: '#526174',
-  cardBG: '#FFFFFF',
-  accentRed: '#B42318',
-  accentYellow: '#B45309',
-  navy: '#13263F',
-  border: '#CCD4DD',
-  mutedBackground: '#EFF2F5',
-  tabActive: '#164BB6',
-  tabInactive: '#526174',
   canvas: '#F5F4EF',
   paper: '#FFFFFF',
-  ink: '#13263F',
+  border: '#C5CED8',
+  sand: '#EFF2F5',
   ember: '#B42318',
   copper: '#B45309',
-  sand: '#EFF2F5',
-  brandGreen: '#087A55',
-  brandMint: '#087A55',
-  brandMintLight: '#087A55',
-  paleGreen: '#E7F3EB',
-  brandSurfaceDark: '#13263F',
   success: '#087A55',
   successBg: '#E7F3EB',
   warning: '#B45309',
   warningBg: '#FDF3E1',
   warningBorder: '#E7C687',
   dangerBg: '#FADBD8',
+} as const;
+
+export const space = {
+  xxs: 4,
+  xs: 8,
+  sm: 12,
+  md: 16,
+  lg: 20,
+  xl: 24,
+  xxl: 32,
+  xxxl: 40,
+} as const;
+
+export const radius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  pill: 999,
+} as const;
+
+export const type = {
+  display: { fontSize: 32, lineHeight: 38, fontWeight: '800', letterSpacing: -0.8 } satisfies TextStyle,
+  title: { fontSize: 20, lineHeight: 26, fontWeight: '700', letterSpacing: -0.3 } satisfies TextStyle,
+  body: { fontSize: 16, lineHeight: 24, fontWeight: '400' } satisfies TextStyle,
+  label: { fontSize: 14, lineHeight: 18, fontWeight: '700' } satisfies TextStyle,
+  meta: { fontSize: 13, lineHeight: 18, fontWeight: '500' } satisfies TextStyle,
+  button: { fontSize: 16, lineHeight: 20, fontWeight: '700' } satisfies TextStyle,
+} as const;
+
+export const elevation = {
+  none: {
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+  } satisfies ViewStyle,
+  card: {
+    shadowColor: color.ink,
+    shadowOpacity: Platform.OS === 'web' ? 0.08 : 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  } satisfies ViewStyle,
+  sheet: {
+    shadowColor: color.ink,
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 16,
+  } satisfies ViewStyle,
+} as const;
+
+/** Minimum tap target for controls used outdoors. */
+export const tapTarget = 48;
+
+/**
+ * Legacy color aliases. Existing screens keep compiling against `Colors`
+ * while new work should use the `color` tokens above. Values stay in the
+ * same family so unmigrated screens do not shift unexpectedly.
+ */
+export const Colors = {
+  midnight: color.ink,
+  action: color.action,
+  actionTint: color.actionTint,
+  signal: color.signal,
+  onDark: color.onDark,
+  onDarkMuted: color.onDarkMuted,
+  primaryRed: color.ember,
+  primaryYellow: color.copper,
+  white: color.paper,
+  offWhite: color.canvas,
+  darkText: color.ink,
+  subtleGray: '#526174',
+  cardBG: color.paper,
+  accentRed: color.ember,
+  accentYellow: color.copper,
+  navy: color.ink,
+  border: color.border,
+  mutedBackground: color.sand,
+  tabActive: color.action,
+  tabInactive: '#526174',
+  canvas: color.canvas,
+  paper: color.paper,
+  ink: color.ink,
+  ember: color.ember,
+  copper: color.copper,
+  sand: color.sand,
+  brandGreen: color.success,
+  brandMint: color.success,
+  brandMintLight: color.success,
+  paleGreen: color.successBg,
+  brandSurfaceDark: color.ink,
+  success: color.success,
+  successBg: color.successBg,
+  warning: color.warning,
+  warningBg: color.warningBg,
+  warningBorder: color.warningBorder,
+  dangerBg: color.dangerBg,
 };

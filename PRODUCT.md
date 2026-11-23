@@ -1,8 +1,8 @@
-# eSAKAY
+# eJeepHero
 
-eSAKAY helps passengers find a ride, drivers run a shift, and supervisors monitor
-fleet operation and driver safety. The official eSAKAY/Meralco logo is supplied
-by the user. The interface must be simple, readable, and consistent across roles.
+eJeepHero helps passengers find a ride, drivers run a shift, and supervisors monitor
+fleet operation and driver safety. The official mark is an original eJeepHero wordmark
+and route-pin icon. The interface must be simple, readable, and consistent across roles.
 
 ## People and jobs
 
@@ -33,7 +33,7 @@ a five-second cancellation timer, attempts server SMS when enabled, and offers a
 ## Current UX request
 
 Remove visual clutter across the entire application. Keep features, data, role
-permissions, and the official logo. Put each screen's main task first. Reduce
+permissions, and the official eJeepHero mark. Put each screen's main task first. Reduce
 repeated cards, tinted icon boxes, oversized metrics, and repeated explanations.
 Use compact lists and progressive disclosure for operational detail. Preserve
 accessible controls and mobile navigation.

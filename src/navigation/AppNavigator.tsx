@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
 import { AuthAction, AuthLink, AuthNotice, AuthPage, authStyles } from '../screens/auth/AuthUI';
-import ESakayLogo from '../components/ESakayLogo';
+import EJeepHeroLogo from '../components/EJeepHeroLogo';
 import AdminHeaderPopover, { type AdminPanel } from '../components/AdminHeaderPopover';
 import RouteWarningBanner from '../components/RouteWarningBanner';
 import { RouteWarningsProvider, useRouteWarnings } from '../contexts/RouteWarningsContext';
@@ -117,7 +117,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           ...tabOptions,
           headerTitle: () => (
             <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel={t('passenger.nav.goMap')} onPress={() => navigation.navigate('Map')}>
-              <ESakayLogo compact roleLabel={width >= 395 ? t('passenger.nav.passenger') : undefined} color={Colors.onDark} />
+              <EJeepHeroLogo compact roleLabel={width >= 395 ? t('passenger.nav.passenger') : undefined} color={Colors.onDark} />
             </TouchableOpacity>
           ),
           headerRight: () => (
@@ -190,7 +190,7 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
           ...tabOptions,
           headerTitle: () => (
             <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}>
-              <ESakayLogo compact roleLabel="Driver" color={Colors.onDark} />
+              <EJeepHeroLogo compact roleLabel="Driver" color={Colors.onDark} />
             </TouchableOpacity>
           ),
           headerRight: () => (
@@ -348,7 +348,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
           ),
           headerTitle: () => (
             <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel="Go to Fleet" onPress={() => navigation.navigate('Fleet')}>
-              <ESakayLogo compact roleLabel="Supervisor" color={Colors.onDark} />
+              <EJeepHeroLogo compact roleLabel="Supervisor" color={Colors.onDark} />
             </TouchableOpacity>
           ),
         })}

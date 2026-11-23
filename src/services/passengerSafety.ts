@@ -70,7 +70,7 @@ function boardingAt(fix: PassengerFix | null, zones: LoadingZone[], now: number,
     return { kind: 'uncertain', title: 'Checking your location', detail: 'The GPS signal is not precise enough yet. Follow the signs at your stop.' };
   }
   const verified = zones.filter(zone => isVerifiedLoadingZone(zone, now));
-  if (!verified.length) return { kind: 'unavailable', title: 'Follow designated loading signs', detail: 'Loading-area coverage is not available here yet. Wait at a marked eSAKAY stop.' };
+  if (!verified.length) return { kind: 'unavailable', title: 'Follow designated loading signs', detail: 'Loading-area coverage is not available here yet. Wait at a marked eJeepHero stop.' };
   const candidates = verified.map(zone => ({ zone, distance: distanceMeters(fix, zone) }));
   const prohibited = candidates.find(x => x.zone.kind === 'no_loading' && x.distance + fix.accuracy! <= x.zone.radius_meters);
   if (prohibited) return { kind: 'prohibited', title: 'No loading in this area', detail: `You are in ${prohibited.zone.name}. Move to a designated loading bay before boarding.`, zone: prohibited.zone };
@@ -89,7 +89,7 @@ function boardingAt(fix: PassengerFix | null, zones: LoadingZone[], now: number,
   return { kind: 'unavailable', title: 'Follow designated loading signs', detail: 'Your location is outside the mapped loading areas. Check the signs where you are waiting.' };
 }
 
-export const BOARDING_EDUCATION = 'eSAKAY supports Makati’s transport modernization and strict loading rules. Board and alight only at designated stops. Keep crossings and traffic lanes clear.';
+export const BOARDING_EDUCATION = 'eJeepHero supports Makati’s transport modernization and strict loading rules. Board and alight only at designated stops. Keep crossings and traffic lanes clear.';
 export const MAKATI_LOADING_SOURCE = 'https://www.makati.gov.ph/content/resolutions-and-ordinances/author/maccay%2C-elena/eeb420a6-a095-bd4a-bb85-8f62c75300c1?type=all';
 
 export function normalizeEmergencyPhone(raw: string): string | null {
@@ -101,7 +101,7 @@ export function normalizeEmergencyPhone(raw: string): string | null {
 
 export function buildEmergencyMessage(input: { message?: string; fix: PassengerFix; body?: string | null; plate?: string | null; isSample?: boolean }) {
   const { fix } = input;
-  return `${input.message || 'EMERGENCY! I need help. Please check on me.'}\n\neSAKAY emergency alert${input.isSample ? ' [TEST RIDE — SAMPLE UNIT]' : ''}\nLocation: https://maps.google.com/?q=${fix.latitude},${fix.longitude}\nRecorded: ${new Date(fix.timestamp).toISOString()}${fix.accuracy == null ? '' : `\nGPS accuracy: ±${Math.round(fix.accuracy)} m`}\nBody number: ${input.body || 'Not selected'}\nPlate number: ${input.plate || 'Not selected'}`;
+  return `${input.message || 'EMERGENCY! I need help. Please check on me.'}\n\neJeepHero emergency alert${input.isSample ? ' [TEST RIDE — SAMPLE UNIT]' : ''}\nLocation: https://maps.google.com/?q=${fix.latitude},${fix.longitude}\nRecorded: ${new Date(fix.timestamp).toISOString()}${fix.accuracy == null ? '' : `\nGPS accuracy: ±${Math.round(fix.accuracy)} m`}\nBody number: ${input.body || 'Not selected'}\nPlate number: ${input.plate || 'Not selected'}`;
 }
 
 export const EMERGENCY_HOTLINES = [

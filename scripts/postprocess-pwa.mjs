@@ -18,7 +18,7 @@ if (!fs.existsSync(distDir)) {
   process.exit(1);
 }
 
-const appleIconSrc = path.join(rootDir, 'assets', 'esakay-app-icon.png');
+const appleIconSrc = path.join(rootDir, 'assets', 'ejeephero-app-icon.png');
 if (fs.existsSync(appleIconSrc)) {
   for (const [name, size] of [
     ['apple-touch-icon.png', 180],

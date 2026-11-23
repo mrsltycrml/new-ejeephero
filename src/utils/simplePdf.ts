@@ -138,7 +138,7 @@ export class SimplePdf {
     this.page.y -= 23;
     this.page.commands.push(`0.094 0.157 0.180 rg 42 ${this.page.y.toFixed(2)} 511 2 re f`);
     this.text('Prepared by: Admin', 42, this.page.y - 22, 11, true);
-    this.text('eSAKAY supervisor', 42, this.page.y - 38, 8, false, '#607079');
+    this.text('eJeepHero supervisor', 42, this.page.y - 38, 8, false, '#607079');
     this.page.commands.push(`0.094 0.157 0.180 RG 385 ${(this.page.y - 35).toFixed(2)} m 553 ${(this.page.y - 35).toFixed(2)} l S`);
     this.text('Signature / date', 385, this.page.y - 48, 8, false, '#607079');
   }

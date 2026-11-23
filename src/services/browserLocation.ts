@@ -8,8 +8,8 @@ function deviceReading({ timestamp, coords }: GeolocationPosition) {
 }
 
 function deviceGPS(): Geolocation {
-  if (!window.isSecureContext) throw new Error('Open eSAKAY over HTTPS to use location.');
-  if (!navigator.geolocation) throw new Error('This browser cannot access your location. Open eSAKAY directly in Safari or another browser.');
+  if (!window.isSecureContext) throw new Error('Open eJeepHero over HTTPS to use location.');
+  if (!navigator.geolocation) throw new Error('This browser cannot access your location. Open eJeepHero directly in Safari or another browser.');
   return navigator.geolocation;
 }
 

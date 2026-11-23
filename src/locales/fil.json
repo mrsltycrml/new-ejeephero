@@ -1,6 +1,6 @@
 {
   "common": {
-    "ejeephero": "eSAKAY",
+    "ejeephero": "eJeepHero",
     "ok": "OK",
     "cancel": "Kanselahin",
     "save": "I-save",
@@ -24,7 +24,7 @@
     "units": "Mga Yunit",
     "drivers": "Mga Driver",
     "directory": "Ruta at Pamasahe",
-    "herobot": "esakaybot",
+    "herobot": "HeroBot",
     "weather": "Panahon",
     "contacts": "SOS Kontak",
     "profile": "Profile"
@@ -38,7 +38,7 @@
     "noAccount": "Wala pang account?",
     "alreadyHaveAccount": "Mayroon nang account?",
     "createAccount": "Gumawa ng Account",
-    "joinNetwork": "Sumali sa Makati e-Sakay Network para sa Komyuter at Driver",
+    "joinNetwork": "Sumali sa Makati eJeepHero Network para sa Komyuter at Driver",
     "email": "Email Address",
     "emailPlaceholder": "Ilagay ang iyong email address",
     "password": "Password",
@@ -64,7 +64,7 @@
     "pendingApproval": "Nakabinbin ang Account",
     "pendingDesc": "Hindi pa handa ang iyong account. Pindutin sa ibaba upang tingnan ang status.",
     "registrationRejected": "Hindi Naaprubahan ang Rehistro",
-    "rejectedDesc": "Hindi magagamit ang iyong account. Makipag-ugnayan sa Makati e-Sakay support kung kailangan ng tulong.",
+    "rejectedDesc": "Hindi magagamit ang iyong account. Makipag-ugnayan sa Makati eJeepHero support kung kailangan ng tulong.",
     "checkStatus": "Tingnan ang Status",
     "registerAsDriver": "Magparehistro bilang Driver",
     "registerAsPassenger": "Magparehistro bilang Pasahero"
@@ -209,12 +209,12 @@
     "no": "Kanselahin"
   },
   "herobot": {
-    "herobot": "esakaybot",
-    "greeting": "Kumusta! Ako si esakaybot. Magtanong tungkol sa ruta, tantiya ng pamasahe, pagsakay, o paggamit ng eSAKAY.",
-    "herobot_welcome": "Kumusta! Ako si esakaybot, ang iyong e-Jeepney AI assistant. 🚌",
+    "herobot": "HeroBot",
+    "greeting": "Kumusta! Ako si HeroBot. Magtanong tungkol sa ruta, tantiya ng pamasahe, pagsakay, o paggamit ng eJeepHero.",
+    "herobot_welcome": "Kumusta! Ako si HeroBot, ang iyong e-Jeepney AI assistant. 🚌",
     "herobot_ask": "Magtanong tungkol sa mga ruta, terminal, o pamasahe sa Makati!",
     "inputPlaceholder": "Magtanong tungkol sa ruta, pamasahe, o sakayan...",
-    "thinking": "Nag-iisip si esakaybot...",
+    "thinking": "Nag-iisip si HeroBot...",
     "suggestionMakatiLoop": "Ano ang mga hintuan sa Route 1?",
     "suggestionFareInfo": "Magkano ang pamasahe sa e-Jeepney?",
     "suggestionNearestTerminal": "Saan ang MRT Buendia terminal?",
@@ -351,7 +351,7 @@
         "Location permission denied. Enable it in device settings.": "Hindi pinayagan ang lokasyon. Payagan ito sa settings ng device.",
         "Location permission unavailable.": "Hindi makuha ang pahintulot sa lokasyon.",
         "Waiting for a fresh, valid GPS reading.": "Naghihintay ng bago at wastong GPS reading.",
-        "Tracking paused. Reopen eSAKAY to resume GPS.": "Nakahinto ang pagsubaybay. Buksan muli ang eSAKAY para maipagpatuloy ang GPS.",
+        "Tracking paused. Reopen eJeepHero to resume GPS.": "Nakahinto ang pagsubaybay. Buksan muli ang eJeepHero para maipagpatuloy ang GPS.",
         "Tracking paused. Keep the app open; tracking is foreground only.": "Nakahinto ang pagsubaybay. Panatilihing bukas ang app para gumana ang GPS.",
         "Location access needed.": "Kailangan ng pahintulot sa lokasyon.",
         "Location services are disabled. Enable device location.": "Naka-off ang serbisyo ng lokasyon. I-on ito sa device.",
@@ -369,7 +369,7 @@
     "map": {
       "centerOnLocation": "Itapat ang mapa sa lokasyon ko",
       "labels": {
-        "eSAKAY street map": "Mapa ng mga kalsada ng eSAKAY",
+        "eJeepHero street map": "Mapa ng mga kalsada ng eJeepHero",
         "Loading street map…": "Nilo-load ang mapa…",
         "Offline — map tiles may be unavailable": "Offline — maaaring hindi lumabas ang ilang bahagi ng mapa",
         "Field reference points": "Mga palatandaan sa lugar",
@@ -499,7 +499,7 @@
     "nav": {
       "fare": "Pamasahe",
       "profile": "Profile",
-      "about": "Tungkol sa eSAKAY",
+      "about": "Tungkol sa eJeepHero",
       "map": "Mapa",
       "more": "Iba pa",
       "safety": "Kaligtasan",
@@ -530,7 +530,7 @@
       "refresh": "I-refresh ang mga hintuan at ruta",
       "reference": "Dating tala ng mga palatandaan",
       "referenceNote": "Ang mga distansiya ay mula sa nakaimprentang talang kinunan ng larawan. Kailangan pang kumpirmahin ang kasalukuyang distansiya, lokasyon, panig ng sakayan at mga pasukan.",
-      "education": "Sinusuportahan ng eSAKAY ang modernisasyon ng transportasyon at ang mga patakaran sa pagsakay sa Makati. Sumakay at bumaba lamang sa mga itinalagang hintuan. Huwag harangan ang tawiran at daanan ng sasakyan."
+      "education": "Sinusuportahan ng eJeepHero ang modernisasyon ng transportasyon at ang mga patakaran sa pagsakay sa Makati. Sumakay at bumaba lamang sa mga itinalagang hintuan. Huwag harangan ang tawiran at daanan ng sasakyan."
     },
     "notice": {
       "close": "Isara ang mga abiso sa pagsakay",
@@ -588,7 +588,7 @@
       "retry": "Subukang muli.",
       "close": "Isara ang menu ng account",
       "account": "Account mo",
-      "confirmLogout": "Mag-sign out sa eSAKAY?",
+      "confirmLogout": "Mag-sign out sa eJeepHero?",
       "signOut": "Mag-sign out"
     },
     "authLogin": {
@@ -614,10 +614,10 @@
       "checkCredentials": "Tingnan kung tama ang email at password. Kung wala ka pang account, gumawa muna nito.",
       "connection": "Tingnan ang koneksiyon at subukang muli.",
       "welcome": "Maligayang pagbabalik",
-      "subtitle": "Mag-sign in sa iyong eSAKAY account.",
-      "newHere": "Bago ka sa eSAKAY?",
+      "subtitle": "Mag-sign in sa iyong eJeepHero account.",
+      "newHere": "Bago ka sa eJeepHero?",
       "create": "Gumawa ng account",
-      "install": "I-install ang eSAKAY sa telepono"
+      "install": "I-install ang eJeepHero sa telepono"
     },
     "authSignup": {
       "driver": "Drayber",
@@ -716,7 +716,7 @@
       "fareDetail": "Tingnan ang pamasahe para sa regular na pasahero, estudyante, senior at PWD ayon sa talaan.",
       "safetyDetail": "Pamahalaan ang mga kontak at maghanda ng SOS na may lokasyon at detalye ng biyahe mo.",
       "assistantDetail": "Magtanong tungkol sa mga ruta, hintuan at paggamit ng serbisyo.",
-      "report": "Ulat ng Meralco tungkol sa sustainability (PDF)"
+      "report": "Ang eJeepHero ay isang independenteng app sa paghahanap ng biyahe para sa mga komyuter, driver, at superbisor ng fleet sa Makati."
     },
     "assistant": {
       "board": "Saan ako sasakay sa MRT Buendia?",
@@ -724,7 +724,7 @@
       "student": "Paano ko malalaman ang pamasahe ng estudyante?",
       "stops": "Paano ko makikita ang mga hintuan sa ruta?",
       "sos": "Paano gumagana ang SOS?",
-      "intro": "Magtanong tungkol sa eSAKAY. Sa Mapa makikita ang mga hintuan at lokasyon ng mga e-jeep. Sa Pamasahe makikita ang halaga ayon sa talaan. May abiso kapag kulang ang datos.",
+      "intro": "Magtanong tungkol sa eJeepHero. Sa Mapa makikita ang mga hintuan at lokasyon ng mga e-jeep. Sa Pamasahe makikita ang halaga ayon sa talaan. May abiso kapag kulang ang datos.",
       "unavailable": "Hindi magamit ang gabay sa biyahe. Subukang muli sandali.",
       "you": "Ikaw",
       "waiting": "Naghihintay ng sagot…",
@@ -735,11 +735,11 @@
     },
     "install": {
       "failed": "Hindi mabuksan ang download. Tingnan ang koneksiyon at subukang muli.",
-      "title": "I-install ang eSAKAY",
+      "title": "I-install ang eJeepHero",
       "close": "Isara ang gabay sa pag-install",
       "androidHelp": "Buksan ang na-download na APK sa telepono. Kung hingin ng Android, payagan ang pag-install mula sa pinagmulang ito.",
       "download": "I-download ang Android app",
-      "safari": "Buksan ang eSAKAY sa Safari. Pindutin ang <menu>Share</menu>, saka ang <menu>Add to Home Screen</menu>."
+      "safari": "Buksan ang eJeepHero sa Safari. Pindutin ang <menu>Share</menu>, saka ang <menu>Add to Home Screen</menu>."
     },
     "boarding": {
       "labels": {
@@ -748,7 +748,7 @@
         "Checking your location": "Sinusuri ang lokasyon mo",
         "The GPS signal is not precise enough yet. Follow the signs at your stop.": "Hindi pa sapat ang katumpakan ng GPS. Sundin ang mga karatula sa hintuan.",
         "Follow designated loading signs": "Sundin ang mga karatula sa sakayan",
-        "Loading-area coverage is not available here yet. Wait at a marked eSAKAY stop.": "Wala pang datos ng sakayan dito. Maghintay sa hintuang may karatula ng eSAKAY.",
+        "Loading-area coverage is not available here yet. Wait at a marked eJeepHero stop.": "Wala pang datos ng sakayan dito. Maghintay sa hintuang may karatula ng eJeepHero.",
         "No loading in this area": "Bawal magsakay rito",
         "Near a no-loading boundary": "Malapit sa hangganan ng bawal magsakay",
         "Check the posted loading signs before boarding.": "Tingnan ang mga karatula sa sakayan bago sumakay.",

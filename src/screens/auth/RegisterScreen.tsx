@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useSignUp } from '@clerk/clerk-expo';
 import { supabaseAuth } from '../../lib/supabase';
 import { isClerkConfigured } from '../../lib/clerk';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { AuthAction, AuthField, AuthLink, AuthNotice, AuthPage, authStyles } from './AuthUI';
 
 type Role = 'passenger' | 'driver';
@@ -20,9 +20,9 @@ function RoleChoice({ option, checked, group, onPress }: {
   const content = (
     <>
       <Ionicons aria-hidden name={option === 'passenger' ? 'person-outline' : 'bus-outline'}
-        size={20} color={checked ? Colors.onDark : Colors.ink} />
+        size={20} color={checked ? color.onDark : color.ink} />
       <Text aria-hidden style={[styles.choiceText, checked && styles.selectedText]}>{label}</Text>
-      {checked && <Ionicons aria-hidden name="checkmark" size={16} color={Colors.onDark} />}
+      {checked && <Ionicons aria-hidden name="checkmark" size={16} color={color.onDark} />}
     </>
   );
 
@@ -240,7 +240,7 @@ function ClerkRegisterForm() {
       <AuthNotice message={errorMessage} error />
       {!isLoaded && (
         <View style={styles.connecting} accessibilityLiveRegion="polite">
-          <ActivityIndicator size="small" color={Colors.action} />
+          <ActivityIndicator size="small" color={color.action} />
           <Text style={authStyles.body}>{t('passenger.authSignup.connecting')}</Text>
         </View>
       )}
@@ -322,13 +322,13 @@ const styles = StyleSheet.create({
   roles: { gap: 8 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   choice: { flexGrow: 1, flexBasis: 135, flexDirection: 'row', alignItems: 'center', gap: 8,
-    minHeight: 50, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: Colors.subtleGray },
-  selected: { backgroundColor: Colors.midnight, borderColor: Colors.midnight },
-  choiceFocus: { outlineStyle: 'solid', outlineWidth: 2, outlineOffset: 2, outlineColor: Colors.action },
-  choiceText: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.ink },
-  selectedText: { color: Colors.onDark },
-  roleNote: { color: Colors.subtleGray, fontSize: 14, lineHeight: 20 },
-  hint: { color: Colors.subtleGray, fontSize: 13, lineHeight: 19, marginTop: -10 },
-  met: { color: Colors.success, fontWeight: '600' },
+    minHeight: tapTarget, paddingHorizontal: 12, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1.5, borderColor: color.inkMuted },
+  selected: { backgroundColor: color.ink, borderColor: color.ink },
+  choiceFocus: { outlineStyle: 'solid', outlineWidth: 2, outlineOffset: 2, outlineColor: color.action },
+  choiceText: { flex: 1, fontSize: 15, fontWeight: '700', color: color.ink },
+  selectedText: { color: color.onDark },
+  roleNote: { color: color.inkMuted, fontSize: 14, lineHeight: 20 },
+  hint: { color: color.inkMuted, fontSize: 13, lineHeight: 19, marginTop: -10 },
+  met: { color: color.success, fontWeight: '600' },
   connecting: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

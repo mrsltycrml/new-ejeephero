@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "eSAKAY",
+    "name": "eJeepHero",
     "slug": "ejeephero",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/esakay-app-icon.png",
+    "icon": "./assets/ejeephero-app-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ejeephero.mobile",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "eSAKAY needs your location to track your ride and show your position on the map.",
-        "NSMotionUsageDescription": "eSAKAY needs accelerometer access to detect potential anomalies or crashes."
+        "NSLocationWhenInUseUsageDescription": "eJeepHero needs your location to track your ride and show your position on the map.",
+        "NSMotionUsageDescription": "eJeepHero needs accelerometer access to detect potential anomalies or crashes."
       }
     },
     "android": {
       "package": "com.ejeephero.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/esakay-app-icon.png"
+        "backgroundColor": "#13263F",
+        "foregroundImage": "./assets/ejeephero-app-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -29,9 +29,9 @@
       ]
     },
     "web": {
-      "favicon": "./assets/esakay-app-icon.png",
-      "name": "eSAKAY",
-      "shortName": "eSAKAY",
+      "favicon": "./assets/ejeephero-app-icon.png",
+      "name": "eJeepHero",
+      "shortName": "eJeepHero",
       "themeColor": "#13263F",
       "backgroundColor": "#F5F4EF"
     },
@@ -40,14 +40,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow eSAKAY to show your location and share an active e-jeep shift."
+          "locationWhenInUsePermission": "Allow eJeepHero to show your location and share an active e-jeep shift."
         }
       ],
       [
         "expo-notifications",
         {
-          "icon": "./assets/esakay-app-icon.png",
-          "color": "#C41E3A",
+          "icon": "./assets/ejeephero-app-icon.png",
+          "color": "#B42318",
           "defaultChannel": "general"
         }
       ],
