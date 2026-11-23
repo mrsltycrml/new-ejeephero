@@ -157,9 +157,10 @@ test('the map-first home layout does not put a full-screen FormScrollView over t
   const src = readFileSync(new URL('../src/screens/passenger/HomeScreen.tsx', import.meta.url), 'utf8');
   const start = src.lastIndexOf('const wideMap');
   const block = src.slice(start, src.indexOf('const styles', start));
-  assert.match(block, /<ScrollView/);
+  assert.match(block, /<PeekSheet/);
   assert.doesNotMatch(block, /FormScrollView/);
   assert.match(block, /defaultMovable/);
   assert.match(block, /pointerEvents="box-none"/);
+  assert.match(block, /compact/);
   assert.match(block, /styles\.mapFill/);
 });

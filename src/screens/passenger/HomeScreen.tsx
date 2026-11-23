@@ -7,7 +7,8 @@ import LeafletMap, { type LeafletMapRef } from '../../components/LeafletMap';
 import PassengerStopGuide from '../../components/PassengerStopGuide';
 import { passengerStyles as s, PassengerSelect } from '../../components/PassengerUI';
 import WalkingDirectionsPanel from '../../components/WalkingDirectionsPanel';
-import { FormScrollView, triggerHaptic } from '../../components/AppUI';
+import { triggerHaptic } from '../../components/AppUI';
+import { PeekSheet } from '../../components/ui';
 import { useLocation } from '../../contexts/LocationContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -418,6 +419,14 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     </View>}
   </View>;
 
+  const wideMap = width >= 860;
+  const mapControlProps = {
+    defaultMovable: true as const,
+    moveButtonStyle: wideMap ? styles.mapMoveButtonWide : styles.mapMoveButton,
+    mapControlsCorner: (wideMap ? 'bottom-left' : 'top-right') as 'bottom-left' | 'top-right',
+    mapControlsOffsetTop: wideMap ? 0 : 88,
+  };
+
   // 2) WHERE TO BOARD VIEW (Board 02 left)
   if (boardingOpen) {
     const targetVehicle = currentSelected;
@@ -425,20 +434,8 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     const isProhibited = boarding.kind === 'prohibited';
 
     return (
-      <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={styles.sheetScreen}>
-        <View style={styles.subHeader}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={t('passenger.home.back')}
-            onPress={() => setBoardingOpen(false)}
-            style={styles.backBtn}
-          >
-            <Ionicons name="chevron-back" size={24} color={color.ink} />
-          </TouchableOpacity>
-          <Text style={styles.subHeaderTitle}>{t('passenger.home.whereToBoard')}</Text>
-        </View>
-
-        <View style={styles.mapFrameSmall}>
+      <View style={styles.homeFill}>
+        <View style={styles.mapFill}>
           <LeafletMap
             ref={map}
             destinationPlace={place}
@@ -449,89 +446,96 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             selectedVehicle={targetVehicle}
             isOffline={!isConnected}
             onSelectVehicle={selectVehicle}
+            {...mapControlProps}
           />
-          <View style={styles.loadingBayOverlay}>
-            <Text style={styles.loadingBayOverlayText}>{boarding.kind === 'allowed' ? t('passenger.home.loadingBay') : t('passenger.home.unverifiedLoading')}</Text>
+        </View>
+        <View pointerEvents="box-none" style={styles.topOverlay}>
+          <View style={[styles.subHeader, styles.floatingBar]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t('passenger.home.back')}
+              onPress={() => setBoardingOpen(false)}
+              style={styles.backBtn}
+            >
+              <Ionicons name="chevron-back" size={24} color={color.ink} />
+            </TouchableOpacity>
+            <Text style={styles.subHeaderTitle}>{t('passenger.home.whereToBoard')}</Text>
           </View>
         </View>
-
-        {mapKey}
-        {trackingCard}
-        {locationControl}
-        {result}
-        {journeyControls}
-        <View style={[styles.boardingStatusRow, isProhibited && styles.boardingStatusDanger]}>
-          <Ionicons
-            name={isProhibited ? 'warning' : boarding.kind === 'allowed' ? 'checkmark-circle' : 'information-circle'}
-            size={22}
-            color={isProhibited ? color.ember : color.success}
-          />
-          <View style={{ flex: 1 }}>
-            <Text accessibilityRole={waitingWarning ? 'alert' : undefined} style={[styles.rowTitle, isProhibited && { color: color.ember }]}>
-              {boarding.title}
-            </Text>
-            <Text style={styles.rowSubtitle}>
-              {boarding.detail}
-            </Text>
-          </View>
+        <View pointerEvents="none" style={[styles.loadingBayOverlay, styles.loadingBayFloat]}>
+          <Text style={styles.loadingBayOverlayText}>{boarding.kind === 'allowed' ? t('passenger.home.loadingBay') : t('passenger.home.unverifiedLoading')}</Text>
         </View>
-
-        <View style={styles.stopSummaryRow}>
-          <View style={styles.stopBadgePill}>
-            <Text style={styles.stopBadgeText}>{stopBadgeCode}</Text>
-          </View>
-          <Text style={[styles.rowTitle, { fontSize: 17 }]}>{boardingStop?.name || t('passenger.home.noStopSelected')}</Text>
-        </View>
-
-        <View style={s.divider} />
-
-        {targetVehicle && (
-          <View style={styles.unitRowCard}>
-            <View style={styles.unitIconCircle}>
-              <Ionicons name="bus-outline" size={20} color={color.success} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={styles.unitCodeText}>{targetVehicle.body_number}</Text>
-                <Text style={styles.rowSubtitle}>{t('passenger.home.plateValue', { plate: targetVehicle.plate_number })}</Text>
+        <PeekSheet
+          peekHeight={210}
+          wide={wideMap}
+          expandAccessibilityLabel={t('passenger.home.whereToBoard')}
+          collapseAccessibilityLabel={t('passenger.home.back')}
+          peek={
+            <>
+              <View style={[styles.boardingStatusRow, isProhibited && styles.boardingStatusDanger]}>
+                <Ionicons
+                  name={isProhibited ? 'warning' : boarding.kind === 'allowed' ? 'checkmark-circle' : 'information-circle'}
+                  size={22}
+                  color={isProhibited ? color.ember : color.success}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text accessibilityRole={waitingWarning ? 'alert' : undefined} style={[styles.rowTitle, isProhibited && { color: color.ember }]}>
+                    {boarding.title}
+                  </Text>
+                  <Text style={styles.rowSubtitle}>{boarding.detail}</Text>
+                </View>
               </View>
-              <Text style={styles.rowSubtitle}>{routeName(targetVehicle.route_id)}</Text>
-            </View>
-            <View style={styles.seatBadge}>
-              <Text style={styles.seatBadgeText}>{targetVehicle.status || t('passenger.home.occupancyUnavailable')}</Text>
-            </View>
-          </View>
-        )}
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          disabled={!canBoardLive}
-          accessibilityState={{ disabled: !canBoardLive }}
-          onPress={() => targetVehicle && canBoardLive && boardUnit(targetVehicle)}
-          style={s.button}
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={!canBoardLive}
+                accessibilityState={{ disabled: !canBoardLive }}
+                onPress={() => targetVehicle && canBoardLive && boardUnit(targetVehicle)}
+                style={s.button}
+              >
+                <Text style={s.buttonText}>{t('passenger.home.boarded')}</Text>
+              </TouchableOpacity>
+            </>
+          }
         >
-          <Text style={s.buttonText}>{t('passenger.home.boarded')}</Text>
-        </TouchableOpacity>
-
-        {!canBoardLive && <Text style={s.muted}>{t('passenger.home.boardingHelp')}</Text>}
-
-      </FormScrollView>
+          <View style={styles.stopSummaryRow}>
+            <View style={styles.stopBadgePill}>
+              <Text style={styles.stopBadgeText}>{stopBadgeCode}</Text>
+            </View>
+            <Text style={[styles.rowTitle, { fontSize: 17 }]}>{boardingStop?.name || t('passenger.home.noStopSelected')}</Text>
+          </View>
+          {targetVehicle && (
+            <View style={styles.unitRowCard}>
+              <View style={styles.unitIconCircle}>
+                <Ionicons name="bus-outline" size={20} color={color.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.unitCodeText}>{targetVehicle.body_number}</Text>
+                  <Text style={styles.rowSubtitle}>{t('passenger.home.plateValue', { plate: targetVehicle.plate_number })}</Text>
+                </View>
+                <Text style={styles.rowSubtitle}>{routeName(targetVehicle.route_id)}</Text>
+              </View>
+              <View style={styles.seatBadge}>
+                <Text style={styles.seatBadgeText}>{targetVehicle.status || t('passenger.home.occupancyUnavailable')}</Text>
+              </View>
+            </View>
+          )}
+          {!canBoardLive && <Text style={s.muted}>{t('passenger.home.boardingHelp')}</Text>}
+          {mapKey}
+          {trackingCard}
+          {locationControl}
+          {result}
+          {journeyControls}
+        </PeekSheet>
+      </View>
     );
   }
 
   // 3) YOUR RIDE LINKED VIEW (Board 02 middle)
   if (unit) {
     return (
-      <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={{ flexGrow: 1, backgroundColor: color.paper }}>
-        <View style={styles.rideHeaderBar}>
-          <Text style={styles.subHeaderTitle}>{t('passenger.home.yourRide')}</Text>
-          <View style={styles.linkedPill}>
-            <Ionicons name="checkmark-circle" size={16} color={color.success} />
-            <Text style={styles.linkedPillText}>{t('passenger.home.linked')}</Text>
-          </View>
-        </View>
-
-        <View style={{ height: 250, borderTopWidth: 1, borderBottomWidth: 1, borderColor: color.border }}>
+      <View style={styles.homeFill}>
+        <View style={styles.mapFill}>
           <LeafletMap
             ref={map}
             destinationPlace={place}
@@ -542,17 +546,38 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             selectedVehicle={currentSelected}
             isOffline={!isConnected}
             onSelectVehicle={selectVehicle}
+            {...mapControlProps}
           />
         </View>
-
-        {mapKey}
-        {trackingCard}
-        {locationControl}
-        {journeyControls}
-        <View style={styles.bottomSheetSurface}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetHeading}>{t('passenger.home.riding', { unit: unit.body_number })}</Text>
-
+        <PeekSheet
+          peekHeight={200}
+          wide={wideMap}
+          expandAccessibilityLabel={t('passenger.home.yourRide')}
+          collapseAccessibilityLabel={t('passenger.home.yourRide')}
+          peek={
+            <>
+              <View style={styles.rideHeaderBar}>
+                <Text style={styles.sheetHeading}>{t('passenger.home.riding', { unit: unit.body_number })}</Text>
+                <View style={styles.linkedPill}>
+                  <Ionicons name="checkmark-circle" size={16} color={color.success} />
+                  <Text style={styles.linkedPillText}>{t('passenger.home.linked')}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => {
+                  triggerHaptic('light');
+                  endRide();
+                  setSelected(null);
+                }}
+                style={styles.endRideBtn}
+              >
+                <Text style={styles.endRideText}>{t('passenger.home.endRide')}</Text>
+              </TouchableOpacity>
+            </>
+          }
+        >
+          <Text style={styles.subHeaderTitle}>{t('passenger.home.yourRide')}</Text>
           <View style={styles.kvList}>
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>{t('passenger.home.plate')}</Text>
@@ -567,9 +592,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
               <Text style={styles.kvValue}>{destination?.name || t('passenger.home.unavailable')}</Text>
             </View>
           </View>
-
           <Text style={s.muted}>{t('passenger.home.sosUnit')}</Text>
-
           <View style={styles.actionRowsGroup}>
             <TouchableOpacity
               accessibilityRole="button"
@@ -580,7 +603,6 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
               <Text style={[styles.rowTitle, { flex: 1 }]}>{t('passenger.home.checkFare')}</Text>
               <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
             </TouchableOpacity>
-
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => navigation.navigate('Safety')}
@@ -591,56 +613,55 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
               <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => {
-              triggerHaptic('light');
-              endRide();
-              setSelected(null);
-            }}
-            style={styles.endRideBtn}
-          >
-            <Text style={styles.endRideText}>{t('passenger.home.endRide')}</Text>
-          </TouchableOpacity>
-        </View>
-      </FormScrollView>
+          {mapKey}
+          {trackingCard}
+          {locationControl}
+          {journeyControls}
+        </PeekSheet>
+      </View>
     );
   }
 
-  const wideMap = width >= 860;
   return (
     <View style={styles.homeFill}>
       <View style={styles.mapFill}>
         <LeafletMap ref={map} destinationPlace={place} hideOccupancy {...journeyMapProps}
           vehicles={displayed} userLocation={locationFresh ? fix : null}
           selectedVehicle={currentSelected} isOffline={!isConnected} onSelectVehicle={selectVehicle}
-          defaultMovable
-          moveButtonStyle={wideMap ? styles.mapMoveButtonWide : styles.mapMoveButton}
-          mapControlsCorner={wideMap ? 'bottom-left' : 'top-right'}
-          mapControlsOffsetTop={wideMap ? 0 : 140} />
+          {...mapControlProps} />
       </View>
       <View pointerEvents="box-none" style={[styles.searchOverlay, wideMap && styles.searchOverlayWide]}>
-        <PassengerDestinationSearch key={user?.id} scope={searchScope} selectedName={place?.name || destination?.name || ''} online={isConnected} onSelect={choosePlace} />
+        <PassengerDestinationSearch compact key={user?.id} scope={searchScope} selectedName={place?.name || destination?.name || ''} online={isConnected} onSelect={choosePlace} />
       </View>
-      <ScrollView
-        ref={scroll}
-        style={[styles.statusSheet, wideMap && styles.statusSheetWide]}
-        contentContainerStyle={styles.statusSheetContent}
-        keyboardShouldPersistTaps="always"
-      >
-        <View style={styles.sheetHandle} />
-        {!!waitingWarning && <View style={[styles.boardingStatusRow, styles.boardingStatusDanger]}>
-          <Ionicons aria-hidden name="warning" size={22} color={color.ember} />
-          <View style={{ flex: 1 }}>
-            <Text accessibilityRole="alert" style={[styles.rowTitle, { color: color.ember }]}>{boarding.title}</Text>
-            <Text style={styles.rowSubtitle}>{boarding.detail}</Text>
-            <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={() => setBoardingOpen(true)}>
-              <Text style={styles.mapLink}>{t('passenger.home.safeBoarding')}</Text>
-            </TouchableOpacity>
+      {!!waitingWarning && (
+        <View pointerEvents="box-none" style={[styles.warningBanner, wideMap && styles.warningBannerWide]}>
+          <View style={[styles.boardingStatusRow, styles.boardingStatusDanger, styles.warningCard]}>
+            <Ionicons aria-hidden name="warning" size={22} color={color.ember} />
+            <View style={{ flex: 1 }}>
+              <Text accessibilityRole="alert" style={[styles.rowTitle, { color: color.ember }]}>{boarding.title}</Text>
+              <Text style={styles.rowSubtitle}>{boarding.detail}</Text>
+              <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={() => setBoardingOpen(true)}>
+                <Text style={styles.mapLink}>{t('passenger.home.safeBoarding')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>}
-        <View style={styles.rideDetails}>{locationControl}{result}</View>
+        </View>
+      )}
+      <PeekSheet
+        peekHeight={168}
+        wide={wideMap}
+        expandAccessibilityLabel={t('passenger.home.safeBoarding')}
+        collapseAccessibilityLabel={t('passenger.home.safeBoarding')}
+        peek={
+          <>
+            {locationControl}
+            <TouchableOpacity accessibilityRole="button" style={styles.peekAction} onPress={() => setBoardingOpen(true)}>
+              <Text style={styles.peekActionText}>{t('passenger.home.safeBoarding')}</Text>
+            </TouchableOpacity>
+          </>
+        }
+      >
+        <View style={styles.rideDetails}>{result}</View>
         {mapKey}
         <View style={styles.mapCaption}>
           <Ionicons name="bus-outline" size={18} color={color.inkMuted} />
@@ -657,7 +678,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           <Text style={[s.label, { flex: 1 }]}>{t('passenger.home.safeBoarding')}</Text>
           <Ionicons name="chevron-forward" size={18} color={color.ink} />
         </TouchableOpacity>
-      </ScrollView>
+      </PeekSheet>
     </View>
   );
 }
@@ -677,8 +698,24 @@ const styles = StyleSheet.create({
   mapFill: { ...StyleSheet.absoluteFill },
   searchOverlay: { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 3 },
   searchOverlayWide: { right: 'auto', width: 420, maxWidth: '42%' },
-  mapMoveButton: { top: 140, left: 12, right: 'auto' },
+  topOverlay: { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 3 },
+  floatingBar: {
+    backgroundColor: color.paper,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: color.border,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 48,
+  },
+  loadingBayFloat: { top: 'auto', bottom: 228, left: 12, right: 'auto' },
+  warningBanner: { position: 'absolute', left: 12, right: 12, bottom: 176, zIndex: 3 },
+  warningBannerWide: { left: 'auto', right: 16, width: 420, maxWidth: '42%' },
+  warningCard: { margin: 0, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, backgroundColor: color.dangerBg },
+  mapMoveButton: { top: 88, left: 12, right: 'auto' },
   mapMoveButtonWide: { top: 12, left: 'auto', right: 12 },
+  peekAction: { minHeight: 48, borderRadius: 14, backgroundColor: color.action, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  peekActionText: { color: color.onDark, fontSize: 16, fontWeight: '700' },
   statusSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '50%', zIndex: 2,
     backgroundColor: color.paper, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
