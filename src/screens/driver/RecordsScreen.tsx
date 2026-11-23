@@ -5,7 +5,7 @@ import { SkeletonBlock } from '../../components/AppUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { realRows } from '../../utils/realData';
 import { supabase } from '../../lib/supabase';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { transitStyles } from '../../constants/transitStyles';
 import {
   currentReportingPeriod,
@@ -130,11 +130,11 @@ export default function RecordsScreen() {
           <Text accessibilityRole="header" style={styles.title}>Safety records</Text>
           <View style={styles.dateNavRow}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous reporting period" onPress={() => stepPeriod(-1)} style={styles.arrowBtn}>
-              <Ionicons name="chevron-back" size={20} color={Colors.onDark} />
+              <Ionicons name="chevron-back" size={20} color={color.onDark} />
             </TouchableOpacity>
             <Text style={styles.dateNavText}>{formatReportingPeriod(period)}</Text>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next reporting period" onPress={() => stepPeriod(1)} style={styles.arrowBtn}>
-              <Ionicons name="chevron-forward" size={20} color={Colors.onDark} />
+              <Ionicons name="chevron-forward" size={20} color={color.onDark} />
             </TouchableOpacity>
           </View>
         </View>
@@ -181,7 +181,7 @@ export default function RecordsScreen() {
                 <Ionicons
                   name={score === 100 ? 'checkmark-circle' : 'information-circle'}
                   size={18}
-                  color={score === 100 ? Colors.success : Colors.subtleGray}
+                  color={score === 100 ? color.success : color.inkMuted}
                 />
                 <Text style={styles.scoreSubText}>
                   {score === 100 ? 'No deductions in this period' : 'Recorded deductions applied'}
@@ -207,9 +207,9 @@ export default function RecordsScreen() {
           </View>
 
           <View style={[styles.pendingBanner, pendingCount > 0 && styles.pending]}>
-            <Ionicons name="information-circle-outline" size={19} color={pendingCount > 0 ? Colors.warning : Colors.subtleGray} />
+            <Ionicons name="information-circle-outline" size={19} color={pendingCount > 0 ? color.warning : color.inkMuted} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.pendingTitle, pendingCount > 0 && { color: Colors.warning }]}>
+              <Text style={[styles.pendingTitle, pendingCount > 0 && { color: color.warning }]}>
                 {pendingCount > 0
                   ? `${pendingCount} route flag${pendingCount === 1 ? '' : 's'} awaiting review`
                   : 'No route flags awaiting review'}
@@ -230,28 +230,28 @@ const styles = StyleSheet.create({
   masthead: { ...transitStyles.masthead, borderRadius: 0 },
   title: transitStyles.heading,
   dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  arrowBtn: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.onDark, borderRadius: 6 },
-  dateNavText: { flex: 1, textAlign: 'center', fontSize: 16, color: Colors.onDark, fontWeight: '600' },
+  arrowBtn: { width: tapTarget, minHeight: tapTarget, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: color.onDark, borderRadius: radius.sm },
+  dateNavText: { flex: 1, textAlign: 'center', fontSize: 16, color: color.onDark, fontWeight: '600' },
   segmentBar: { flexDirection: 'row', padding: 4, gap: 4 },
-  segmentBtn: { flex: 1, minHeight: 44, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
+  segmentBtn: { flex: 1, minHeight: tapTarget, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
   segmentBtnActive: transitStyles.selected,
-  segmentText: { fontSize: 14, fontWeight: '600', color: Colors.subtleGray },
+  segmentText: { fontSize: 14, fontWeight: '600', color: color.inkMuted },
   segmentTextActive: transitStyles.selectedText,
   gradePanel: { ...transitStyles.panel, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden' },
-  scorePanel: { flexGrow: 1, flexShrink: 1, flexBasis: 230, padding: 18, gap: 6, justifyContent: 'center', backgroundColor: Colors.mutedBackground },
-  gradeTitle: { fontSize: 18, fontWeight: '700', color: Colors.ink },
-  scoreBig: { fontSize: 38, fontWeight: '800', color: Colors.ink, fontVariant: ['tabular-nums'] },
-  scoreDenom: { fontSize: 20, fontWeight: '500', color: Colors.subtleGray },
+  scorePanel: { flexGrow: 1, flexShrink: 1, flexBasis: 230, padding: 18, gap: 6, justifyContent: 'center', backgroundColor: color.sand },
+  gradeTitle: { fontSize: 18, fontWeight: '700', color: color.ink },
+  scoreBig: { fontSize: 38, fontWeight: '800', color: color.ink, fontVariant: ['tabular-nums'] },
+  scoreDenom: { fontSize: 20, fontWeight: '500', color: color.inkMuted },
   scoreNote: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  scoreSubText: { flexShrink: 1, color: Colors.ink, fontSize: 14 },
+  scoreSubText: { flexShrink: 1, color: color.ink, fontSize: 14 },
   breakdownList: { flexGrow: 2, flexShrink: 1, flexBasis: 260, paddingHorizontal: 18 },
-  breakdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderColor: Colors.border },
-  breakdownLabel: { flex: 1, fontSize: 14, color: Colors.subtleGray },
-  breakdownVal: { fontSize: 16, fontWeight: '700', color: Colors.ink, fontVariant: ['tabular-nums'] },
-  formulaText: { fontSize: 13, lineHeight: 19, paddingVertical: 12, color: Colors.subtleGray },
-  pendingBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 8 },
-  pending: { backgroundColor: Colors.warningBg, borderColor: Colors.warningBorder },
-  pendingTitle: { fontSize: 14, fontWeight: '700', color: Colors.ink },
-  pendingSub: { fontSize: 13, lineHeight: 19, color: Colors.subtleGray, marginTop: 2 },
-  error: { backgroundColor: Colors.dangerBg, color: Colors.primaryRed, padding: 14, borderRadius: 8 },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderColor: color.border },
+  breakdownLabel: { flex: 1, fontSize: 14, color: color.inkMuted },
+  breakdownVal: { fontSize: 16, fontWeight: '700', color: color.ink, fontVariant: ['tabular-nums'] },
+  formulaText: { fontSize: 13, lineHeight: 19, paddingVertical: 12, color: color.inkMuted },
+  pendingBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, backgroundColor: color.paper, borderWidth: 1, borderColor: color.border, borderRadius: radius.md },
+  pending: { backgroundColor: color.warningBg, borderColor: color.warningBorder },
+  pendingTitle: { fontSize: 14, fontWeight: '700', color: color.ink },
+  pendingSub: { fontSize: 13, lineHeight: 19, color: color.inkMuted, marginTop: 2 },
+  error: { backgroundColor: color.dangerBg, color: color.ember, padding: 14, borderRadius: radius.md },
 });

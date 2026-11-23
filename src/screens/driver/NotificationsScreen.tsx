@@ -14,7 +14,7 @@ import { realRows } from '../../utils/realData';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouteWarnings } from '../../contexts/RouteWarningsContext';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { transitStyles } from '../../constants/transitStyles';
 import { offlineTransit, type RouteData, type TerminalData } from '../../services/offlineTransitService';
 
@@ -172,10 +172,10 @@ export default function NotificationsScreen() {
           : 'git-branch-outline';
     const iconColor =
       item.severity === 'danger'
-        ? Colors.primaryRed
+        ? color.ember
         : item.severity === 'warning'
-          ? Colors.warning
-          : Colors.ink;
+          ? color.warning
+          : color.ink;
     const timeText = new Date(item.timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
@@ -198,7 +198,7 @@ export default function NotificationsScreen() {
           <Text style={styles.rowTitle}>{item.title}</Text>
           <Text style={styles.rowBody}>{item.body}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+        <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
       </TouchableOpacity>
     );
   };
@@ -241,9 +241,9 @@ export default function NotificationsScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => setSelectedFlag(null)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: tapTarget }}
             >
-              <Ionicons name="chevron-back" size={20} color={Colors.ink} />
+              <Ionicons name="chevron-back" size={20} color={color.ink} />
               <Text style={styles.sheetHeaderLabel}>
                 {selectedFlag.category === 'violation' ? 'Route flag' : 'Alert details'}
               </Text>
@@ -253,8 +253,8 @@ export default function NotificationsScreen() {
             {selectedFlag.category === 'violation' && (
               <Text style={[
                 styles.statusText,
-                selectedFlag.severity === 'danger' && { color: Colors.primaryRed, backgroundColor: Colors.dangerBg },
-                selectedFlag.severity === 'warning' && { color: Colors.warning, backgroundColor: Colors.warningBg },
+                selectedFlag.severity === 'danger' && { color: color.ember, backgroundColor: color.dangerBg },
+                selectedFlag.severity === 'warning' && { color: color.warning, backgroundColor: color.warningBg },
               ]}>
                 {selectedFlag.statusLabel || 'Awaiting supervisor review'}
               </Text>
@@ -306,32 +306,32 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: transitStyles.page,
   content: transitStyles.content,
-  title: { ...transitStyles.heading, color: Colors.ink },
+  title: { ...transitStyles.heading, color: color.ink },
   groupBand: { paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  groupBandText: { fontSize: 18, fontWeight: '700', color: Colors.ink },
-  groupCount: { fontSize: 14, color: Colors.subtleGray, fontVariant: ['tabular-nums'] },
+  groupBandText: { fontSize: 18, fontWeight: '700', color: color.ink },
+  groupCount: { fontSize: 14, color: color.inkMuted, fontVariant: ['tabular-nums'] },
   listSection: transitStyles.panel,
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderTopWidth: 1, borderColor: Colors.border },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: tapTarget, padding: 16, borderTopWidth: 1, borderColor: color.border },
   message: { flex: 1, minWidth: 0, gap: 4 },
-  rowTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },
-  rowTime: { fontSize: 13, color: Colors.subtleGray, fontVariant: ['tabular-nums'] },
-  rowBody: { fontSize: 14, lineHeight: 20, color: Colors.subtleGray },
-  empty: { padding: 18, backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 8, color: Colors.ink },
-  error: { padding: 14, color: Colors.primaryRed, backgroundColor: Colors.dangerBg, borderRadius: 8 },
+  rowTitle: { fontSize: 16, fontWeight: '700', color: color.ink },
+  rowTime: { fontSize: 13, color: color.inkMuted, fontVariant: ['tabular-nums'] },
+  rowBody: { fontSize: 14, lineHeight: 20, color: color.inkMuted },
+  empty: { padding: 18, backgroundColor: color.paper, borderColor: color.border, borderWidth: 1, borderRadius: radius.md, color: color.ink },
+  error: { padding: 14, color: color.ember, backgroundColor: color.dangerBg, borderRadius: radius.md },
   sheetHeaderLabel: {
     fontSize: 17,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
-  statusText: { alignSelf: 'flex-start', color: Colors.ink, backgroundColor: Colors.canvas, fontWeight: '700', fontSize: 14, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 },
+  statusText: { alignSelf: 'flex-start', color: color.ink, backgroundColor: color.canvas, fontWeight: '700', fontSize: 14, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.sm },
   detailHeading: {
     fontSize: 22,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   kvGroup: {
     borderTopWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   kvRow: {
     flexDirection: 'row',
@@ -339,11 +339,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   kvLabel: {
     fontSize: 14,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
   },
   kvValue: {
     flexShrink: 1,
@@ -351,18 +351,18 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   mapBox: {
-    height: 170,
-    borderRadius: 12,
+    height: 220,
+    borderRadius: radius.lg,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   readOnlyNote: {
     fontSize: 14,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
     lineHeight: 20,
   },
 });
