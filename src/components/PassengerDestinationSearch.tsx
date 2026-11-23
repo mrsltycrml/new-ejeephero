@@ -11,9 +11,10 @@ type Props = {
   online: boolean;
   selectedName: string;
   onSelect: (place: PassengerPlace) => void;
+  compact?: boolean;
 };
 
-export default function PassengerDestinationSearch({ scope, online, selectedName, onSelect }: Props) {
+export default function PassengerDestinationSearch({ scope, online, selectedName, onSelect, compact = false }: Props) {
   const { t } = useTranslation();
   const input = useRef<React.ElementRef<typeof TextInput>>(null);
   const [draft, setDraft] = useState<string | null>(null);
@@ -43,8 +44,8 @@ export default function PassengerDestinationSearch({ scope, online, selectedName
     : !results.length && online && query.length >= 3 && !current ? t('passenger.search.searching')
     : !results.length ? (online ? t('passenger.search.noMatches') : t('passenger.search.offlineEmpty')) : '';
 
-  return <View style={styles.panel}>
-    <Text accessibilityRole="header" style={styles.title}>{t('passenger.search.heading')}</Text>
+  return <View style={[styles.panel, compact && styles.panelCompact]} accessibilityLabel={compact ? t('passenger.search.heading') : undefined}>
+    {!compact && <Text accessibilityRole="header" style={styles.title}>{t('passenger.search.heading')}</Text>}
     <View style={styles.field}>
       <View pointerEvents="none" style={styles.searchIcon}><Ionicons name="search" size={22} color={color.ink} /></View>
       <TextInput ref={input} accessibilityLabel={t('passenger.search.destination')} style={styles.input}
@@ -77,6 +78,7 @@ export default function PassengerDestinationSearch({ scope, online, selectedName
 
 const styles = StyleSheet.create({
   panel: { paddingHorizontal: 16, paddingVertical: 14, gap: 10, backgroundColor: color.paper, borderRadius: 16, borderWidth: 1, borderColor: color.border, ...elevation.card },
+  panelCompact: { paddingHorizontal: 10, paddingVertical: 8, gap: 0, borderRadius: 18 },
   title: { ...type.title, fontSize: 22, lineHeight: 26, color: color.ink },
   field: { minHeight: tapTarget, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', backgroundColor: color.sand, borderWidth: 1.5, borderColor: color.border },
   searchIcon: { position: 'absolute', left: 14 },

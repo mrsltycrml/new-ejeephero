@@ -7,3 +7,5 @@ export { Badge, Chip } from './Badge';
 export type { BadgeTone } from './Badge';
 export { default as ScreenHeader } from './ScreenHeader';
 export { default as OverlaySheet } from './OverlaySheet';
+export { default as PeekSheet } from './PeekSheet';
+export type { SheetSnap } from './PeekSheet';

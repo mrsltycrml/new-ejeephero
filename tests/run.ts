@@ -1,4 +1,5 @@
 import './fareCalculator.test.ts';
+import './sheetSnap.test.ts';
 import './walkingRoute.test.ts';
 import './walkingBackend.test.ts';
 import './herobotContext.test.ts';

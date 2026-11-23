@@ -79,6 +79,15 @@ export const elevation = {
 /** Minimum tap target for controls used outdoors. */
 export const tapTarget = 48;
 
+/** Compact chrome so a map can run closer to the edges of the phone. */
+export const chrome = {
+  tabBar: 48,
+  header: 48,
+  search: 56,
+} as const;
+
+export { sheetSnap, sheetHeights, nearestSheetSnap, type SheetSnap } from './sheetSnap';
+
 /**
  * Legacy color aliases. Existing screens keep compiling against `Colors`
  * while new work should use the `color` tokens above. Values stay in the
