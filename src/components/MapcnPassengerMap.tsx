@@ -13,6 +13,8 @@ export type MapcnPassengerMapProps = {
     labels: Record<string, string>;
     zoomIn: string;
     zoomOut: string;
+    controlsCorner?: 'bottom-left' | 'top-right';
+    controlsOffsetTop?: number;
     routes: { coordinates: Point[]; isSelected: boolean; color_code: string; referenceDirection?: 'outbound' | 'inbound' }[];
     terminals: (Point & { id: string; name: string; role: string; isSelected: boolean })[];
     vehicles: (Point & { id: string; body_number: string; quality: string; isSelected: boolean })[];

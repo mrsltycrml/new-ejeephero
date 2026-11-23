@@ -75,7 +75,8 @@ test('serialized map executes safely, frames journeys, preserves camera on telem
   const handler = { enable() {}, disable() {} };
   let stops = 0;
   const map = { dragging: handler, touchZoom: handler, scrollWheelZoom: handler, doubleClickZoom: handler, boxZoom: handler, stop() { stops++; }, setView() { return this; }, on() { return this; }, getZoom: () => 14, fitBounds(points: any) { fits.push(points); }, flyTo(...args: any[]) { flights.push(args); } };
-  const context: any = { document: { querySelector: () => ({ setAttribute() {} }), getElementById: () => ({ style: {} }), createElement: () => ({ textContent: '' }) }, L: {
+  const mapEl = { style: {} as { touchAction?: string } };
+  const context: any = { document: { querySelector: () => ({ setAttribute() {} }), getElementById: () => mapEl, createElement: () => ({ textContent: '' }) }, L: {
     control: { zoom: layer },
     map: (_: string, value: any) => { options = value; return map; }, TileLayer: { extend: () => {} }, tileLayer: layer, layerGroup: layer,
     polyline: (points: any, settings: any) => { const value = { ...layer(), points, settings }; lines.push(value); return value; },
@@ -104,6 +105,7 @@ test('serialized map executes safely, frames journeys, preserves camera on telem
   const data = { canMove: true, cameraKey, fitPoints: [a, b], routes: [], terminals: [], rideCoordinates: [], walkingRoutes: [], vehicles: [vehicle], selectedVehicleId: 'v' };
   context.window.renderMapData(data);
   assert.equal(context.window.canMoveMap, true);
+  assert.equal(mapEl.style.touchAction, 'none');
   assert.equal(fits.length, 1);
   assert.equal(flights.length, 1);
   assert.deepEqual(Array.from(flights[0][0]), [14.7, 121.2]);
@@ -139,6 +141,25 @@ test('serialized map executes safely, frames journeys, preserves camera on telem
   assert.equal(flights.length, consumedFlights + 3, 'explicit deselection and reselection still focuses');
   context.window.renderMapData({ ...data, canMove: false, cameraKey: 'new-journey', fitPoints: [b], vehicles: [] });
   assert.equal(context.window.canMoveMap, false);
+  assert.equal(mapEl.style.touchAction, 'pan-y');
   assert.equal(fits.length, 2);
   assert.equal(stops, 1, 'locking stops the momentum of the previous drag');
+});
+
+test('defaultMovable starts with the map unlocked and still offers Lock map', () => {
+  const props = { preferMapcn: true, routes: [], terminals: [], vehicles: [], defaultMovable: true };
+  const markup = renderToStaticMarkup(React.createElement(LeafletMap, props));
+  assert.match(markup, />Lock map</);
+  assert.doesNotMatch(markup, />Move map</);
+});
+
+test('the map-first home layout does not put a full-screen FormScrollView over the map', () => {
+  const src = readFileSync(new URL('../src/screens/passenger/HomeScreen.tsx', import.meta.url), 'utf8');
+  const start = src.lastIndexOf('const wideMap');
+  const block = src.slice(start, src.indexOf('const styles', start));
+  assert.match(block, /<ScrollView/);
+  assert.doesNotMatch(block, /FormScrollView/);
+  assert.match(block, /defaultMovable/);
+  assert.match(block, /pointerEvents="box-none"/);
+  assert.match(block, /styles\.mapFill/);
 });

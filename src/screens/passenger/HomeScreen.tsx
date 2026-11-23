@@ -614,12 +614,21 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
       <View style={styles.mapFill}>
         <LeafletMap ref={map} destinationPlace={place} hideOccupancy {...journeyMapProps}
           vehicles={displayed} userLocation={locationFresh ? fix : null}
-          selectedVehicle={currentSelected} isOffline={!isConnected} onSelectVehicle={selectVehicle} />
+          selectedVehicle={currentSelected} isOffline={!isConnected} onSelectVehicle={selectVehicle}
+          defaultMovable
+          moveButtonStyle={wideMap ? styles.mapMoveButtonWide : styles.mapMoveButton}
+          mapControlsCorner={wideMap ? 'bottom-left' : 'top-right'}
+          mapControlsOffsetTop={wideMap ? 0 : 140} />
       </View>
       <View pointerEvents="box-none" style={[styles.searchOverlay, wideMap && styles.searchOverlayWide]}>
         <PassengerDestinationSearch key={user?.id} scope={searchScope} selectedName={place?.name || destination?.name || ''} online={isConnected} onSelect={choosePlace} />
       </View>
-      <FormScrollView ref={scroll} style={[styles.statusSheet, wideMap && styles.statusSheetWide]} contentContainerStyle={styles.statusSheetContent}>
+      <ScrollView
+        ref={scroll}
+        style={[styles.statusSheet, wideMap && styles.statusSheetWide]}
+        contentContainerStyle={styles.statusSheetContent}
+        keyboardShouldPersistTaps="always"
+      >
         <View style={styles.sheetHandle} />
         {!!waitingWarning && <View style={[styles.boardingStatusRow, styles.boardingStatusDanger]}>
           <Ionicons aria-hidden name="warning" size={22} color={color.ember} />
@@ -648,7 +657,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           <Text style={[s.label, { flex: 1 }]}>{t('passenger.home.safeBoarding')}</Text>
           <Ionicons name="chevron-forward" size={18} color={color.ink} />
         </TouchableOpacity>
-      </FormScrollView>
+      </ScrollView>
     </View>
   );
 }
@@ -668,6 +677,8 @@ const styles = StyleSheet.create({
   mapFill: { ...StyleSheet.absoluteFill },
   searchOverlay: { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 3 },
   searchOverlayWide: { right: 'auto', width: 420, maxWidth: '42%' },
+  mapMoveButton: { top: 140, left: 12, right: 'auto' },
+  mapMoveButtonWide: { top: 12, left: 'auto', right: 12 },
   statusSheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '50%', zIndex: 2,
     backgroundColor: color.paper, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,

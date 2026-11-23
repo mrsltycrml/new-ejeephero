@@ -33,7 +33,7 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
   const select = useRef(onSelect);
   select.current = onSelect;
   const vehicleFocus = useRef<{ key: string | null; pending: boolean }>({ key: null, pending: false });
-  const { canMove = false, labels, zoomIn = 'Zoom in', zoomOut = 'Zoom out' } = data;
+  const { canMove = false, labels, zoomIn = 'Zoom in', zoomOut = 'Zoom out', controlsCorner = 'bottom-left', controlsOffsetTop = 0 } = data;
   const label = useCallback((english: string) => labels?.[english] || english, [labels]);
 
   useEffect(() => {
@@ -55,7 +55,6 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
       });
       map = instance;
       instance.touchZoomRotate.disableRotation();
-      instance.addControl(new lib.NavigationControl({ showCompass: false }), 'bottom-left');
       instance.once('load', () => {
         if (cancelled) return;
         clearTimeout(timeout);
@@ -79,6 +78,21 @@ export default function MapcnPassengerMap({ data, controls, onFailure, onSelect,
       else handler.disable();
     }
   }, [view, canMove]);
+
+  useEffect(() => {
+    if (!view) return;
+    const nav = new view.lib.NavigationControl({ showCompass: false });
+    view.map.addControl(nav, controlsCorner);
+    const cornerClass = controlsCorner === 'top-right' ? 'maplibregl-ctrl-top-right' : 'maplibregl-ctrl-bottom-left';
+    const group = view.map.getContainer().querySelector<HTMLElement>('.' + cornerClass);
+    if (group && controlsOffsetTop) {
+      if (controlsCorner.startsWith('top')) group.style.marginTop = `${controlsOffsetTop}px`;
+      else group.style.marginBottom = `${controlsOffsetTop}px`;
+    }
+    return () => {
+      try { view.map.removeControl(nav); } catch { /* map already removed */ }
+    };
+  }, [view, controlsCorner, controlsOffsetTop]);
 
   useEffect(() => {
     if (!view) return;

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useMemo, useState } from 'react';
-import { StyleSheet, View, Platform, Pressable, Text } from 'react-native';
+import { StyleSheet, View, Platform, Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { scriptJson } from '../utils/scriptJson';
@@ -57,6 +57,11 @@ export interface LeafletMapProps {
   isOffline?: boolean;
   onSelectTerminal?: (terminal: TerminalData) => void;
   onSelectVehicle?: (vehicle: VehicleData) => void;
+  /** Start with pan/pinch enabled. The Lock map control can still freeze the camera. */
+  defaultMovable?: boolean;
+  moveButtonStyle?: StyleProp<ViewStyle>;
+  mapControlsCorner?: 'bottom-left' | 'top-right';
+  mapControlsOffsetTop?: number;
 }
 
 const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
@@ -83,6 +88,10 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   isOffline = false,
   onSelectTerminal,
   onSelectVehicle,
+  defaultMovable = false,
+  moveButtonStyle,
+  mapControlsCorner = 'bottom-left',
+  mapControlsOffsetTop = 0,
 }, ref) => {
   const webViewRef = useRef<any>(null);
   const NativeWebView = WebView as React.ComponentType<any>;
@@ -91,7 +100,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
   const labels = useMemo(() => Object.fromEntries(mapText.map(key => [key, t('passenger.map.labels.' + key, key)])), [t]);
   const zoomIn = t('passenger.map.zoomIn', 'Zoom in');
   const zoomOut = t('passenger.map.zoomOut', 'Zoom out');
-  const [moveMap, setMoveMap] = useState(false);
+  const [moveMap, setMoveMap] = useState(defaultMovable);
   const canMove = !!fieldReview || moveMap;
   const [listOnly, setListOnly] = useState(false);
   const mapcnControls = useRef<LeafletMapRef>(null);
@@ -162,6 +171,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     [fieldReview, mapTerminals, passengerOverview]);
   const mapData = useMemo(() => ({
     canMove, labels, zoomIn, zoomOut,
+    controlsCorner: mapControlsCorner,
+    controlsOffsetTop: mapControlsOffsetTop,
     routes: displayRoutes,
     terminals: displayPins,
     fieldReview: !!fieldReview,
@@ -196,6 +207,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
     isOffline: Boolean(isOffline),
   }), [
     fieldReview, passengerOverview, displayRoutes, displayPins, canMove, labels, zoomIn, zoomOut,
+    mapControlsCorner, mapControlsOffsetTop,
     vehicles,
     userLocation,
     destinationPlace,
@@ -550,6 +562,8 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         [map.dragging, map.touchZoom, map.scrollWheelZoom, map.doubleClickZoom, map.boxZoom].forEach(function(handler) {
           if (data.canMove) handler.enable(); else handler.disable();
         });
+        var mapEl = document.getElementById('map');
+        if (mapEl) mapEl.style.touchAction = data.canMove ? 'none' : 'pan-y';
       }
       ['in', 'out'].forEach(function(direction) {
         var button = document.querySelector('.leaflet-control-zoom-' + direction);
@@ -804,7 +818,7 @@ const LeafletMap = forwardRef<LeafletMapRef, LeafletMapProps>(({
         />
       )}
       {!fieldReview && (showMapcn || !listOnly) && (
-        <Pressable accessibilityRole="button" style={styles.moveButton} onPress={() => setMoveMap(value => !value)}>
+        <Pressable accessibilityRole="button" style={[styles.moveButton, moveButtonStyle]} onPress={() => setMoveMap(value => !value)}>
           <Text style={styles.moveLabel}>{moveMap ? t('passenger.map.lock', 'Lock map') : t('passenger.map.move', 'Move map')}</Text>
         </Pressable>
       )}
