@@ -716,7 +716,8 @@
       "fareDetail": "Check sourced regular, student, senior and PWD fares.",
       "safetyDetail": "Manage trusted contacts and prepare an SOS with your location and ride details.",
       "assistantDetail": "Ask about routes, stops and using the service.",
-      "report": "eJeepHero is an independent wayfinding app for Makati commuters, drivers, and fleet supervisors."
+      "summary": "eJeepHero is an independent wayfinding app for Makati commuters, drivers, and fleet supervisors.",
+      "report": "Sustainability report (PDF)"
     },
     "assistant": {
       "board": "Where do I board at MRT Buendia?",

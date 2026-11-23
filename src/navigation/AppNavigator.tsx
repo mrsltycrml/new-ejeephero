@@ -9,7 +9,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { Colors } from '../constants/theme';
+import { chrome, Colors } from '../constants/theme';
 import { AuthAction, AuthLink, AuthNotice, AuthPage, authStyles } from '../screens/auth/AuthUI';
 import EJeepHeroLogo from '../components/EJeepHeroLogo';
 import AdminHeaderPopover, { type AdminPanel } from '../components/AdminHeaderPopover';
@@ -68,7 +68,7 @@ function useTabOptions(): BottomTabNavigationOptions {
     tabBarActiveTintColor: rail ? Colors.midnight : Platform.OS === 'web' ? Colors.onDark : Colors.action,
     tabBarInactiveTintColor: rail ? Colors.onDarkMuted : Colors.subtleGray,
     tabBarActiveBackgroundColor: rail ? Colors.signal : Platform.OS === 'web' ? Colors.action : Colors.actionTint,
-    tabBarStyle: rail ? styles.rail : [styles.bottomBar, { height: 56 + bottom, paddingBottom: bottom }],
+    tabBarStyle: rail ? styles.rail : [styles.bottomBar, { height: chrome.tabBar + bottom, paddingBottom: bottom }],
     tabBarItemStyle: rail ? styles.railItem : styles.bottomItem,
     tabBarLabelStyle: rail ? styles.railLabel : styles.bottomLabel,
     tabBarIconStyle: rail ? undefined : styles.bottomIcon,
@@ -80,10 +80,10 @@ const styles = StyleSheet.create({
   rail: { width: 160, minWidth: 160, maxWidth: 160, paddingTop: 20, backgroundColor: Colors.midnight, borderRightWidth: 0, elevation: 0 },
   railItem: { minHeight: 52, borderRadius: 8, marginVertical: 3 },
   railLabel: { fontSize: 14, fontWeight: '700' },
-  bottomBar: { backgroundColor: Colors.paper, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 4, paddingHorizontal: 4, elevation: 0 },
+  bottomBar: { backgroundColor: Colors.paper, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 2, paddingHorizontal: 4, elevation: 0 },
   bottomItem: { marginHorizontal: 2, borderRadius: 8, overflow: 'hidden' },
   bottomIcon: { height: 24, flexGrow: 0, flexShrink: 0 },
-  bottomLabel: { fontSize: 12, lineHeight: 16, minHeight: 16, flexShrink: 0, fontWeight: '700' },
+  bottomLabel: { fontSize: 11, lineHeight: 14, minHeight: 14, flexShrink: 0, fontWeight: '700' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 12 },
   headerHome: Platform.OS === 'web' ? { minHeight: 44, justifyContent: 'center' } : {},
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },

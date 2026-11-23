@@ -56,9 +56,9 @@ export default function MoreScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  group: { gap: 8 },
+  group: { gap: 12 },
   list: { paddingVertical: 0, gap: 0 },
   details: { flex: 1, minWidth: 0, gap: 3 },
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: 12, paddingVertical: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 56, gap: 12, paddingVertical: 14 },
   rule: { borderTopWidth: 1, borderTopColor: color.border },
 });

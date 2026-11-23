@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import EJeepHeroLogo from '../../components/EJeepHeroLogo';
 import { passengerStyles as s } from '../../components/PassengerUI';
 import { color } from '../../constants/theme';
 import { BOARDING_EDUCATION } from '../../services/passengerSafety';
+
+const REPORT_URL = 'https://meralcomain.s3.ap-southeast-1.amazonaws.com/2020-04/mer_sustainabilityreport2019_final.pdf';
 
 export default function AboutScreen() {
   const { t } = useTranslation();
@@ -41,7 +43,16 @@ export default function AboutScreen() {
         ))}
       </View>
 
-      <Text style={s.body}>{t('passenger.about.report')}</Text>
+      <Text style={s.body}>{t('passenger.about.summary')}</Text>
+      <TouchableOpacity
+        accessibilityRole="link"
+        accessibilityLabel={t('passenger.about.report')}
+        onPress={() => Linking.openURL(REPORT_URL)}
+        style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+      >
+        <Text style={[s.link, { flexShrink: 1 }]}>{t('passenger.about.report')}</Text>
+        <Ionicons aria-hidden name="open-outline" size={16} color={color.action} />
+      </TouchableOpacity>
     </ScrollView>
   );
 }

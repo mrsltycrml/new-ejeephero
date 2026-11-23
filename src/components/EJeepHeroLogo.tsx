@@ -27,7 +27,7 @@ function usesOnDarkWordmark(colorValue: string) {
 }
 
 export default function EJeepHeroLogo({ compact, roleLabel, showIcon, width, color = tokens.ink }: Props) {
-  const logoWidth = width ?? (compact ? 158 : showIcon ? 200 : 186);
+  const logoWidth = width ?? (compact ? 100 : showIcon ? 200 : 186);
   const onDark = usesOnDarkWordmark(color);
   const source = onDark
     ? require('../../assets/brand/ejeephero-wordmark-on-dark.png')

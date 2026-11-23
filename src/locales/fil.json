@@ -716,7 +716,8 @@
       "fareDetail": "Tingnan ang pamasahe para sa regular na pasahero, estudyante, senior at PWD ayon sa talaan.",
       "safetyDetail": "Pamahalaan ang mga kontak at maghanda ng SOS na may lokasyon at detalye ng biyahe mo.",
       "assistantDetail": "Magtanong tungkol sa mga ruta, hintuan at paggamit ng serbisyo.",
-      "report": "Ang eJeepHero ay isang independenteng app sa paghahanap ng biyahe para sa mga komyuter, driver, at superbisor ng fleet sa Makati."
+      "summary": "Ang eJeepHero ay isang independenteng app sa paghahanap ng biyahe para sa mga komyuter, driver, at superbisor ng fleet sa Makati.",
+      "report": "Ulat tungkol sa sustainability (PDF)"
     },
     "assistant": {
       "board": "Saan ako sasakay sa MRT Buendia?",

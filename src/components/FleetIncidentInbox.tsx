@@ -62,10 +62,14 @@ export default function FleetIncidentInbox() {
       const next = incident.status === 'resolved' ? undefined : nextStatus[incident.status];
       const unit = [incident.vehicle_body_number, incident.vehicle_plate].filter(Boolean).join(' · ') || incident.vehicle_id;
       const captured = new Date(incident.captured_at).toLocaleString(i18n.language, { timeZone: 'Asia/Manila' });
+      const typeLabel = t(`passenger.incident.${incident.incident_type}`);
+      const statusLabel = t(`passenger.incident.${incident.status}`);
       return <View key={incident.id} style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={[s.label, styles.cardTitle]}>{t(`passenger.incident.${incident.incident_type}`)}</Text>
-          <Badge label={t(`passenger.incident.${incident.status}`)} tone={statusTone[incident.status]} />
+        <View accessible accessibilityLabel={`${typeLabel}, ${statusLabel}`} style={styles.cardHeader}>
+          <Text aria-hidden style={[s.label, styles.cardTitle]}>{typeLabel}</Text>
+          <View importantForAccessibility="no-hide-descendants" accessible={false}>
+            <Badge label={statusLabel} tone={statusTone[incident.status]} />
+          </View>
         </View>
         <Text style={s.body}>{unit ?? t('passenger.incident.locationOnly')}</Text>
         <Text selectable style={s.body}>{incident.latitude.toFixed(6)}, {incident.longitude.toFixed(6)}
