@@ -1,14 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import { BottomSheetModal } from './AppUI';
 import { passengerStyles as s } from './PassengerUI';
+import { color, radius, tapTarget } from '../constants/theme';
 import { requestEmergencyFix } from '../services/emergencyLocation';
 import { reportFleetIncident, type FleetIncidentType } from '../services/fleetIncidents';
 import type { PassengerFix } from '../services/passengerSafety';
 
 type Draft = { kind: FleetIncidentType; requestId: string; vehicleId?: string };
+
+const kinds = [
+  { kind: 'accident' as const, icon: 'warning-outline' as const },
+  { kind: 'breakdown' as const, icon: 'construct-outline' as const },
+];
 
 export default function FleetIncidentReporter({ vehicleId }: { vehicleId?: string }) {
   const { t } = useTranslation();
@@ -57,10 +64,15 @@ export default function FleetIncidentReporter({ vehicleId }: { vehicleId?: strin
   return <View style={s.section}>
     <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.incident.reportTitle')}</Text>
     <Text style={s.body}>{t('passenger.incident.reportHint')}</Text>
-    {(['accident', 'breakdown'] as const).map(kind => <TouchableOpacity key={kind} accessibilityRole="button"
-      onPress={() => { setFeedback(''); setDraft({ kind, requestId: randomUUID(), vehicleId }); }} style={[s.button, s.secondary]}>
-      <Text style={s.label}>{t(`passenger.incident.${kind}`)}</Text>
-    </TouchableOpacity>)}
+    <View style={styles.list}>
+      {kinds.map(({ kind, icon }, index) => <TouchableOpacity key={kind} accessibilityRole="button"
+        onPress={() => { setFeedback(''); setDraft({ kind, requestId: randomUUID(), vehicleId }); }}
+        style={[styles.row, index > 0 && styles.rowRule]}>
+        <Ionicons aria-hidden name={icon} size={22} color={color.ember} />
+        <Text style={[s.label, styles.rowLabel]}>{t(`passenger.incident.${kind}`)}</Text>
+        <Ionicons aria-hidden name="chevron-forward" size={18} color={color.inkMuted} />
+      </TouchableOpacity>)}
+    </View>
     {!draft && feedbackLine}
     <BottomSheetModal visible={draft !== null} onClose={close}>
       {draft && <>
@@ -78,3 +90,10 @@ export default function FleetIncidentReporter({ vehicleId }: { vehicleId?: strin
     </BottomSheetModal>
   </View>;
 }
+
+const styles = StyleSheet.create({
+  list: { borderWidth: 1, borderColor: color.border, borderRadius: radius.md, overflow: 'hidden', backgroundColor: color.paper },
+  row: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  rowRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.border },
+  rowLabel: { flex: 1, minWidth: 0 },
+});

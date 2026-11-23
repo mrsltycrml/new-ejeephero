@@ -249,6 +249,9 @@ test('fleet incident shares GPS only after confirmation and reuses its request I
   };
   const modules: Record<string, unknown> = {
     react: { default: react, ...react },
+    'react-native': { StyleSheet: { create: (s: any) => s, hairlineWidth: 1 } },
+    '@expo/vector-icons': { Ionicons: 'Icon' },
+    '../constants/theme': themeTokens,
     'react-i18next': { useTranslation: () => ({ t: (key: string) => key }) },
     './PassengerUI': { passengerStyles: {} },
     'expo-crypto': { randomUUID: () => 'incident-1' },
