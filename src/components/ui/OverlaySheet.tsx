@@ -14,7 +14,7 @@ type Props = {
   sheetStyle?: StyleProp<ViewStyle>;
 };
 
-/** Map-first bottom sheet: navy header, rounded top, 48px close target. */
+/** Map-first bottom sheet: Charge paper header, rounded top, 48px close target. */
 export default function OverlaySheet({ visible, onClose, title, closeLabel, children, maxWidth, sheetStyle }: Props) {
   return (
     <BottomSheetModal
@@ -28,7 +28,7 @@ export default function OverlaySheet({ visible, onClose, title, closeLabel, chil
         <View style={styles.headerRow}>
           <Text accessibilityRole="header" style={styles.title}>{title}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={closeLabel} onPress={onClose} style={styles.close}>
-            <Ionicons name="close" color={color.onDark} size={24} />
+            <Ionicons name="close" color={color.ink} size={24} />
           </TouchableOpacity>
         </View>
       </View>
@@ -40,7 +40,7 @@ export default function OverlaySheet({ visible, onClose, title, closeLabel, chil
 const styles = StyleSheet.create({
   sheet: { paddingHorizontal: 0, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, overflow: 'hidden' },
   content: { gap: 0 },
-  header: { backgroundColor: color.ink },
+  header: { backgroundColor: color.paper, borderBottomWidth: 1, borderBottomColor: color.border },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     paddingVertical: 8,
   },
-  title: { flex: 1, ...type.title, fontSize: 22, lineHeight: 28, color: color.onDark },
+  title: { flex: 1, ...type.title, fontSize: 22, lineHeight: 28, color: color.ink },
   close: { alignItems: 'center', justifyContent: 'center', width: tapTarget, minHeight: tapTarget },
   body: { paddingHorizontal: space.xl, paddingTop: 22, paddingBottom: space.lg, gap: 22, backgroundColor: color.paper },
 });

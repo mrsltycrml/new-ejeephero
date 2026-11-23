@@ -71,7 +71,7 @@ export function PassengerSelect({
             maxHeight: 240,
             borderWidth: 1,
             borderColor: color.border,
-            borderRadius: radius.md,
+            borderRadius: radius.pill,
             backgroundColor: color.paper,
           }}
           nestedScrollEnabled
@@ -89,7 +89,7 @@ export const passengerStyles = StyleSheet.create({
   screen: transitStyles.page,
   content: { ...transitStyles.content, maxWidth: 920 },
   heroBanner: transitStyles.masthead,
-  eyebrow: { ...type.meta, letterSpacing: 0.4, textTransform: 'uppercase', color: color.signal },
+  eyebrow: { ...type.kicker, color: color.actionPressed },
   title: { ...type.display, color: color.ink },
   heroTitle: transitStyles.heading,
   subtitle: { fontSize: 15, lineHeight: 22, color: color.inkMuted, marginTop: 2 },
@@ -106,7 +106,7 @@ export const passengerStyles = StyleSheet.create({
   input: {
     borderWidth: 1.5,
     borderColor: color.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 13,
     minHeight: tapTarget,

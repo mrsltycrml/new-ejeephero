@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { color, radius, tapTarget } from '../../constants/theme';
+import { color, font, radius, tapTarget } from '../../constants/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -35,11 +35,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: radius.md,
-    backgroundColor: color.canvas,
+    backgroundColor: color.paper,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  label: { flex: 1, color: color.ink, fontSize: 15, fontWeight: '600', lineHeight: 20 },
+  label: { flex: 1, color: color.ink, fontFamily: font.semibold, fontSize: 15, fontWeight: '600', lineHeight: 20 },
 });
 

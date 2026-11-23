@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   back: { minHeight: tapTarget, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 8 },
   backLabel: { fontSize: 15, fontWeight: '600' },
   heading: { alignItems: 'flex-start', gap: 8 },
-  marker: { width: 32, height: 4, borderRadius: 2, backgroundColor: color.signal },
+  marker: { width: 36, height: 4, borderRadius: 2, backgroundColor: color.volt },
   title: { ...type.display },
   subtitle: { fontSize: 16, lineHeight: 23, maxWidth: 320 },
 });

@@ -36,9 +36,9 @@ type ChipProps = {
 export function Chip({ label, selected, onPress, icon, accessibilityRole = 'button', accessibilityState }: ChipProps) {
   const content = (
     <>
-      {icon ? <Ionicons aria-hidden name={icon} size={20} color={selected ? color.onDark : color.ink} /> : null}
+      {icon ? <Ionicons aria-hidden name={icon} size={20} color={selected ? color.voltInk : color.ink} /> : null}
       <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
-      {selected ? <Ionicons aria-hidden name="checkmark" size={16} color={color.onDark} /> : null}
+      {selected ? <Ionicons aria-hidden name="checkmark" size={16} color={color.voltInk} /> : null}
     </>
   );
   const style = [styles.chip, selected && styles.chipOn];
@@ -74,12 +74,12 @@ const styles = StyleSheet.create({
     minHeight: tapTarget,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 1.5,
     borderColor: color.inkMuted,
     backgroundColor: color.paper,
   },
-  chipOn: { backgroundColor: color.ink, borderColor: color.ink },
+  chipOn: { backgroundColor: color.volt, borderColor: color.volt },
   chipText: { flex: 1, fontSize: 15, fontWeight: '700', color: color.ink },
-  chipTextOn: { color: color.onDark },
+  chipTextOn: { color: color.voltInk },
 });

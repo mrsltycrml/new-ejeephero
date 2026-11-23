@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     minHeight: tapTarget,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 1.5,
     borderColor: color.inkMuted,
     backgroundColor: color.paper,

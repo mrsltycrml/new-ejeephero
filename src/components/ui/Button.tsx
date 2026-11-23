@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { color, radius, tapTarget, type } from '../../constants/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'sos';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'sos' | 'volt';
 
 type Props = {
   label: string;
@@ -26,10 +26,11 @@ type Props = {
 
 const tones: Record<ButtonVariant, { bg: string; fg: string; border?: string }> = {
   primary: { bg: color.action, fg: color.onDark },
-  secondary: { bg: color.paper, fg: color.ink, border: color.border },
-  ghost: { bg: 'transparent', fg: color.action },
+  secondary: { bg: color.mint, fg: color.actionPressed, border: color.mint },
+  ghost: { bg: 'transparent', fg: color.actionPressed },
   danger: { bg: color.ember, fg: color.onDark },
   sos: { bg: color.ember, fg: color.onDark },
+  volt: { bg: color.volt, fg: color.voltInk },
 };
 
 export default function Button({
@@ -62,14 +63,14 @@ export default function Button({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: tapTarget,
+    minHeight: 52,
     paddingVertical: 14,
     paddingHorizontal: 18,
     gap: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
   },
   label: { flexShrink: 1, ...type.button },
   busy: { opacity: 0.7 },
