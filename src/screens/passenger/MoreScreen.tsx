@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s } from '../../components/PassengerUI';
-import { Colors } from '../../constants/theme';
+import { color } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function MoreScreen({ navigation }: any) {
@@ -30,9 +30,9 @@ export default function MoreScreen({ navigation }: any) {
           {group.items.map((item, index) => <TouchableOpacity key={item.screen} accessibilityRole="button"
             onPress={() => item.screen === 'Safety' ? navigation.navigate('Safety', { section: 'contacts' }) : navigation.navigate(item.screen)}
             style={[styles.row, index > 0 && styles.rule]}>
-            <Ionicons aria-hidden name={item.icon} size={22} color={Colors.brandGreen} />
+            <Ionicons aria-hidden name={item.icon} size={22} color={color.action} />
             <Text style={[s.label, styles.details]}>{t(item.name)}</Text>
-            <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
+            <Ionicons aria-hidden name="chevron-forward" size={18} color={color.inkMuted} />
           </TouchableOpacity>)}
         </View>
       </View>)}
@@ -40,12 +40,12 @@ export default function MoreScreen({ navigation }: any) {
         <Text accessibilityRole="header" style={s.sectionTitle}>{t('passenger.more.account')}</Text>
         <View style={[s.section, styles.list]}>
           <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('PassengerProfile')} style={styles.row}>
-            <Ionicons aria-hidden name="person-outline" size={22} color={Colors.brandGreen} />
+            <Ionicons aria-hidden name="person-outline" size={22} color={color.action} />
             <Text style={[s.label, styles.details]}>{t('passenger.nav.profile')}</Text>
-            <Ionicons aria-hidden name="chevron-forward" size={18} color={Colors.subtleGray} />
+            <Ionicons aria-hidden name="chevron-forward" size={18} color={color.inkMuted} />
           </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" onPress={() => { setSignOutFailed(false); void signOut().catch(() => setSignOutFailed(true)); }} style={[styles.row, styles.rule]}>
-            <Ionicons aria-hidden name="log-out-outline" size={22} color={Colors.ink} />
+            <Ionicons aria-hidden name="log-out-outline" size={22} color={color.ink} />
             <Text style={s.label}>{t('passenger.more.signOut')}</Text>
           </TouchableOpacity>
         </View>
@@ -60,5 +60,5 @@ const styles = StyleSheet.create({
   list: { paddingVertical: 0, gap: 0 },
   details: { flex: 1, minWidth: 0, gap: 3 },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: 12, paddingVertical: 12 },
-  rule: { borderTopWidth: 1, borderTopColor: Colors.border },
+  rule: { borderTopWidth: 1, borderTopColor: color.border },
 });

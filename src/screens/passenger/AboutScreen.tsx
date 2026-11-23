@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import EJeepHeroLogo from '../../components/EJeepHeroLogo';
 import { passengerStyles as s } from '../../components/PassengerUI';
-import { Colors } from '../../constants/theme';
+import { color } from '../../constants/theme';
 import { BOARDING_EDUCATION } from '../../services/passengerSafety';
 
 export default function AboutScreen() {
@@ -31,8 +31,8 @@ export default function AboutScreen() {
           { icon: 'shield-outline', label: t('passenger.nav.safety'), detail: t('passenger.about.safetyDetail') },
           { icon: 'chatbubble-outline', label: t('passenger.nav.assistant'), detail: t('passenger.about.assistantDetail') },
         ] as const).map(item => (
-          <View key={item.label} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12 }}>
-            <Ionicons aria-hidden name={item.icon} size={21} color={Colors.ink} />
+          <View key={item.label} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderTopWidth: 1, borderColor: color.border, paddingTop: 12 }}>
+            <Ionicons aria-hidden name={item.icon} size={21} color={color.ink} />
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={s.label}>{item.label}</Text>
               <Text style={s.muted}>{item.detail}</Text>

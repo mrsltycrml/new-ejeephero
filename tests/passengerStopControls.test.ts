@@ -15,6 +15,16 @@ import * as passengerTrip from '../src/services/passengerTrip.ts';
 import * as landmarks from '../src/services/stopLandmarks.ts';
 import { manilaDateKey } from '../src/utils/reportingPeriod.ts';
 
+const themeTokens = {
+  Colors: {},
+  color: new Proxy({}, { get: () => undefined }),
+  elevation: new Proxy({}, { get: () => ({}) }),
+  radius: new Proxy({}, { get: () => 8 }),
+  type: new Proxy({}, { get: () => ({}) }),
+  space: new Proxy({}, { get: () => 8 }),
+  tapTarget: 48,
+};
+
 const i18n = i18next.createInstance();
 await i18n.init({ lng: 'en', resources: { en: { translation: english } } });
 
@@ -56,7 +66,7 @@ function screen(file: string, props: Record<string, any> = {}, journeyState: Rec
     PassengerUI: { PassengerSelect: 'Select', passengerStyles: {} }, AppUI: { FormScrollView: 'Scroll', triggerHaptic() {} },
     PassengerJourneyContext: { usePassengerJourney: () => journeyState }, NetworkContext: { useNetwork: () => ({ isConnected: true }) },
     AuthContext: { useAuth: () => ({}) }, LocationContext: { useLocation: () => ({ fix: null, now: Date.now() }) },
-    LeafletMap: { default: 'Map' }, theme: { Colors: {} }, passengerFare: fare, passengerSafety: safety, passengerTrip,
+    LeafletMap: { default: 'Map' }, theme: themeTokens, passengerFare: fare, passengerSafety: safety, passengerTrip,
     routeMap, passengerMapOverview, locationQuality: quality, stopLandmarks: landmarks, reportingPeriod: { manilaDateKey },
     esakayOperations: { LANDMARK_REFERENCE: { date: '', stops: [] } },
     transitStyles: { transitStyles: {} }, ...options.modules,

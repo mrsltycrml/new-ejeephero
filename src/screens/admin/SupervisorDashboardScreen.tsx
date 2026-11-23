@@ -15,7 +15,7 @@ import { operationsStyles as ops } from './operationsStyles';
 import SupervisorRouteManager from '../../components/SupervisorRouteManager';
 import FleetIncidentInbox from '../../components/FleetIncidentInbox';
 import { supabase } from '../../lib/supabase';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { offlineTransit } from '../../services/offlineTransitService';
 import type { RouteData, TerminalData, VehicleData } from '../../services/offlineTransitService';
 import { useRoute } from '@react-navigation/native';
@@ -120,12 +120,12 @@ function initialsOf(name: string): string {
 }
 
 function FlagStatus({ status }: { status: Violation['status'] }) {
-  const [label, backgroundColor, color] = status === 'confirmed'
-    ? ['Confirmed', Colors.dangerBg, Colors.primaryRed]
+  const [label, backgroundColor, textColor] = status === 'confirmed'
+    ? ['Confirmed', color.dangerBg, color.ember]
     : status === 'dismissed'
-      ? ['Dismissed', Colors.mutedBackground, Colors.subtleGray]
-      : ['Pending review', Colors.warningBg, Colors.warning];
-  return <Text style={[styles.flagStatus, { backgroundColor, color }]}>{label}</Text>;
+      ? ['Dismissed', color.sand, color.inkMuted]
+      : ['Pending review', color.warningBg, color.warning];
+  return <Text style={[styles.flagStatus, { backgroundColor, color: textColor }]}>{label}</Text>;
 }
 
 export default function SupervisorDashboardScreen() {
@@ -413,11 +413,11 @@ export default function SupervisorDashboardScreen() {
 
   if (manageMode !== 'none') return <SupervisorRouteManager initialPage={manageMode} onChanged={loadDashboard} onBack={() => setManageMode('none')} />;
   const addRouteButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add route" style={styles.routeAction} onPress={() => setManageMode('add')}>
-    <Ionicons aria-hidden name="add" size={18} color={Colors.brandGreen} />
+    <Ionicons aria-hidden name="add" size={18} color={color.action} />
     <Text style={styles.routeActionText}>Add route</Text>
   </TouchableOpacity>;
   const route1ReviewButton = <TouchableOpacity accessibilityRole="button" accessibilityLabel="Review Route 1 map and stops" style={styles.routeAction} onPress={()=>setManageMode('route1')}>
-    <Ionicons aria-hidden name="git-branch-outline" size={18} color={Colors.brandGreen} />
+    <Ionicons aria-hidden name="git-branch-outline" size={18} color={color.action} />
     <Text style={styles.routeActionText}>Review Route 1 map and stops</Text>
   </TouchableOpacity>;
   if (loading) return <ScreenSkeleton preset="dashboard" />;
@@ -466,7 +466,7 @@ export default function SupervisorDashboardScreen() {
           <View style={styles.kpiGrid}>
             <View style={styles.kpiTile}>
               <Text style={styles.kpiLabel}>Live units</Text>
-              <Text style={[styles.kpiNumber, { color: Colors.brandGreen }]}>{currentLiveUnits.length - gpsIssueCount}</Text>
+              <Text style={[styles.kpiNumber, { color: color.success }]}>{currentLiveUnits.length - gpsIssueCount}</Text>
             </View>
 
             <View style={styles.kpiTile}>
@@ -481,7 +481,7 @@ export default function SupervisorDashboardScreen() {
 
             <View style={styles.kpiTile}>
               <Text style={styles.kpiLabel}>Pending flags</Text>
-              <Text style={[styles.kpiNumber, pendingCount > 0 && { color: Colors.warning }]}>{pendingCount}</Text>
+              <Text style={[styles.kpiNumber, pendingCount > 0 && { color: color.warning }]}>{pendingCount}</Text>
             </View>
           </View>
           <View style={styles.routeActions}>{route1ReviewButton}{addRouteButton}</View>
@@ -545,7 +545,7 @@ export default function SupervisorDashboardScreen() {
                   <Text style={styles.dropdownPillText} numberOfLines={1}>
                     {activeRouteLabel}
                   </Text>
-                  <Ionicons name={routeMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.subtleGray} />
+                  <Ionicons name={routeMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={color.inkMuted} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -561,7 +561,7 @@ export default function SupervisorDashboardScreen() {
                   <Text style={styles.dropdownPillText} numberOfLines={1}>
                     {activeUnitLabel}
                   </Text>
-                  <Ionicons name={unitMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.subtleGray} />
+                  <Ionicons name={unitMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={color.inkMuted} />
                 </TouchableOpacity>
               </View>
 
@@ -636,7 +636,7 @@ export default function SupervisorDashboardScreen() {
 
             <View style={styles.mapActions}>
               {gpsIssueCount > 0 && <View style={styles.staleBanner}>
-                <Ionicons name="warning-outline" size={18} color={Colors.warning} />
+                <Ionicons name="warning-outline" size={18} color={color.warning} />
                 <Text style={styles.staleBannerText}>{gpsIssueCount} {gpsIssueCount === 1 ? 'active shift has' : 'active shifts have'} stale, weak or unavailable GPS</Text>
               </View>}
 
@@ -646,12 +646,12 @@ export default function SupervisorDashboardScreen() {
                   onPress={() => setManageMode('list')}
                   style={styles.listRow}
                 >
-                  <Ionicons aria-hidden name="git-branch-outline" size={20} color={Colors.brandGreen} />
+                  <Ionicons aria-hidden name="git-branch-outline" size={20} color={color.action} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>Manage routes and stops</Text>
                     <Text style={styles.rowSub}>Published routes and verified stops</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+                  <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -659,12 +659,12 @@ export default function SupervisorDashboardScreen() {
                   onPress={() => setActivityView('cuts')}
                   style={styles.listRow}
                 >
-                  <Ionicons aria-hidden name="flag-outline" size={20} color={pendingCount > 0 ? Colors.warning : Colors.ink} />
+                  <Ionicons aria-hidden name="flag-outline" size={20} color={pendingCount > 0 ? color.warning : color.ink} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>Review route flags</Text>
                     <Text style={styles.rowSub}>{pendingCount} awaiting review</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+                  <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -690,13 +690,13 @@ export default function SupervisorDashboardScreen() {
                       <View
                         style={[
                           styles.statusDot,
-                          { backgroundColor: unit.stale ? Colors.warning : Colors.brandGreen },
+                          { backgroundColor: unit.stale ? color.warning : color.success },
                         ]}
                       />
                       <Text
                         style={[
                           styles.rowSub,
-                          { marginTop: 0, color: unit.stale ? Colors.warning : Colors.brandGreen, fontWeight: '600' },
+                          { marginTop: 0, color: unit.stale ? color.warning : color.success, fontWeight: '600' },
                         ]}
                       >
                         {unit.stale
@@ -708,8 +708,8 @@ export default function SupervisorDashboardScreen() {
                   <Text
                     style={[
                       styles.speedBig,
-                      unit.isSpeeding && { color: Colors.primaryRed },
-                      unit.stale && { color: Colors.subtleGray },
+                      unit.isSpeeding && { color: color.ember },
+                      unit.stale && { color: color.inkMuted },
                     ]}
                   >
                     {unit.speed === null ? '—' : `${Math.round(unit.speed)} km/h`}
@@ -741,7 +741,7 @@ export default function SupervisorDashboardScreen() {
                       style={[
                         styles.rowSub,
                         {
-                          color: item.pendingFlags > 0 ? Colors.warning : Colors.brandGreen,
+                          color: item.pendingFlags > 0 ? color.warning : color.success,
                           fontWeight: '600',
                         },
                       ]}
@@ -771,9 +771,9 @@ export default function SupervisorDashboardScreen() {
             ).map((ev) => (
               <View key={ev.id} style={styles.speedOffenseCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Ionicons aria-hidden name="warning-outline" size={20} color={Colors.primaryRed} />
+                  <Ionicons aria-hidden name="warning-outline" size={20} color={color.ember} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.rowTitle, { color: Colors.primaryRed }]}>
+                    <Text style={[styles.rowTitle, { color: color.ember }]}>
                       Operator cap exceeded
                     </Text>
                     <Text style={styles.rowSub}>
@@ -784,7 +784,7 @@ export default function SupervisorDashboardScreen() {
                 <View style={styles.kvGroup}>
                   <View style={styles.kvRow}>
                     <Text style={styles.kvLabel}>Recorded speed</Text>
-                    <Text style={[styles.kvValue, { color: Colors.primaryRed }]}>{ev.speedKph} km/h</Text>
+                    <Text style={[styles.kvValue, { color: color.ember }]}>{ev.speedKph} km/h</Text>
                   </View>
                   <View style={styles.kvRow}>
                     <Text style={styles.kvLabel}>Operator cap</Text>
@@ -839,7 +839,7 @@ export default function SupervisorDashboardScreen() {
                   onPress={() => setSelectedViolation(item)}
                   style={styles.listRow}
                 >
-                  <Ionicons aria-hidden name="git-branch-outline" size={19} color={Colors.warning} />
+                  <Ionicons aria-hidden name="git-branch-outline" size={19} color={color.warning} />
                   <View style={{ flex: 1 }}>
                     <View style={styles.rowHeading}>
                       <Text style={styles.rowTitle}>
@@ -852,7 +852,7 @@ export default function SupervisorDashboardScreen() {
                     </Text>
                     <Text style={styles.rowSub}>{item.reason}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+                  <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -873,7 +873,7 @@ export default function SupervisorDashboardScreen() {
               onPress={() => setSelectedViolation(null)}
               style={styles.backNavRow}
             >
-              <Ionicons name="chevron-back" size={20} color={Colors.ink} />
+              <Ionicons name="chevron-back" size={20} color={color.ink} />
               <Text style={styles.sectionTitle}>Review route flag</Text>
             </TouchableOpacity>
 
@@ -952,7 +952,7 @@ export default function SupervisorDashboardScreen() {
 
 const styles = StyleSheet.create({
   pageTitle: {
-    color: Colors.ink,
+    color: color.ink,
     fontSize: 26,
     fontWeight: '700',
     letterSpacing: -0.4,
@@ -960,12 +960,12 @@ const styles = StyleSheet.create({
   filterDropdownRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10 },
   dropdownPill: {
     flex: 1,
-    minHeight: 46,
+    minHeight: tapTarget,
     paddingHorizontal: 14,
-    borderRadius: 8,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.paper,
+    borderColor: color.border,
+    backgroundColor: color.paper,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -973,35 +973,35 @@ const styles = StyleSheet.create({
   dropdownPillText: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.ink,
+    color: color.ink,
     flex: 1,
   },
   dropdownMenu: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    backgroundColor: Colors.paper,
+    borderColor: color.border,
+    borderRadius: radius.md,
+    backgroundColor: color.paper,
     overflow: 'hidden',
   },
   dropdownItem: {
-    minHeight: 44,
+    minHeight: tapTarget,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   dropdownItemText: {
     fontSize: 15,
-    color: Colors.ink,
+    color: color.ink,
     fontWeight: '500',
   },
   rowHeading: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
-  routeActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', paddingHorizontal: 12, columnGap: 16, borderTopWidth: 1, borderTopColor: Colors.border },
-  routeAction: { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 6, paddingHorizontal: 4, flexShrink: 1 },
-  routeActionText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen, flexShrink: 1 },
+  routeActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', paddingHorizontal: 12, columnGap: 16, borderTopWidth: 1, borderTopColor: color.border },
+  routeAction: { flexDirection: 'row', alignItems: 'center', minHeight: tapTarget, gap: 6, paddingHorizontal: 4, flexShrink: 1 },
+  routeActionText: { fontSize: 14, fontWeight: '700', color: color.action, flexShrink: 1 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 8 },
   kpiTile: {
     flexGrow: 1,
@@ -1010,27 +1010,27 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 4,
   },
-  kpiLabel: { flexShrink: 1, fontSize: 13, fontWeight: '600', color: Colors.subtleGray },
-  kpiNumber: { fontSize: 22, fontWeight: '700', color: Colors.ink, fontVariant: ['tabular-nums'] },
+  kpiLabel: { flexShrink: 1, fontSize: 13, fontWeight: '600', color: color.inkMuted },
+  kpiNumber: { fontSize: 22, fontWeight: '700', color: color.ink, fontVariant: ['tabular-nums'] },
   mapLayout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 12 },
   mapColumn: { flexBasis: 510, flexGrow: 3, flexShrink: 1, minWidth: 0 },
   mapActions: { flexBasis: 260, flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 10 },
-  mapFrame: { height: 300, overflow: 'hidden', borderTopWidth: 1, borderColor: Colors.border, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
+  mapFrame: { height: 300, overflow: 'hidden', borderTopWidth: 1, borderColor: color.border, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
   mapFrameSmall: {
     height: 170,
-    borderRadius: 8,
+    borderRadius: radius.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   staleBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.warningBg,
+    backgroundColor: color.warningBg,
     borderWidth: 1,
-    borderColor: Colors.warningBorder,
-    borderRadius: 8,
+    borderColor: color.warningBorder,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
@@ -1038,7 +1038,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.warning,
+    color: color.warning,
   },
   listRow: {
     flexDirection: 'row',
@@ -1046,31 +1046,31 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
-  initialsCircle: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.mutedBackground, alignItems: 'center', justifyContent: 'center' },
-  initialsText: { fontSize: 14, fontWeight: '800', color: Colors.ink },
+  initialsCircle: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: color.sand, alignItems: 'center', justifyContent: 'center' },
+  initialsText: { fontSize: 14, fontWeight: '800', color: color.ink },
   rowTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   rowSub: {
     fontSize: 13,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
     marginTop: 2,
   },
   flagStatus: { alignSelf: 'flex-start', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, fontSize: 12, fontWeight: '700' },
   capStrip: {
-    backgroundColor: Colors.canvas,
-    borderRadius: 10,
+    backgroundColor: color.canvas,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   capStripText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.subtleGray,
+    color: color.inkMuted,
   },
   statusDot: {
     width: 7,
@@ -1080,29 +1080,29 @@ const styles = StyleSheet.create({
   speedBig: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.ink,
+    color: color.ink,
     fontVariant: ['tabular-nums'],
   },
   gradeRatio: {
     fontSize: 17,
     fontWeight: '800',
-    color: Colors.ink,
+    color: color.ink,
   },
   gradeDenom: {
     fontSize: 13,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
   },
   speedOffenseCard: {
     borderWidth: 1.5,
-    borderColor: Colors.primaryRed,
-    borderRadius: 8,
+    borderColor: color.ember,
+    borderRadius: radius.md,
     padding: 14,
     gap: 12,
-    backgroundColor: Colors.paper,
+    backgroundColor: color.paper,
   },
   kvGroup: {
     borderTopWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   kvRow: {
     flexDirection: 'row',
@@ -1110,29 +1110,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   kvLabel: {
     fontSize: 14,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
   },
   kvValue: {
     flexShrink: 1,
     textAlign: 'right',
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
-  backNavRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 6 },
+  backNavRow: { flexDirection: 'row', alignItems: 'center', minHeight: tapTarget, gap: 6 },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   primaryBtn: {
     minHeight: 48,
-    borderRadius: 8,
-    backgroundColor: Colors.ink,
+    borderRadius: radius.md,
+    backgroundColor: color.ink,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
@@ -1140,24 +1140,24 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.white,
+    color: color.onDark,
   },
   outlineDarkBtn: {
     minHeight: 50,
-    borderRadius: 8,
+    borderRadius: radius.md,
     borderWidth: 1.5,
-    borderColor: Colors.ink,
+    borderColor: color.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineDarkText: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   smallHelper: {
     fontSize: 13,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
     lineHeight: 18,
   },
 });

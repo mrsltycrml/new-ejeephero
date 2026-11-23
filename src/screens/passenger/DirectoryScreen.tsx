@@ -4,7 +4,7 @@ import { View, Text, ScrollView, TouchableOpacity, RefreshControl, StyleSheet } 
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s } from '../../components/PassengerUI';
 import PassengerRouteRow from '../../components/PassengerRouteRow';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { confirmedPassengerUse, verifiedStop } from '../../services/routeMap';
 import { passengerMapOverview } from '../../services/passengerMapOverview';
@@ -32,7 +32,7 @@ export default function DirectoryScreen() {
         {transit.routes.map(item => <TouchableOpacity key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === route?.id }}
           onPress={() => setSelected(item.id)} style={[styles.choice, item.id === route?.id && styles.selected]}>
           <Text style={[s.label, { flex: 1 }]}>{item.name}</Text>
-          {item.id === route?.id && <Ionicons aria-hidden name="checkmark" size={20} color={Colors.ink} />}
+          {item.id === route?.id && <Ionicons aria-hidden name="checkmark" size={20} color={color.ink} />}
         </TouchableOpacity>)}
       </View>}
       <View style={styles.directory}>
@@ -58,7 +58,7 @@ export default function DirectoryScreen() {
           </>}
         </View>}
         <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: refreshing }} disabled={refreshing} onPress={refresh} style={styles.refresh}>
-          <Ionicons aria-hidden name="refresh-outline" color={Colors.brandGreen} size={18} />
+          <Ionicons aria-hidden name="refresh-outline" color={color.action} size={18} />
           <Text style={s.link}>{t(refreshing ? 'passenger.directory.refreshing' : 'passenger.directory.refresh')}</Text>
         </TouchableOpacity>
       </View>
@@ -68,12 +68,12 @@ export default function DirectoryScreen() {
 
 const styles = StyleSheet.create({
   choices: { gap: 6 },
-  choice: { minHeight: 48, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, backgroundColor: Colors.paper },
-  selected: { backgroundColor: Colors.signal },
-  directory: { backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, overflow: 'hidden' },
+  choice: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderWidth: 1, borderColor: color.border, borderRadius: radius.md, backgroundColor: color.paper },
+  selected: { backgroundColor: color.signal },
+  directory: { backgroundColor: color.paper, borderWidth: 1, borderColor: color.border, borderRadius: radius.lg, overflow: 'hidden' },
   routeHeader: { borderRadius: 0 },
-  notice: { ...s.body, color: Colors.ink, backgroundColor: Colors.warningBg, padding: 16 },
+  notice: { ...s.body, color: color.ink, backgroundColor: color.warningBg, padding: 16 },
   itinerary: { padding: 20, gap: 12 },
   stopName: { ...s.body, fontWeight: '700' },
-  refresh: { minHeight: 48, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: Colors.border, flexDirection: 'row', gap: 8, alignItems: 'center' },
+  refresh: { minHeight: tapTarget, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: color.border, flexDirection: 'row', gap: 8, alignItems: 'center' },
 });

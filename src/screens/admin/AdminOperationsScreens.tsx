@@ -17,7 +17,7 @@ import { BottomSheetModal, ScreenSkeleton, triggerHaptic } from '../../component
 import { transitStyles } from '../../constants/transitStyles';
 import { operationsStyles as ops } from './operationsStyles';
 import AdminRegistryManager from '../../components/AdminRegistryManager';
-import { Colors } from '../../constants/theme';
+import { color, elevation, radius, tapTarget } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -240,7 +240,7 @@ export function AdminDriversScreen() {
             }}
             style={styles.topAddBtn}
           >
-            <Ionicons name="people-outline" size={18} color={Colors.ink} />
+            <Ionicons name="people-outline" size={18} color={color.ink} />
             <Text style={styles.topAddText}>Driver roster</Text>
           </TouchableOpacity>
         </View>
@@ -248,13 +248,13 @@ export function AdminDriversScreen() {
         <View style={ops.panel}>
           <View style={ops.toolbar}>
             <View style={styles.searchBar}>
-              <Ionicons name="search-outline" size={18} color={Colors.subtleGray} />
+              <Ionicons name="search-outline" size={18} color={color.inkMuted} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 accessibilityLabel="Search drivers"
                 placeholder="Search drivers"
-                placeholderTextColor={Colors.subtleGray}
+                placeholderTextColor={color.inkMuted}
                 style={styles.searchInput}
               />
             </View>
@@ -325,7 +325,7 @@ export function AdminDriversScreen() {
                 {d.status === 'pending' ? (
                   <View style={styles.reviewBtn}><Text style={styles.reviewText}>Review</Text></View>
                 ) : d.status !== 'hidden' && (
-                  <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+                  <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
                 )}
               </TouchableOpacity>
               {d.status === 'hidden' && (
@@ -358,7 +358,7 @@ export function AdminDriversScreen() {
               onPress={() => setReviewingDriver(null)}
               style={styles.backNavRow}
             >
-              <Ionicons name="chevron-back" size={20} color={Colors.ink} />
+              <Ionicons name="chevron-back" size={20} color={color.ink} />
               <Text style={styles.sheetHeaderLabel}>Drivers</Text>
             </TouchableOpacity>
 
@@ -406,7 +406,7 @@ export function AdminDriversScreen() {
               style={styles.primaryBtn}
             >
               {saving ? (
-                <ActivityIndicator color={Colors.white} />
+                <ActivityIndicator color={color.onDark} />
               ) : (
                 <Text style={styles.primaryBtnText}>Approve driver</Text>
               )}
@@ -440,7 +440,7 @@ export function AdminDriversScreen() {
               onPress={() => setEditingDriver(null)}
               style={styles.backNavRow}
             >
-              <Ionicons name="chevron-back" size={20} color={Colors.ink} />
+              <Ionicons name="chevron-back" size={20} color={color.ink} />
               <Text style={styles.sheetHeaderLabel}>Drivers</Text>
             </TouchableOpacity>
 
@@ -504,7 +504,7 @@ export function AdminDriversScreen() {
               }}
               style={[styles.outlineRedBtn, editingDriver.onShift && styles.disabledOutlineBtn]}
             >
-              <Text style={[styles.outlineRedText, editingDriver.onShift && { color: Colors.subtleGray }]}>
+              <Text style={[styles.outlineRedText, editingDriver.onShift && { color: color.inkMuted }]}>
                 Hide driver
               </Text>
             </TouchableOpacity>
@@ -673,7 +673,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
             }}
             style={styles.topAddBtn}
           >
-            <Ionicons name="add" size={18} color={Colors.ink} />
+            <Ionicons name="add" size={18} color={color.ink} />
             <Text style={styles.topAddText}>Add unit</Text>
           </TouchableOpacity>
         </View>
@@ -681,13 +681,13 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
         <View style={ops.panel}>
           <View style={ops.toolbar}>
             <View style={styles.searchBar}>
-              <Ionicons name="search-outline" size={18} color={Colors.subtleGray} />
+              <Ionicons name="search-outline" size={18} color={color.inkMuted} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 accessibilityLabel="Search units"
                 placeholder="Search body, plate or driver"
-                placeholderTextColor={Colors.subtleGray}
+                placeholderTextColor={color.inkMuted}
                 style={styles.searchInput}
               />
             </View>
@@ -733,8 +733,8 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
                   <View
                     style={[
                       styles.initialsCircle,
-                      u.state === 'stale' && { backgroundColor: Colors.warningBg },
-                      u.state === 'inactive' && { backgroundColor: Colors.canvas },
+                      u.state === 'stale' && { backgroundColor: color.warningBg },
+                      u.state === 'inactive' && { backgroundColor: color.canvas },
                     ]}
                   >
                     <Ionicons
@@ -742,10 +742,10 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
                       size={20}
                       color={
                         u.state === 'stale'
-                          ? Colors.warning
+                          ? color.warning
                           : u.state === 'inactive'
-                            ? Colors.subtleGray
-                            : Colors.brandGreen
+                            ? color.inkMuted
+                            : color.action
                       }
                     />
                   </View>
@@ -778,7 +778,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
                     {!!u.registryDeletedAt && <Text style={styles.rowSub}>Inactive in registry · historical records kept</Text>}
                   </View>
 
-                  <Ionicons name={isSelected ? 'checkmark-circle' : 'ellipse-outline'} size={19} color={isSelected ? Colors.brandGreen : Colors.subtleGray} />
+                  <Ionicons name={isSelected ? 'checkmark-circle' : 'ellipse-outline'} size={19} color={isSelected ? color.success : color.inkMuted} />
                 </TouchableOpacity>
                 {!!u.registryDeletedAt && (
                   <TouchableOpacity
@@ -801,7 +801,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
       {selectedUnit && (
         <View style={styles.bottomActionDock}>
           <View style={styles.dockHeading}>
-            <Ionicons name="bus-outline" size={18} color={Colors.ink} />
+            <Ionicons name="bus-outline" size={18} color={color.ink} />
             <Text style={styles.dockSelectedLabel}>Selected unit · {selectedUnit.body}</Text>
           </View>
           <View style={styles.dockActions}>
@@ -830,7 +830,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
               }}
               style={[styles.outlineBtn, styles.dockButton, !selectedUnit.registryId && styles.disabledOutlineBtn]}
             >
-              <Text style={[styles.outlineText, !selectedUnit.registryId && { color: Colors.subtleGray }]}>Edit unit</Text>
+              <Text style={[styles.outlineText, !selectedUnit.registryId && { color: color.inkMuted }]}>Edit unit</Text>
             </TouchableOpacity>
             {!!selectedUnit.activeShiftId && (
               <TouchableOpacity
@@ -859,15 +859,15 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
               onPress={() => setForceEndModalUnit(null)}
               style={styles.backNavRow}
             >
-              <Ionicons name="chevron-back" size={20} color={Colors.ink} />
+              <Ionicons name="chevron-back" size={20} color={color.ink} />
               <Text style={styles.sheetHeaderLabel}>Units</Text>
             </TouchableOpacity>
 
             <Text style={styles.title}>End stuck shift</Text>
 
             <View style={{ alignItems: 'center', gap: 6, paddingVertical: 4 }}>
-              <View style={[styles.initialsCircle, { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.warningBg }]}>
-                <Ionicons name="warning-outline" size={28} color={Colors.warning} />
+              <View style={[styles.initialsCircle, { width: 56, height: 56, borderRadius: 28, backgroundColor: color.warningBg }]}>
+                <Ionicons name="warning-outline" size={28} color={color.warning} />
               </View>
               <Text style={[styles.rowTitle, { fontSize: 20 }]}>Force-end this shift?</Text>
               <Text style={[styles.rowSub, { textAlign: 'center' }]}>
@@ -896,7 +896,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
               </View>
               <View style={styles.kvRow}>
                 <Text style={styles.kvLabel}>Last GPS update</Text>
-                <Text style={[styles.kvValue, { color: Colors.warning }]}>
+                <Text style={[styles.kvValue, { color: color.warning }]}>
                   {forceEndModalUnit.lastGps || 'Unavailable'}
                 </Text>
               </View>
@@ -907,7 +907,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
             </View>
 
             <View style={styles.staleBanner}>
-              <Ionicons name="information-circle-outline" size={18} color={Colors.warning} />
+              <Ionicons name="information-circle-outline" size={18} color={color.warning} />
               <Text style={styles.staleBannerText}>
                 Ending this shift removes the unit from live passenger and fleet maps.
               </Text>
@@ -930,7 +930,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
               style={styles.solidRedBtn}
             >
               {saving ? (
-                <ActivityIndicator color={Colors.white} />
+                <ActivityIndicator color={color.onDark} />
               ) : (
                 <Text style={styles.primaryBtnText}>Force-end shift</Text>
               )}
@@ -957,7 +957,7 @@ export function AdminUnitsScreen({ navigation }: { navigation: any }) {
           }}
           style={styles.backNavRow}
         >
-          <Ionicons name="chevron-back" size={20} color={Colors.ink} />
+          <Ionicons name="chevron-back" size={20} color={color.ink} />
           <Text style={styles.sheetHeaderLabel}>Units</Text>
         </TouchableOpacity>
 
@@ -1118,7 +1118,7 @@ export function AdminReportsScreen() {
             onPress={() => setPreviewOpen(true)}
             style={[styles.topAddBtn, (loading || !!error) && styles.disabledAction]}
           >
-            <Ionicons name="document-text-outline" size={18} color={Colors.ink} />
+            <Ionicons name="document-text-outline" size={18} color={color.ink} />
             <Text style={styles.topAddText}>Export PDF</Text>
           </TouchableOpacity>
         </View>
@@ -1152,11 +1152,11 @@ export function AdminReportsScreen() {
 
             <View style={styles.selectorRowCard}>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous reporting period" onPress={() => stepPeriod(-1)} style={styles.stepButton}>
-                <Ionicons name="chevron-back" size={18} color={Colors.brandGreen} />
+                <Ionicons name="chevron-back" size={18} color={color.action} />
               </TouchableOpacity>
               <Text style={styles.selectorRowText}>{formatReportingPeriod(period)}</Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next reporting period" onPress={() => stepPeriod(1)} style={styles.stepButton}>
-                <Ionicons name="chevron-forward" size={18} color={Colors.brandGreen} />
+                <Ionicons name="chevron-forward" size={18} color={color.action} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1205,7 +1205,7 @@ export function AdminReportsScreen() {
           onPress={() => setPreviewOpen(false)}
           style={styles.backNavRow}
         >
-          <Ionicons name="chevron-back" size={20} color={Colors.ink} />
+          <Ionicons name="chevron-back" size={20} color={color.ink} />
           <Text style={styles.sheetHeaderLabel}>PDF preview</Text>
         </TouchableOpacity>
 
@@ -1213,7 +1213,7 @@ export function AdminReportsScreen() {
 
         <View style={styles.pdfSheetCard}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: Colors.ink }}>eJeepHero</Text>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: color.ink }}>eJeepHero</Text>
             <Text style={styles.rowSub}>{period.key}</Text>
           </View>
           <Text style={[styles.rowTitle, { fontSize: 18 }]}>Fleet report</Text>
@@ -1250,7 +1250,7 @@ export function AdminReportsScreen() {
           style={styles.primaryBtn}
         >
           {exporting ? (
-            <ActivityIndicator color={Colors.white} />
+            <ActivityIndicator color={color.onDark} />
           ) : (
             <Text style={styles.primaryBtnText}>Save PDF</Text>
           )}
@@ -1265,41 +1265,41 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
     letterSpacing: -0.4,
   },
-  topAddBtn: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 10, backgroundColor: Colors.signal },
+  topAddBtn: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: radius.md, backgroundColor: color.signal },
   recordButton: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, minHeight: 60, paddingVertical: 10, gap: 10 },
   recordHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
-  selectedUnit: { backgroundColor: Colors.paleGreen },
+  selectedUnit: { backgroundColor: color.successBg },
   dockHeading: { flexDirection: 'row', alignItems: 'center', flexGrow: 1, gap: 6 },
   dockActions: { flexDirection: 'row', flexWrap: 'wrap', flexGrow: 1, flexShrink: 1, gap: 6 },
-  dockButton: { flexGrow: 1, minHeight: 44, paddingHorizontal: 8, paddingVertical: 6 },
+  dockButton: { flexGrow: 1, minHeight: tapTarget, paddingHorizontal: 8, paddingVertical: 6 },
   reportLayout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 12 },
   reportControls: { flexGrow: 1, flexShrink: 1, flexBasis: 300, padding: 14, gap: 14 },
   reportSummary: { flexGrow: 2, flexShrink: 1, flexBasis: 360, padding: 14, gap: 10 },
-  panelTitle: { fontSize: 18, fontWeight: '700', color: Colors.ink },
-  stepButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  panelTitle: { fontSize: 18, fontWeight: '700', color: color.ink },
+  stepButton: { width: 44, minHeight: tapTarget, alignItems: 'center', justifyContent: 'center' },
   disabledAction: { opacity: 0.6 },
-  topAddText: { fontSize: 14, fontWeight: '700', color: Colors.ink },
-  searchBar: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: Colors.paper, borderRadius: 6, borderWidth: 1, borderColor: Colors.border },
+  topAddText: { fontSize: 14, fontWeight: '700', color: color.ink },
+  searchBar: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: color.paper, borderRadius: radius.sm, borderWidth: 1, borderColor: color.border },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: Colors.ink,
+    color: color.ink,
     paddingVertical: 10,
   },
-  listRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 6, borderTopWidth: 1, borderColor: Colors.border },
-  initialsCircle: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.mutedBackground, alignItems: 'center', justifyContent: 'center' },
-  initialsText: { fontSize: 14, fontWeight: '800', color: Colors.midnight },
+  listRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 6, borderTopWidth: 1, borderColor: color.border },
+  initialsCircle: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: color.sand, alignItems: 'center', justifyContent: 'center' },
+  initialsText: { fontSize: 14, fontWeight: '800', color: color.ink },
   rowTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   rowSub: {
     fontSize: 13,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
     marginTop: 2,
   },
   statusBadge: {
@@ -1308,39 +1308,39 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   badgeGreen: {
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: color.successBg,
   },
   badgeAmber: {
-    backgroundColor: Colors.warningBg,
+    backgroundColor: color.warningBg,
     borderWidth: 1,
-    borderColor: Colors.warningBorder,
+    borderColor: color.warningBorder,
   },
   badgeGray: {
-    backgroundColor: Colors.canvas,
+    backgroundColor: color.canvas,
   },
   statusBadgeText: {
     fontSize: 12,
     fontWeight: '700',
   },
   badgeGreenText: {
-    color: Colors.brandGreen,
+    color: color.action,
   },
   badgeAmberText: {
-    color: Colors.warning,
+    color: color.warning,
   },
   badgeGrayText: {
-    color: Colors.subtleGray,
+    color: color.inkMuted,
   },
   reviewBtn: { paddingHorizontal: 10, paddingVertical: 6 },
   reviewText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.brandGreen,
+    color: color.action,
   },
-  restoreOutlineBtn: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: Colors.brandGreen, paddingHorizontal: 10, borderRadius: 6 },
-  restoreOutlineText: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
+  restoreOutlineBtn: { minHeight: tapTarget, justifyContent: 'center', borderWidth: 1, borderColor: color.action, paddingHorizontal: 10, borderRadius: radius.sm },
+  restoreOutlineText: { fontSize: 13, fontWeight: '700', color: color.action },
   backNavRow: {
-    minHeight: 44,
+    minHeight: tapTarget,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -1348,11 +1348,11 @@ const styles = StyleSheet.create({
   sheetHeaderLabel: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   kvGroup: {
     borderTopWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   kvRow: {
     gap: 8,
@@ -1361,113 +1361,113 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   kvLabel: {
     fontSize: 14,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
   },
   kvValue: {
     flexShrink: 1,
     textAlign: 'right',
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   fieldLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.ink,
+    color: color.ink,
   },
   textInput: {
-    minHeight: 50,
-    borderRadius: 8,
+    minHeight: tapTarget,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
     paddingHorizontal: 14,
     fontSize: 16,
-    color: Colors.ink,
-    backgroundColor: Colors.paper,
+    color: color.ink,
+    backgroundColor: color.paper,
   },
   primaryBtn: transitStyles.primaryButton,
   primaryBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.white,
+    color: color.onDark,
   },
   solidRedBtn: {
     minHeight: 52,
-    borderRadius: 8,
-    backgroundColor: Colors.primaryRed,
+    borderRadius: radius.md,
+    backgroundColor: color.ember,
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineRedBtn: {
-    minHeight: 50,
-    borderRadius: 8,
+    minHeight: tapTarget,
+    borderRadius: radius.md,
     borderWidth: 1.5,
-    borderColor: Colors.primaryRed,
-    backgroundColor: Colors.paper,
+    borderColor: color.ember,
+    backgroundColor: color.paper,
     alignItems: 'center',
     justifyContent: 'center',
   },
   disabledOutlineBtn: {
-    borderColor: Colors.border,
-    backgroundColor: Colors.canvas,
+    borderColor: color.border,
+    backgroundColor: color.canvas,
   },
   outlineRedText: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.primaryRed,
+    color: color.ember,
   },
   outlineBtn: {
-    minHeight: 46,
-    borderRadius: 10,
+    minHeight: tapTarget,
+    borderRadius: radius.md,
     borderWidth: 1.5,
-    borderColor: Colors.brandGreen,
-    backgroundColor: Colors.paper,
+    borderColor: color.action,
+    backgroundColor: color.paper,
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.brandGreen,
+    color: color.action,
   },
   outlineDarkBtn: {
-    minHeight: 50,
-    borderRadius: 8,
+    minHeight: tapTarget,
+    borderRadius: radius.md,
     borderWidth: 1.5,
-    borderColor: Colors.ink,
-    backgroundColor: Colors.paper,
+    borderColor: color.ink,
+    backgroundColor: color.paper,
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineDarkText: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   smallHelper: {
     fontSize: 13,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
     lineHeight: 18,
   },
   bottomActionDock: {
     width: '100%', maxWidth: 992, alignSelf: 'center',
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
     gap: 8, paddingHorizontal: 14, paddingVertical: 10,
-    backgroundColor: Colors.paper, borderTopWidth: 2, borderTopColor: Colors.brandGreen,
+    backgroundColor: color.paper, borderTopWidth: 2, borderTopColor: color.action,
   },
-  dockSelectedLabel: { color: Colors.ink, fontSize: 16, fontWeight: '700', flexShrink: 1 },
+  dockSelectedLabel: { color: color.ink, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   staleBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.warningBg,
+    backgroundColor: color.warningBg,
     borderWidth: 1,
-    borderColor: Colors.warningBorder,
-    borderRadius: 8,
+    borderColor: color.warningBorder,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -1475,16 +1475,17 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.warning,
+    color: color.warning,
   },
-  selectorRowCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: Colors.border, borderRadius: 6 },
-  selectorRowText: { flex: 1, textAlign: 'center', color: Colors.ink, fontSize: 15, fontWeight: '700' },
+  selectorRowCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: color.border, borderRadius: radius.sm },
+  selectorRowText: { flex: 1, textAlign: 'center', color: color.ink, fontSize: 15, fontWeight: '700' },
   pdfSheetCard: {
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
+    borderColor: color.border,
+    borderRadius: radius.lg,
     padding: 16,
-    backgroundColor: Colors.paper,
+    backgroundColor: color.canvas,
     gap: 8,
+    ...elevation.card,
   },
 });

@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/theme';
+import { color, radius, tapTarget, type } from '../constants/theme';
 import { transitStyles } from '../constants/transitStyles';
 
 export function PassengerSelect({
@@ -30,10 +30,10 @@ export function PassengerSelect({
     return <TouchableOpacity key={o.value} accessibilityRole="button" accessibilityLabel={o.label}
       accessibilityState={{ selected, disabled: disabled || !!o.disabled }} disabled={disabled || o.disabled}
       onPress={() => { onSelect(o.value); setOpen(false); }}
-      style={[passengerStyles.input, { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, flexShrink: 1 },
+      style={[passengerStyles.input, { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: tapTarget, flexShrink: 1 },
         selected && passengerStyles.selected, (disabled || o.disabled) && { opacity: 0.55 }]}>
       <Text style={[passengerStyles.label, { flexShrink: 1 }, selected && passengerStyles.selectedText]}>{o.label}</Text>
-      {selected && <Ionicons aria-hidden name="checkmark" size={16} color={Colors.ink} />}
+      {selected && <Ionicons aria-hidden name="checkmark" size={16} color={color.ink} />}
     </TouchableOpacity>;
   });
   return (
@@ -51,28 +51,28 @@ export function PassengerSelect({
         style={[
           passengerStyles.input,
           { flexDirection: 'row', alignItems: 'center', gap: 10 },
-          open && { borderColor: Colors.brandGreen },
+          open && { borderColor: color.action },
           disabled && { opacity: 0.6 },
         ]}
       >
         <Text
           style={[
             passengerStyles.body,
-            { flex: 1, minWidth: 0, fontWeight: '600', color: selectedLabel ? Colors.ink : Colors.subtleGray },
+            { flex: 1, minWidth: 0, fontWeight: '600', color: selectedLabel ? color.ink : color.inkMuted },
           ]}
         >
           {selectedLabel || t('passenger.select.choose')}
         </Text>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray} />
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={color.inkMuted} />
       </TouchableOpacity>
       {open && !disabled && (
         <ScrollView
           style={{
             maxHeight: 240,
             borderWidth: 1,
-            borderColor: Colors.border,
-            borderRadius: 10,
-            backgroundColor: Colors.paper,
+            borderColor: color.border,
+            borderRadius: radius.md,
+            backgroundColor: color.paper,
           }}
           nestedScrollEnabled
           keyboardShouldPersistTaps="always"
@@ -89,46 +89,46 @@ export const passengerStyles = StyleSheet.create({
   screen: transitStyles.page,
   content: { ...transitStyles.content, maxWidth: 920 },
   heroBanner: transitStyles.masthead,
-  eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', color: Colors.action },
-  title: { fontSize: 32, fontWeight: '800', letterSpacing: -0.95, color: Colors.ink },
+  eyebrow: { ...type.meta, letterSpacing: 0.4, textTransform: 'uppercase', color: color.signal },
+  title: { ...type.display, color: color.ink },
   heroTitle: transitStyles.heading,
-  subtitle: { fontSize: 15, lineHeight: 21, color: Colors.subtleGray, marginTop: 2 },
+  subtitle: { fontSize: 15, lineHeight: 22, color: color.inkMuted, marginTop: 2 },
   heroSubtitle: transitStyles.description,
   section: {
     ...transitStyles.panel,
     padding: 18,
     gap: 12,
   },
-  sectionTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.45, color: Colors.ink },
-  body: { fontSize: 16, lineHeight: 22, color: Colors.ink },
-  muted: { fontSize: 14, lineHeight: 20, color: Colors.subtleGray },
-  label: { fontSize: 14, fontWeight: '600', color: Colors.ink },
+  sectionTitle: { ...type.title, color: color.ink },
+  body: { ...type.body, fontSize: 16, lineHeight: 22, color: color.ink },
+  muted: { fontSize: 14, lineHeight: 20, color: color.inkMuted },
+  label: { ...type.label, color: color.ink },
   input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: color.border,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    minHeight: 50,
-    backgroundColor: Colors.paper,
+    minHeight: tapTarget,
+    backgroundColor: color.paper,
     fontSize: 16,
     fontWeight: '500',
-    color: Colors.ink,
+    color: color.ink,
   },
   button: transitStyles.primaryButton,
   buttonMint: transitStyles.primaryButton,
   buttonText: transitStyles.primaryText,
   selected: transitStyles.selected,
   selectedText: transitStyles.selectedText,
-  secondary: { backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border },
+  secondary: { backgroundColor: color.paper, borderWidth: 1, borderColor: color.border },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: Colors.actionTint,
+    borderRadius: radius.pill,
+    backgroundColor: color.actionTint,
   },
   pillDark: {
     flexDirection: 'row',
@@ -136,10 +136,10 @@ export const passengerStyles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: Colors.actionTint,
+    borderRadius: radius.pill,
+    backgroundColor: color.actionTint,
   },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center', flexWrap: 'wrap' },
-  divider: { height: 1, backgroundColor: Colors.border },
-  link: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
+  divider: { height: 1, backgroundColor: color.border },
+  link: { fontSize: 14, fontWeight: '700', color: color.action },
 });

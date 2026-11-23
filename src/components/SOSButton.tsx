@@ -5,7 +5,7 @@ import * as SMS from 'expo-sms';
 import * as Crypto from 'expo-crypto';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { Colors } from '../constants/theme';
+import { color } from '../constants/theme';
 import { BottomSheetModal, triggerHaptic } from './AppUI';
 import { passengerStyles as s } from './PassengerUI';
 import EmergencyHotlines from './EmergencyHotlines';
@@ -199,7 +199,7 @@ export default function SOSButton({
     <>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.sos.startLabel')}
         onPress={activate} style={[s.button, styles.sosTrigger]}>
-        <Ionicons aria-hidden name="alert-circle-outline" size={24} color={Colors.white} />
+        <Ionicons aria-hidden name="alert-circle-outline" size={24} color={color.onDark} />
         <Text style={s.buttonText}>{t('passenger.sos.start')}</Text>
       </TouchableOpacity>
 
@@ -215,7 +215,7 @@ export default function SOSButton({
           </TouchableOpacity>
           <Text style={s.body}>{t('passenger.sos.countdownHelp')}</Text>
           <View style={styles.ride}>
-            <Ionicons aria-hidden name="bus-outline" size={22} color={Colors.action} />
+            <Ionicons aria-hidden name="bus-outline" size={22} color={color.action} />
             <View style={{ flex: 1 }}>
               <Text style={s.label}>{activeVehicleBody ? t('passenger.sos.linked', { unit: activeVehicleBody }) : t('passenger.sos.noUnit')}</Text>
               {activeVehiclePlate && <Text style={s.muted}>{t('passenger.home.plateValue', { plate: activeVehiclePlate })}</Text>}
@@ -223,15 +223,15 @@ export default function SOSButton({
           </View>
         </> : <>
           <View style={styles.statusRow}>
-            {preparing ? <ActivityIndicator color={Colors.action} />
+            {preparing ? <ActivityIndicator color={color.action} />
               : <Ionicons aria-hidden name={phase === 'accepted' ? 'checkmark-circle-outline' : phase === 'ready' ? 'chatbubble-outline' : 'warning-outline'}
-                size={26} color={phase === 'accepted' ? Colors.success : phase === 'ready' ? Colors.action : Colors.warning} />}
+                size={26} color={phase === 'accepted' ? color.success : phase === 'ready' ? color.action : color.warning} />}
             <Text accessibilityRole="header" style={[s.sectionTitle, { flex: 1 }]}>{heading}</Text>
           </View>
           <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.body}>{status}</Text>
           {!preparing && phase !== 'accepted' && <>
             <TouchableOpacity accessibilityRole="button" onPress={() => void openMessages()} style={s.button}>
-              <Ionicons aria-hidden name="chatbubble-outline" size={20} color={Colors.white} /><Text style={s.buttonText}>{t('passenger.sos.openMessages')}</Text>
+              <Ionicons aria-hidden name="chatbubble-outline" size={20} color={color.onDark} /><Text style={s.buttonText}>{t('passenger.sos.openMessages')}</Text>
             </TouchableOpacity>
             <Text style={s.muted}>{contacts.length ? t('passenger.sos.reviewRecipients', { total: contacts.length, suffix: contacts.length === 1 ? '' : 's' }) : t('passenger.sos.chooseRecipient')}</Text>
           </>}
@@ -250,10 +250,10 @@ export default function SOSButton({
 }
 
 const styles = StyleSheet.create({
-  sosTrigger: { minHeight: 54, backgroundColor: Colors.primaryRed },
-  countdown: { padding: 16, borderRadius: 8, backgroundColor: Colors.dangerBg, alignItems: 'center' },
-  number: { fontSize: 64, fontWeight: '800', color: Colors.primaryRed, fontVariant: ['tabular-nums'] },
+  sosTrigger: { minHeight: 54, backgroundColor: color.ember },
+  countdown: { padding: 16, borderRadius: 8, backgroundColor: color.dangerBg, alignItems: 'center' },
+  number: { fontSize: 64, fontWeight: '800', color: color.ember, fontVariant: ['tabular-nums'] },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  ride: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12 },
-  preview: { gap: 6, padding: 12, borderLeftWidth: 3, borderColor: Colors.action, backgroundColor: Colors.canvas },
+  ride: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderColor: color.border, paddingTop: 12 },
+  preview: { gap: 6, padding: 12, borderLeftWidth: 3, borderColor: color.action, backgroundColor: color.canvas },
 });

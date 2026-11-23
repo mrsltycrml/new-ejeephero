@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { transitStyles } from '../../constants/transitStyles';
 
 export const operationsStyles = StyleSheet.create({
@@ -20,25 +20,25 @@ export const operationsStyles = StyleSheet.create({
   mastheadMeta: transitStyles.description,
   panel: transitStyles.panel,
   toolbar: { gap: 8, padding: 12 },
-  segmentBar: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, gap: 4, borderRadius: 10, backgroundColor: Colors.mutedBackground },
+  segmentBar: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, gap: 4, borderRadius: radius.md, backgroundColor: color.sand },
   segmentBtn: {
     flexGrow: 1,
-    minHeight: 44,
+    minHeight: tapTarget,
     paddingVertical: 6,
     paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 7,
+    borderRadius: radius.sm,
   },
   segmentBtnActive: transitStyles.selected,
-  segmentText: { color: Colors.ink, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  segmentText: { color: color.ink, fontSize: 14, fontWeight: '600', textAlign: 'center' },
   segmentTextActive: transitStyles.selectedText,
-  emptyState: { padding: 16, color: Colors.subtleGray, fontSize: 14 },
+  emptyState: { padding: 16, color: color.inkMuted, fontSize: 14 },
   errorBanner: {
     padding: 12,
-    borderRadius: 8,
-    color: Colors.primaryRed,
-    backgroundColor: Colors.dangerBg,
+    borderRadius: radius.md,
+    color: color.ember,
+    backgroundColor: color.dangerBg,
     fontSize: 14,
   },
 });

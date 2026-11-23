@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { Linking, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/theme';
+import { color } from '../constants/theme';
 import PassengerRouteRow from './PassengerRouteRow';
 import { passengerStyles as s } from './PassengerUI';
 import type { WalkingRoute } from '../services/walkingDirections';
@@ -12,10 +12,10 @@ export default function WalkingDirectionsPanel({ route, fromLabel, toLabel }: { 
   return (
     <View style={s.section}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Ionicons aria-hidden name="walk-outline" size={24} color={Colors.action} />
+        <Ionicons aria-hidden name="walk-outline" size={24} color={color.action} />
         <Text accessibilityRole="header" style={[s.sectionTitle, { flex: 1 }]}>{t('passenger.walk.title')}</Text>
       </View>
-      <View style={{ gap: 6, paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border }}>
+      <View style={{ gap: 6, paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: color.border }}>
         <Text style={s.muted}>{t('passenger.walk.from', { place: fromLabel })}</Text>
         <Text style={s.sectionTitle}>{t('passenger.walk.to', { place: toLabel })}</Text>
         <Text style={s.label}>{t('passenger.walk.length', { distance: Math.round(route.distance_meters), minutes: Math.ceil(route.duration_seconds / 60) })}</Text>

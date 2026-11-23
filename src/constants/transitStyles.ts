@@ -1,18 +1,18 @@
 import { StyleSheet } from 'react-native';
-import { Colors } from './theme';
+import { color, radius, space, tapTarget, type } from './theme';
 
 export const transitStyles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: Colors.canvas },
-  content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 16, paddingBottom: 36, gap: 16 },
-  panel: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 12 },
-  masthead: { backgroundColor: Colors.ink, borderRadius: 12, padding: 20, gap: 8 },
-  heading: { color: Colors.onDark, fontSize: 30, fontWeight: '800', letterSpacing: -0.8 },
-  description: { color: Colors.onDarkMuted, fontSize: 15, lineHeight: 21 },
+  page: { flex: 1, backgroundColor: color.canvas },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: space.md, paddingBottom: 36, gap: space.md },
+  panel: { backgroundColor: color.paper, borderColor: color.border, borderWidth: 1, borderRadius: radius.lg },
+  masthead: { backgroundColor: color.ink, borderRadius: radius.lg, padding: space.lg, gap: space.xs },
+  heading: { color: color.onDark, ...type.display, fontSize: 30, lineHeight: 36 },
+  description: { color: color.onDarkMuted, fontSize: 15, lineHeight: 22 },
   primaryButton: {
-    minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.brandGreen,
+    minHeight: tapTarget, paddingHorizontal: space.md, paddingVertical: 12, borderRadius: radius.md,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: color.action,
   },
-  primaryText: { color: Colors.white, fontSize: 16, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
-  selected: { backgroundColor: Colors.signal },
-  selectedText: { color: Colors.ink, fontWeight: '700' },
+  primaryText: { color: color.onDark, ...type.button, flexShrink: 1, textAlign: 'center' },
+  selected: { backgroundColor: color.signal },
+  selectedText: { color: color.ink, fontWeight: '700' },
 });

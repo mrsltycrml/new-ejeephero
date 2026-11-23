@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Platform, Pressable, View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/theme';
+import { color, radius, tapTarget } from '../constants/theme';
 import { triggerHaptic } from './AppUI';
 
 type Props = { body: string; plate: string; driver: string; route: string; trips: number; total: number; started: string; ended: string; status: string; onTrack: () => void; onDelete?: () => void; onEndShift?: () => void };
@@ -25,28 +25,28 @@ export default function FleetRosterRow(props: Props) {
       {wide && <View style={styles.assignment}><Text style={styles.value}>{props.driver}</Text><Text style={styles.meta} numberOfLines={1}>{props.route}</Text></View>}
       {wide && <View style={styles.quantity}><Text style={styles.count}>{props.trips}</Text><Text style={styles.meta}>trips today</Text></View>}
       <Text style={styles.status}>{props.status}</Text>
-      {wide && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Track ${props.body}`} onPress={props.onTrack} style={styles.action}><Ionicons name="navigate-outline" size={16} color={Colors.onDark}/><Text style={styles.actionText}>Track unit</Text></TouchableOpacity>}
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Details for ${props.body}`} accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={styles.expand}><Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subtleGray}/></TouchableOpacity>
+      {wide && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Track ${props.body}`} onPress={props.onTrack} style={styles.action}><Ionicons name="navigate-outline" size={16} color={color.onDark}/><Text style={styles.actionText}>Track unit</Text></TouchableOpacity>}
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Details for ${props.body}`} accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={styles.expand}><Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={color.inkMuted}/></TouchableOpacity>
     </View>
-    {!wide && <View style={styles.mobileSub}><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.meta}>{props.driver}</Text><Text style={styles.meta}>{props.trips} trips today</Text></View><TouchableOpacity accessibilityRole="button" accessibilityLabel={`Track ${props.body}`} onPress={props.onTrack} style={styles.action}><Ionicons name="navigate-outline" size={16} color={Colors.onDark}/><Text style={styles.actionText}>Track unit</Text></TouchableOpacity></View>}
+    {!wide && <View style={styles.mobileSub}><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.meta}>{props.driver}</Text><Text style={styles.meta}>{props.trips} trips today</Text></View><TouchableOpacity accessibilityRole="button" accessibilityLabel={`Track ${props.body}`} onPress={props.onTrack} style={styles.action}><Ionicons name="navigate-outline" size={16} color={color.onDark}/><Text style={styles.actionText}>Track unit</Text></TouchableOpacity></View>}
     {open && <View style={styles.detail}>
       <Pair label="Route" value={props.route}/><Pair label="Last trip" value={props.started}/><Pair label="Shift ended" value={props.ended}/><Pair label="Total trips" value={String(props.total)}/>
-      {props.onEndShift && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`End shift for ${props.body}`} onPress={props.onEndShift} style={styles.delete}><Ionicons name="stop-circle-outline" size={16} color={Colors.primaryRed}/><Text style={{ color: Colors.primaryRed, fontSize: 13 }}>Force end shift</Text></TouchableOpacity>}
-      {props.onDelete && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete unit ${props.body}`} onPress={props.onDelete} style={styles.delete}><Ionicons name="trash-outline" size={16} color={Colors.primaryRed}/><Text style={{ color: Colors.primaryRed, fontSize: 13 }}>Delete unit</Text></TouchableOpacity>}
+      {props.onEndShift && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`End shift for ${props.body}`} onPress={props.onEndShift} style={styles.delete}><Ionicons name="stop-circle-outline" size={16} color={color.ember}/><Text style={{ color: color.ember, fontSize: 13 }}>Force end shift</Text></TouchableOpacity>}
+      {props.onDelete && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete unit ${props.body}`} onPress={props.onDelete} style={styles.delete}><Ionicons name="trash-outline" size={16} color={color.ember}/><Text style={{ color: color.ember, fontSize: 13 }}>Delete unit</Text></TouchableOpacity>}
     </View>}
   </Pressable>;
 }
 function Pair({ label, value }: { label: string; value: string }) { return <View style={styles.pair}><Text style={styles.meta}>{label}</Text><Text style={styles.value}>{value}</Text></View>; }
 const styles=StyleSheet.create({
-  row: { backgroundColor: Colors.paper, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: Colors.border },
+  row: { backgroundColor: color.paper, paddingHorizontal: 16, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: color.border },
   top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  identity: { flex: 1.4, minWidth: 0 }, name: { fontSize: 15, fontWeight: '700', color: Colors.ink },
-  assignment: { flex: 2, minWidth: 0 }, quantity: { alignItems: 'flex-end', minWidth: 58 }, count: { fontSize: 16, fontWeight: '700', color: Colors.ink, fontVariant: ['tabular-nums'] },
-  meta: { color: Colors.subtleGray, fontSize: 12, lineHeight: 18 }, value: { color: Colors.ink, fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  status: { color: Colors.ink, backgroundColor: Colors.sand, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 5, overflow: 'hidden', fontSize: 12, fontWeight: '700', maxWidth: 110 },
-  action: { minHeight: 44, paddingHorizontal: 10, borderRadius: 6, backgroundColor: Colors.action, flexDirection: 'row', alignItems: 'center', gap: 6 }, actionText: { color: Colors.onDark, fontSize: 12, fontWeight: '700' },
+  identity: { flex: 1.4, minWidth: 0 }, name: { fontSize: 15, fontWeight: '700', color: color.ink },
+  assignment: { flex: 2, minWidth: 0 }, quantity: { alignItems: 'flex-end', minWidth: 58 }, count: { fontSize: 16, fontWeight: '700', color: color.ink, fontVariant: ['tabular-nums'] },
+  meta: { color: color.inkMuted, fontSize: 12, lineHeight: 18 }, value: { color: color.ink, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  status: { color: color.ink, backgroundColor: color.sand, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm, overflow: 'hidden', fontSize: 12, fontWeight: '700', maxWidth: 110 },
+  action: { minHeight: tapTarget, paddingHorizontal: 10, borderRadius: radius.md, backgroundColor: color.action, flexDirection: 'row', alignItems: 'center', gap: 6 }, actionText: { color: color.onDark, fontSize: 12, fontWeight: '700' },
   expand: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   mobileSub: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
-  detail: { borderTopWidth: 1, borderColor: Colors.border, paddingTop: 14, marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  detail: { borderTopWidth: 1, borderColor: color.border, paddingTop: 14, marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
   pair: { flexGrow: 1, flexBasis: 180, minWidth: 0, gap: 3 }, delete: { minHeight: 44, flexDirection: 'row', gap: 7, alignItems: 'center' },
 });

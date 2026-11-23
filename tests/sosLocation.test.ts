@@ -9,6 +9,16 @@ import * as quality from '../src/services/locationQuality.ts';
 import * as safety from '../src/services/passengerSafety.ts';
 
 const now = Date.UTC(2026, 10, 21);
+const themeTokens = {
+  Colors: {},
+  color: new Proxy({}, { get: () => undefined }),
+  elevation: new Proxy({}, { get: () => ({}) }),
+  radius: new Proxy({}, { get: () => 8 }),
+  type: new Proxy({}, { get: () => ({}) }),
+  space: new Proxy({}, { get: () => 8 }),
+  tapTarget: 48,
+};
+
 const i18n = i18next.createInstance();
 await i18n.init({ lng: 'en', resources: { en: { translation: english } } });
 const position = { coords: { latitude: 14.6, longitude: 121, accuracy: 12 }, timestamp: now };
@@ -60,7 +70,7 @@ function mount(os: string, reading: typeof position | Error, permission: string,
         dispatches.push(body);
         return options.call ? options.call(body) : { status: 'complete', accepted: 1, total: 1 };
       } },
-    'expo-crypto': { randomUUID: () => 'test-request' }, '../constants/theme': { Colors: {} },
+    'expo-crypto': { randomUUID: () => 'test-request' }, '../constants/theme': themeTokens,
     './PassengerUI': { passengerStyles: {} }, './AppUI': { triggerHaptic() {} },
   };
   const locationExports = {};

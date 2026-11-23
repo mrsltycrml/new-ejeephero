@@ -4,6 +4,16 @@ import test from 'node:test';
 import { setImmediate } from 'node:timers/promises';
 import ts from 'typescript';
 
+const themeTokens = {
+  Colors: {},
+  color: new Proxy({}, { get: () => undefined }),
+  elevation: new Proxy({}, { get: () => ({}) }),
+  radius: new Proxy({}, { get: () => 8 }),
+  type: new Proxy({}, { get: () => ({}) }),
+  space: new Proxy({}, { get: () => 8 }),
+  tapTarget: 48,
+};
+
 // Exercise the actual TSX with isolated hook state and query responses.
 function load(path: string, modules: Record<string, any>) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -41,7 +51,7 @@ function hooks() {
 
 const native = { Platform: { OS: 'android' }, StyleSheet: { create: (value: any) => value }, View: 'View', Text: 'Text', ScrollView: 'ScrollView',
   TouchableOpacity: 'Button', useWindowDimensions: () => ({ width: 400, height: 800 }) };
-const common = { 'react-native': native, '../constants/theme': { Colors: {} } };
+const common = { 'react-native': native, '../constants/theme': themeTokens };
 const warning = (id: string, seconds: number, open = true, driver = 'driver') => {
   const time = new Date(Date.UTC(2020, 0, 1) + seconds * 1000).toISOString();
   return { id, driver_id: driver, captured_at: time, created_at: time, closed_at: open ? null : time,

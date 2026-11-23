@@ -11,7 +11,7 @@ import FleetIncidentReporter from '../../components/FleetIncidentReporter';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { readEmergencyContacts, saveEmergencyContact, removeEmergencyContact, type EmergencyContact } from '../../services/emergencyService';
-import { Colors } from '../../constants/theme';
+import { color, tapTarget } from '../../constants/theme';
 
 function TrustedContacts({ userId }: { userId?: string }) {
   const { t } = useTranslation();
@@ -88,11 +88,11 @@ function TrustedContacts({ userId }: { userId?: string }) {
       </View>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.safety.edit', { name: c.contact_name })}
         disabled={busy} onPress={() => { setDraft(c); setEditing(true); setFeedback(''); }} style={styles.iconBtn}>
-        <Ionicons aria-hidden name="pencil-outline" size={20} color={Colors.brandGreen} />
+        <Ionicons aria-hidden name="pencil-outline" size={20} color={color.action} />
       </TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.safety.removeName', { name: c.contact_name })}
         disabled={busy} onPress={() => setToRemove(c)} style={styles.iconBtn}>
-        <Ionicons aria-hidden name="trash-outline" size={20} color={Colors.subtleGray} />
+        <Ionicons aria-hidden name="trash-outline" size={20} color={color.inkMuted} />
       </TouchableOpacity>
     </View>)}
     {!!feedback && <Text accessibilityLiveRegion="polite" style={s.body}>{t('passenger.safety.' + feedback)}</Text>}
@@ -118,7 +118,7 @@ function TrustedContacts({ userId }: { userId?: string }) {
       setEditing(false); setFeedback('');
       setDraft({ user_id: userId, contact_name: '', phone_number: '', preset_message: t('sos.emergencyText') });
     }} style={s.button}>
-      <Ionicons aria-hidden name="add" size={20} color={Colors.white} />
+      <Ionicons aria-hidden name="add" size={20} color={color.onDark} />
       <Text style={s.buttonText}>{t('passenger.safety.add')}</Text>
     </TouchableOpacity>}
     {toRemove && <BottomSheetModal visible onClose={() => { if (!busy) setToRemove(null); }}>
@@ -162,9 +162,9 @@ export default function SafetyScreen({ route }: { route?: { params?: { section?:
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, borderBottomWidth: 1, borderColor: Colors.border },
+  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: tapTarget, paddingVertical: 8, borderBottomWidth: 1, borderColor: color.border },
   iconBtn: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  retry: { minHeight: 44, justifyContent: 'center' },
+  retry: { minHeight: tapTarget, justifyContent: 'center' },
   offline: { gap: 4 },
   formBox: { gap: 8 },
 });

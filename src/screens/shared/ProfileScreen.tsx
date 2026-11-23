@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ActivityInd
 import { useUser } from '@clerk/clerk-expo';
 import { useAuth } from '../../contexts/AuthContext';
 import { isClerkConfigured } from '../../lib/clerk';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { transitStyles } from '../../constants/transitStyles';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase, supabaseAuth } from '../../lib/supabase';
@@ -158,7 +158,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const statusColor = status === 'approved' ? Colors.success : status === 'pending' ? Colors.warning : Colors.primaryRed;
+  const statusColor = status === 'approved' ? color.success : status === 'pending' ? color.warning : color.ember;
 
   return (
     <FormScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -175,7 +175,7 @@ export default function ProfileScreen() {
               onPress={() => { setIsEditingName(true); setNewName(fullName); }}
               style={styles.editButton}
             >
-              <Ionicons name="pencil" size={16} color={Colors.ink} />
+              <Ionicons name="pencil" size={16} color={color.ink} />
               <Text style={styles.editText}>{t('common.edit')}</Text>
             </TouchableOpacity>
           )}
@@ -191,7 +191,7 @@ export default function ProfileScreen() {
               onChangeText={setNewName}
               autoFocus
               placeholder={t('passenger.profile.enterName')}
-              placeholderTextColor={Colors.subtleGray}
+              placeholderTextColor={color.inkMuted}
             />
             <View style={styles.editActions}>
               <TouchableOpacity
@@ -200,7 +200,7 @@ export default function ProfileScreen() {
                 accessibilityState={{ disabled: updatingName, busy: updatingName }}
                 style={styles.primaryButton}
               >
-                {updatingName ? <ActivityIndicator size="small" color={Colors.onDark} /> : <Text style={styles.primaryText}>{t('common.save')}</Text>}
+                {updatingName ? <ActivityIndicator size="small" color={color.onDark} /> : <Text style={styles.primaryText}>{t('common.save')}</Text>}
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
@@ -236,12 +236,12 @@ export default function ProfileScreen() {
           accessibilityState={{ expanded: showPasswordSection }}
           onPress={() => setShowPasswordSection(!showPasswordSection)}
         >
-          <Ionicons name="lock-closed-outline" size={21} color={Colors.brandGreen} />
+          <Ionicons name="lock-closed-outline" size={21} color={color.action} />
           <Text style={styles.rowTitle}>{t('passenger.profile.security')}</Text>
           <Ionicons
             name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
             size={20}
-            color={Colors.darkText}
+            color={color.ink}
           />
         </TouchableOpacity>
 
@@ -253,7 +253,7 @@ export default function ProfileScreen() {
                 style={styles.input}
                 placeholder={t('passenger.profile.currentTitle')}
                 accessibilityLabel={t('passenger.profile.current')}
-                placeholderTextColor={Colors.subtleGray}
+                placeholderTextColor={color.inkMuted}
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
                 secureTextEntry
@@ -264,7 +264,7 @@ export default function ProfileScreen() {
               style={styles.input}
               placeholder={authProvider === 'clerk' ? t('passenger.profile.minFifteen') : t('passenger.profile.minSix')}
               accessibilityLabel={t('passenger.authReset.newPassword')}
-              placeholderTextColor={Colors.subtleGray}
+              placeholderTextColor={color.inkMuted}
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry
@@ -274,7 +274,7 @@ export default function ProfileScreen() {
               style={styles.input}
               placeholder={t('passenger.profile.confirmNew')}
               accessibilityLabel={t('passenger.profile.confirmPlaceholder')}
-              placeholderTextColor={Colors.subtleGray}
+              placeholderTextColor={color.inkMuted}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
@@ -288,7 +288,7 @@ export default function ProfileScreen() {
               disabled={updatingPassword}
             >
               {updatingPassword ? (
-                <ActivityIndicator color={Colors.white} size="small" />
+                <ActivityIndicator color={color.onDark} size="small" />
               ) : (
                 <Text style={styles.primaryText}>{t('passenger.profile.update')}</Text>
               )}
@@ -301,14 +301,14 @@ export default function ProfileScreen() {
           style={styles.settingsRow}
           onPress={() => setShowLanguageSelector(true)}
         >
-          <Ionicons name="globe-outline" size={21} color={Colors.brandGreen} />
+          <Ionicons name="globe-outline" size={21} color={color.action} />
           <View style={{ flex: 1 }}>
             <Text style={styles.rowTitle}>{t('profile.language')}</Text>
             <Text style={styles.secondaryText}>
               {i18n.language === 'en' ? t('profile.english') : t('profile.tagalog')}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.subtleGray} />
+          <Ionicons name="chevron-forward" size={20} color={color.inkMuted} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -316,12 +316,12 @@ export default function ProfileScreen() {
           style={styles.settingsRow}
           onPress={() => setDownloadModalVisible(true)}
         >
-          <Ionicons name="phone-portrait-outline" size={21} color={Colors.brandGreen} />
+          <Ionicons name="phone-portrait-outline" size={21} color={color.action} />
           <View style={{ flex: 1 }}>
             <Text style={styles.rowTitle}>{t('passenger.install.title')}</Text>
             <Text style={styles.secondaryText}>{t('passenger.profile.installationGuide')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.subtleGray} />
+          <Ionicons name="chevron-forward" size={20} color={color.inkMuted} />
         </TouchableOpacity>
 
       </View>
@@ -333,7 +333,7 @@ export default function ProfileScreen() {
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>{t('profile.selectLanguage')}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setShowLanguageSelector(false)} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color={Colors.darkText} />
+            <Ionicons name="close" size={24} color={color.ink} />
           </TouchableOpacity>
         </View>
 
@@ -350,7 +350,7 @@ export default function ProfileScreen() {
             <Ionicons 
               name={i18n.language === 'en' ? 'radio-button-on' : 'radio-button-off'} 
               size={24} 
-              color={i18n.language === 'en' ? Colors.brandGreen : Colors.subtleGray}
+              color={i18n.language === 'en' ? color.action : color.inkMuted}
               style={{ marginRight: 12 }}
             />
             <Text style={[styles.languageOptionText, i18n.language === 'en' && styles.languageOptionTextActive]}>
@@ -370,7 +370,7 @@ export default function ProfileScreen() {
             <Ionicons 
               name={i18n.language === 'fil' ? 'radio-button-on' : 'radio-button-off'} 
               size={24} 
-              color={i18n.language === 'fil' ? Colors.brandGreen : Colors.subtleGray}
+              color={i18n.language === 'fil' ? color.action : color.inkMuted}
               style={{ marginRight: 12 }}
             />
             <Text style={[styles.languageOptionText, i18n.language === 'fil' && styles.languageOptionTextActive]}>
@@ -387,7 +387,7 @@ export default function ProfileScreen() {
 
       {/* Logout Button */}
       <TouchableOpacity accessibilityRole="button" style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={20} color={Colors.primaryRed} />
+        <Ionicons name="log-out-outline" size={20} color={color.ember} />
         <Text style={styles.logoutText}>{t('profile.logout')}</Text>
       </TouchableOpacity>
     </FormScrollView>
@@ -400,32 +400,32 @@ const styles = StyleSheet.create({
   identityCard: { ...transitStyles.panel, overflow: 'hidden' },
   masthead: { ...transitStyles.masthead, borderRadius: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14 },
   heroIdentity: { minWidth: 0, flexBasis: 180, flexGrow: 1, flexShrink: 1, gap: 4 },
-  nameHeader: { color: Colors.onDark, fontSize: 26, letterSpacing: -0.6, fontWeight: '800' },
-  emailHeader: { color: Colors.onDark, fontSize: 14, lineHeight: 20, ...(Platform.OS === 'web' ? { overflowWrap: 'anywhere' as const } : {}) },
-  editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, minHeight: 44, borderRadius: 10, backgroundColor: Colors.signal },
-  editText: { fontWeight: '700', fontSize: 14, color: Colors.ink },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderTopWidth: 1, borderColor: Colors.border },
-  secondaryText: { color: Colors.subtleGray, fontSize: 14, lineHeight: 20 },
+  nameHeader: { color: color.onDark, fontSize: 26, letterSpacing: -0.6, fontWeight: '800' },
+  emailHeader: { color: color.onDark, fontSize: 14, lineHeight: 20, ...(Platform.OS === 'web' ? { overflowWrap: 'anywhere' as const } : {}) },
+  editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, minHeight: tapTarget, borderRadius: radius.md, backgroundColor: color.signal },
+  editText: { fontWeight: '700', fontSize: 14, color: color.ink },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderTopWidth: 1, borderColor: color.border },
+  secondaryText: { color: color.inkMuted, fontSize: 14, lineHeight: 20 },
   status: { textTransform: 'capitalize', fontWeight: '700', fontSize: 15 },
-  form: { padding: 16, gap: 12, borderTopWidth: 1, borderColor: Colors.border },
-  fieldLabel: { fontSize: 15, fontWeight: '600', color: Colors.ink },
-  input: { minHeight: 48, paddingVertical: 10, paddingHorizontal: 12, fontSize: 15, color: Colors.ink, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.subtleGray, borderRadius: 6 },
+  form: { padding: 16, gap: 12, borderTopWidth: 1, borderColor: color.border },
+  fieldLabel: { fontSize: 15, fontWeight: '600', color: color.ink },
+  input: { minHeight: tapTarget, paddingVertical: 10, paddingHorizontal: 12, fontSize: 15, color: color.ink, backgroundColor: color.paper, borderWidth: 1, borderColor: color.border, borderRadius: radius.md },
   editActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   primaryButton: transitStyles.primaryButton,
   primaryText: transitStyles.primaryText,
-  cancelButton: { paddingHorizontal: 16, justifyContent: 'center', minHeight: 46 },
-  actionText: { color: Colors.brandGreen, fontSize: 15, fontWeight: '700' },
+  cancelButton: { paddingHorizontal: 16, justifyContent: 'center', minHeight: tapTarget },
+  actionText: { color: color.action, fontSize: 15, fontWeight: '700' },
   settingsPanel: { ...transitStyles.panel, overflow: 'hidden' },
-  settingsRow: { minHeight: 56, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
-  rowTitle: { flexShrink: 1, flexGrow: 1, fontSize: 16, fontWeight: '700', color: Colors.ink },
+  settingsRow: { minHeight: 56, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.border },
+  rowTitle: { flexShrink: 1, flexGrow: 1, fontSize: 16, fontWeight: '700', color: color.ink },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 },
-  modalTitle: { flexShrink: 1, fontSize: 20, fontWeight: '700', color: Colors.ink },
-  closeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  modalTitle: { flexShrink: 1, fontSize: 20, fontWeight: '700', color: color.ink },
+  closeButton: { width: tapTarget, height: tapTarget, alignItems: 'center', justifyContent: 'center' },
   languageOptions: { gap: 8 },
-  languageOption: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 6, backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border },
-  languageOptionActive: { borderColor: Colors.brandGreen, backgroundColor: Colors.paleGreen },
-  languageOptionText: { flexShrink: 1, fontSize: 16, fontWeight: '600', color: Colors.ink },
-  languageOptionTextActive: { color: Colors.brandGreen },
-  logoutButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', minHeight: 46, paddingHorizontal: 14, gap: 8, borderWidth: 1, borderColor: Colors.primaryRed, borderRadius: 6 },
-  logoutText: { color: Colors.primaryRed, fontSize: 15, fontWeight: '700' },
+  languageOption: { flexDirection: 'row', alignItems: 'center', padding: 14, minHeight: tapTarget, borderRadius: radius.md, backgroundColor: color.paper, borderWidth: 1, borderColor: color.border },
+  languageOptionActive: { borderColor: color.action, backgroundColor: color.actionTint },
+  languageOptionText: { flexShrink: 1, fontSize: 16, fontWeight: '600', color: color.ink },
+  languageOptionTextActive: { color: color.action },
+  logoutButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', minHeight: tapTarget, paddingHorizontal: 14, gap: 8, borderWidth: 1, borderColor: color.ember, borderRadius: radius.md },
+  logoutText: { color: color.ember, fontSize: 15, fontWeight: '700' },
 });

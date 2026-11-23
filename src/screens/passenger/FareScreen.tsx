@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, Switch, Linking, StyleSheet } 
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s, PassengerSelect } from '../../components/PassengerUI';
 import { FormScrollView } from '../../components/AppUI';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { usePassengerJourney } from '../../contexts/PassengerJourneyContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from '../../contexts/LocationContext';
@@ -107,11 +107,11 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
     <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={[s.content, styles.layout]}>
       <View style={[s.heroBanner, styles.ticket]}>
         <View style={styles.headingRow}>
-          <Ionicons aria-hidden name="ticket-outline" color={Colors.signal} size={24} />
+          <Ionicons aria-hidden name="ticket-outline" color={color.signal} size={24} />
           <Text accessibilityRole="header" style={[s.heroTitle, styles.grow]}>{t('passenger.nav.fare')}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.fare.refreshAll')} accessibilityState={{ disabled: refreshing }}
             disabled={refreshing} onPress={() => void refresh()} style={[styles.source, refreshing && { opacity: 0.6 }]}>
-            <Ionicons aria-hidden name="refresh-outline" size={18} color={Colors.onDark} />
+            <Ionicons aria-hidden name="refresh-outline" size={18} color={color.onDark} />
             <Text style={[s.label, styles.light]}>{t('passenger.fare.refresh')}</Text>
           </TouchableOpacity>
         </View>
@@ -130,7 +130,7 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
               })}</Text>
               <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(quote.source)} style={styles.source}>
                 <Text style={[s.label, styles.light]}>{t('passenger.fare.source')}</Text>
-                <Ionicons aria-hidden name="open-outline" size={16} color={Colors.onDark} />
+                <Ionicons aria-hidden name="open-outline" size={16} color={color.onDark} />
               </TouchableOpacity>
             </View>
           </> : <>
@@ -167,9 +167,9 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
             {destinationPlace && <Text style={s.muted}>{t('passenger.fare.destinationCoverage', { place: destinationPlace.name })}</Text>}
           </> : <View style={styles.field}>
             <Text style={s.label}>{t('passenger.fare.distanceKm')}</Text>
-            <TextInput accessibilityLabel={t('passenger.fare.distanceLabel')} style={s.input} keyboardType="decimal-pad" value={distance} onChangeText={setDistance} placeholder={t('passenger.fare.distancePlaceholder')} placeholderTextColor={Colors.subtleGray} />
+            <TextInput accessibilityLabel={t('passenger.fare.distanceLabel')} style={s.input} keyboardType="decimal-pad" value={distance} onChangeText={setDistance} placeholder={t('passenger.fare.distancePlaceholder')} placeholderTextColor={color.inkMuted} />
             <Text style={s.muted}>{t('passenger.fare.distanceNote')}</Text>
-            {!!distance && (km == null || !Number.isFinite(km) || km <= 0 || km > 200) && <Text accessibilityRole="alert" style={[s.muted, { color: Colors.primaryRed }]}>{t('passenger.fare.distanceRange')}</Text>}
+            {!!distance && (km == null || !Number.isFinite(km) || km <= 0 || km > 200) && <Text accessibilityRole="alert" style={[s.muted, { color: color.ember }]}>{t('passenger.fare.distanceRange')}</Text>}
           </View>}
           <View style={s.divider} />
           <PassengerSelect label={t('passenger.fare.passengerCategory')} value={type} inline options={TYPES.map(id => ({ value: id, label: t('passenger.fare.' + id) }))}
@@ -180,11 +180,11 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
           </TouchableOpacity>}
         </View>
 
-        <View style={s.section}>
+        <View style={[s.section, styles.walkCard]}>
           <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: walkExpanded }} onPress={() => setWalkExpanded(!walkExpanded)} style={styles.disclosure}>
-            <Ionicons aria-hidden name="walk-outline" size={24} color={Colors.brandGreen} />
+            <Ionicons aria-hidden name="walk-outline" size={24} color={color.action} />
             <View style={styles.grow}><Text style={s.sectionTitle}>{t('passenger.fare.walkSave')}</Text>{!walkExpanded && <Text accessibilityLiveRegion="polite" style={s.muted}>{savings?.status === 'available' ? t('passenger.fare.cheaperFare') : walkHint()}</Text>}</View>
-            <Ionicons aria-hidden name={walkExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.ink} />
+            <Ionicons aria-hidden name={walkExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={color.ink} />
           </TouchableOpacity>
           {walkExpanded && <>
             <View style={s.divider} />
@@ -192,7 +192,7 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
               {mode === 'distance' && <TouchableOpacity accessibilityRole="button" onPress={() => setMode('stops')} style={s.input}><Text style={s.label}>{t('passenger.fare.useSelected')}</Text></TouchableOpacity>}
             </> : <>
             <PassengerSelect label={t('passenger.fare.maxWalk')} value={String(maxWalk)} options={[100, 250, 500, 1000, 2000].map(value => ({ value: String(value), label: `${value} m` }))} onSelect={value => setMaxWalk(Number(value))} />
-            <View style={styles.disclosure}><Text style={[s.label, styles.grow]}>{t('passenger.fare.stepFree')}</Text><Switch accessibilityLabel={t('passenger.fare.stepFreeLabel')} value={stepFree} onValueChange={setStepFree} trackColor={{ true: Colors.brandGreen }} /></View>
+            <View style={styles.disclosure}><Text style={[s.label, styles.grow]}>{t('passenger.fare.stepFree')}</Text><Switch accessibilityLabel={t('passenger.fare.stepFreeLabel')} value={stepFree} onValueChange={setStepFree} trackColor={{ true: color.action }} /></View>
               <Text style={s.label}>{savings.status === 'available' ? t('passenger.fare.lowerFare') : savings.status === 'no-saving' ? t('passenger.fare.noSaving') : t('passenger.fare.comparisonUnavailable')}</Text>
               <Text style={s.muted}>{t('passenger.fare.reasons.' + savings.reason, savings.reason)}</Text>
               {savings.suggestions.map(item => (
@@ -224,17 +224,18 @@ const styles = StyleSheet.create({
   controls: { flexBasis: 360, flexGrow: 5, flexShrink: 1, minWidth: 0, gap: 16 },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   total: { gap: 2 },
-  amount: { color: Colors.signal, fontSize: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  ticketDetail: { color: Colors.onDarkMuted, fontSize: 15, lineHeight: 21 },
-  ticketFooter: { borderTopWidth: 1, borderTopColor: Colors.onDarkMuted, borderStyle: 'dashed', paddingTop: 12, gap: 4 },
-  light: { color: Colors.onDark },
+  amount: { color: color.signal, fontSize: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  ticketDetail: { color: color.onDarkMuted, fontSize: 15, lineHeight: 21 },
+  ticketFooter: { borderTopWidth: 1, borderTopColor: color.onDarkMuted, borderStyle: 'dashed', paddingTop: 12, gap: 4 },
+  light: { color: color.onDark },
   source: { flexDirection: 'row', gap: 8, alignItems: 'center', minHeight: 48, alignSelf: 'flex-start' },
-  segmented: { flexDirection: 'row', padding: 3, backgroundColor: Colors.canvas, borderRadius: 8 },
-  segment: { flex: 1, minHeight: 48, padding: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+  segmented: { flexDirection: 'row', padding: 3, backgroundColor: color.sand, borderRadius: radius.md },
+  segment: { flex: 1, minHeight: tapTarget, padding: 6, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
   segmentText: { textAlign: 'center' },
   field: { gap: 6 },
-  disclosure: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  disclosure: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', gap: 12 },
   grow: { flex: 1, minWidth: 0 },
-  suggestion: { borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12, gap: 8 },
-  saving: { color: Colors.success },
+  suggestion: { borderTopWidth: 1, borderColor: color.border, paddingTop: 12, gap: 8 },
+  saving: { color: color.success },
+  walkCard: { borderColor: color.signal, borderWidth: 1.5, backgroundColor: color.paper },
 });

@@ -22,7 +22,7 @@ import PassengerDestinationSearch from '../../components/PassengerDestinationSea
 import { type PassengerPlace } from '../../services/passengerPlaces';
 import { locationDescription, locationQuality, vehicleTelemetryReadout } from '../../services/locationQuality';
 import { rideLeg, selectJourneyStop, confirmedPassengerUse, permitsPassengerUse, passengerStopOptions, passengerUseLabel } from '../../services/routeMap';
-import { Colors } from '../../constants/theme';
+import { color, elevation, radius, tapTarget } from '../../constants/theme';
 import { manilaDateKey } from '../../utils/reportingPeriod';
 import { passengerMapOverview } from '../../services/passengerMapOverview';
 
@@ -274,14 +274,14 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     <Text accessibilityLiveRegion="polite" style={s.muted}>{trip?.route.name || rideStatus}</Text>
     {(trip || destinationCandidates.length > 0) && <View style={styles.itinerary}>
       {trip && <View style={styles.itineraryRow}>
-        <Ionicons name="radio-button-on" size={19} color={Colors.brandGreen} />
+        <Ionicons name="radio-button-on" size={19} color={color.success} />
         <View style={styles.itineraryText}>
           <Text style={s.muted}>{t('passenger.home.boardAt')}</Text><Text style={styles.rowTitle}>{trip.boarding.name}</Text>
           {trip.boardingProximity != null && <Text style={s.muted}>{t('passenger.home.boardingDistance', { distance: Math.round(trip.boardingProximity) })}</Text>}
         </View>
       </View>}
       <View style={styles.itineraryRow}>
-        <Ionicons name="location-outline" size={20} color={Colors.ink} />
+        <Ionicons name="location-outline" size={20} color={color.ink} />
         <View style={styles.itineraryText}>
           <Text style={s.muted}>{trip ? t('passenger.home.alightAt') : t('passenger.home.possibleAlight')}</Text>
           <Text style={styles.rowTitle}>{trip?.alighting.name || destinationCandidates[0]?.stop.name || t('passenger.home.unavailable')}</Text>
@@ -295,11 +295,11 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     </View>}
     {trip && (tripApplied ? <>
       <TouchableOpacity accessibilityRole="button" disabled={walkingBusy} style={s.button} onPress={() => void requestWalk(trip.boarding)}>
-        <Ionicons name="walk-outline" size={19} color={Colors.white} /><Text style={s.buttonText}>{t('passenger.home.walkToBoard')}</Text>
+        <Ionicons name="walk-outline" size={19} color={color.onDark} /><Text style={s.buttonText}>{t('passenger.home.walkToBoard')}</Text>
       </TouchableOpacity>
       {walkingFeedback}
       <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => navigation.navigate('Fares', { showSelectedStops: Date.now() })}>
-        <Text style={s.label}>{t('passenger.home.fareDiscounts')}</Text><Ionicons name="chevron-forward" size={18} color={Colors.ink} />
+        <Text style={s.label}>{t('passenger.home.fareDiscounts')}</Text><Ionicons name="chevron-forward" size={18} color={color.ink} />
       </TouchableOpacity>
     </> : <TouchableOpacity accessibilityRole="button" style={s.button} onPress={() => {
       if (locationQuality(fix) === 'live') setRideStops(trip.boarding, trip.alighting);
@@ -314,7 +314,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     accessibilityHint={locationDetail}
     onPress={() => locationFresh && fix ? map.current?.centerOn(fix.latitude, fix.longitude) : void enableLocation()}
     style={styles.locationRow}>
-    <Ionicons name="locate-outline" size={21} color={Colors.action} />
+    <Ionicons name="locate-outline" size={21} color={color.action} />
     <View style={styles.itineraryText}><Text style={s.label}>{t('passenger.home.yourLocation')}</Text>
       <Text style={s.muted}>{locationDetail}</Text></View>
     <Text style={styles.locationAction}>{locationAction}</Text>
@@ -323,7 +323,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: manualOpen }} style={styles.actionRow}
       onPress={() => setManualOpen(open => !open)}>
       <Text style={s.label}>{t('passenger.home.chooseStops')}</Text>
-      <Ionicons name={manualOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.ink} />
+      <Ionicons name={manualOpen ? 'chevron-up' : 'chevron-down'} size={18} color={color.ink} />
     </TouchableOpacity>
     {manualOpen && <View style={styles.manual}>
       <PassengerSelect label={t('passenger.home.route')} value={selectedRouteId || ''} options={[{ value: '', label: t('passenger.home.allRoutes') }, ...routes.map(r => ({ value: r.id, label: r.name }))]}
@@ -398,7 +398,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     {pinCount > 0 && <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: pinListOpen }}
       style={styles.mapKeyHeading} onPress={() => setPinListOpen(!pinListOpen)}>
       <Text style={styles.mapLink}>{t('passenger.home.stopCount', { total: pinCount })}</Text>
-      <Ionicons name={pinListOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.action} />
+      <Ionicons name={pinListOpen ? 'chevron-up' : 'chevron-down'} size={18} color={color.action} />
     </TouchableOpacity>}
     {pinListOpen && <View>{[
       ...locatedStops.map(stop => ({ id: stop.id, name: stop.name, point: stop, select: () => chooseDestination(stop) })),
@@ -406,7 +406,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     ].map(item => <TouchableOpacity key={item.id} accessibilityRole="button" accessibilityLabel={item.name} style={styles.actionRow} onPress={() => {
       item.select(); setPinListOpen(false); map.current?.centerOn(item.point.latitude, item.point.longitude, 17);
     }}>
-      <Text style={s.label}>{item.name}</Text><Ionicons name="location-outline" size={18} color={Colors.action} />
+      <Text style={s.label}>{item.name}</Text><Ionicons name="location-outline" size={18} color={color.action} />
     </TouchableOpacity>)}</View>}
     {inspectedPin && <View style={styles.pinDetail}>
       <Text style={s.label}>{landmark?.name ?? locatedStop?.name}</Text>
@@ -433,7 +433,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
             onPress={() => setBoardingOpen(false)}
             style={styles.backBtn}
           >
-            <Ionicons name="chevron-back" size={24} color={Colors.ink} />
+            <Ionicons name="chevron-back" size={24} color={color.ink} />
           </TouchableOpacity>
           <Text style={styles.subHeaderTitle}>{t('passenger.home.whereToBoard')}</Text>
         </View>
@@ -464,10 +464,10 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
           <Ionicons
             name={isProhibited ? 'warning' : boarding.kind === 'allowed' ? 'checkmark-circle' : 'information-circle'}
             size={22}
-            color={isProhibited ? Colors.primaryRed : Colors.brandGreen}
+            color={isProhibited ? color.ember : color.success}
           />
           <View style={{ flex: 1 }}>
-            <Text accessibilityRole={waitingWarning ? 'alert' : undefined} style={[styles.rowTitle, isProhibited && { color: Colors.primaryRed }]}>
+            <Text accessibilityRole={waitingWarning ? 'alert' : undefined} style={[styles.rowTitle, isProhibited && { color: color.ember }]}>
               {boarding.title}
             </Text>
             <Text style={styles.rowSubtitle}>
@@ -488,7 +488,7 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
         {targetVehicle && (
           <View style={styles.unitRowCard}>
             <View style={styles.unitIconCircle}>
-              <Ionicons name="bus-outline" size={20} color={Colors.brandGreen} />
+              <Ionicons name="bus-outline" size={20} color={color.success} />
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -522,16 +522,16 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
   // 3) YOUR RIDE LINKED VIEW (Board 02 middle)
   if (unit) {
     return (
-      <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={{ flexGrow: 1, backgroundColor: Colors.paper }}>
+      <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={{ flexGrow: 1, backgroundColor: color.paper }}>
         <View style={styles.rideHeaderBar}>
           <Text style={styles.subHeaderTitle}>{t('passenger.home.yourRide')}</Text>
           <View style={styles.linkedPill}>
-            <Ionicons name="checkmark-circle" size={16} color={Colors.brandGreen} />
+            <Ionicons name="checkmark-circle" size={16} color={color.success} />
             <Text style={styles.linkedPillText}>{t('passenger.home.linked')}</Text>
           </View>
         </View>
 
-        <View style={{ height: 250, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border }}>
+        <View style={{ height: 250, borderTopWidth: 1, borderBottomWidth: 1, borderColor: color.border }}>
           <LeafletMap
             ref={map}
             destinationPlace={place}
@@ -576,9 +576,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
               onPress={() => navigation.navigate('Fares')}
               style={styles.dividerRow}
             >
-              <Ionicons name="ticket-outline" size={20} color={Colors.brandGreen} />
+              <Ionicons name="ticket-outline" size={20} color={color.success} />
               <Text style={[styles.rowTitle, { flex: 1 }]}>{t('passenger.home.checkFare')}</Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+              <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -586,9 +586,9 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
               onPress={() => navigation.navigate('Safety')}
               style={styles.dividerRow}
             >
-              <Ionicons name="shield-outline" size={20} color={Colors.primaryRed} />
+              <Ionicons name="shield-outline" size={20} color={color.ember} />
               <Text style={[styles.rowTitle, { flex: 1 }]}>{t('passenger.home.safetySos')}</Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.subtleGray} />
+              <Ionicons name="chevron-forward" size={18} color={color.inkMuted} />
             </TouchableOpacity>
           </View>
 
@@ -608,88 +608,102 @@ export default function PassengerHomeScreen({ route, navigation }: any) {
     );
   }
 
+  const wideMap = width >= 860;
   return (
-    <FormScrollView ref={scroll} style={s.screen} contentContainerStyle={styles.home}>
-      <View style={styles.layout}>
-        <PassengerDestinationSearch key={user?.id} scope={searchScope} selectedName={place?.name || destination?.name || ''} online={isConnected} onSelect={choosePlace} />
-        <View style={styles.mapColumn}>
-          {!!waitingWarning && <View style={[styles.boardingStatusRow, styles.boardingStatusDanger]}>
-            <Ionicons aria-hidden name="warning" size={22} color={Colors.primaryRed} />
-            <View style={{ flex: 1 }}>
-              <Text accessibilityRole="alert" style={[styles.rowTitle, { color: Colors.primaryRed }]}>{boarding.title}</Text>
-              <Text style={styles.rowSubtitle}>{boarding.detail}</Text>
-              <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={() => setBoardingOpen(true)}>
-                <Text style={styles.mapLink}>{t('passenger.home.safeBoarding')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>}
-          <View style={[styles.mapContainer, { height: width >= 860 ? 400 : Math.min(380, Math.max(240, (height || 700) * 0.40)) }]}>
-            <LeafletMap ref={map} destinationPlace={place} hideOccupancy {...journeyMapProps}
-              vehicles={displayed} userLocation={locationFresh ? fix : null}
-              selectedVehicle={currentSelected} isOffline={!isConnected} onSelectVehicle={selectVehicle} />
-          </View>
-          <View style={styles.rideDetails}>{locationControl}{result}</View>
-          {mapKey}
-          <View style={styles.mapCaption}>
-            <Ionicons name="bus-outline" size={18} color={Colors.subtleGray} />
-            <Text style={[s.muted, { flex: 1 }]}>{vehicleError ? t('passenger.home.statuses.' + vehicleError, vehicleError)
-              : t(displayed.length ? 'passenger.home.tapForSpeed' : 'passenger.home.noLiveUnits')}</Text>
-            {displayed.length > 0 && <TouchableOpacity accessibilityRole="button" onPress={() => map.current?.fitPoints?.(displayed)}>
-              <Text style={styles.mapLink}>{t('passenger.home.showUnit', { total: displayed.length, unit: displayed.length === 1 ? 'e-jeep' : 'e-jeeps' })}</Text>
-            </TouchableOpacity>}
-          </View>
-          {trackingCard}
-        </View>
+    <View style={styles.homeFill}>
+      <View style={styles.mapFill}>
+        <LeafletMap ref={map} destinationPlace={place} hideOccupancy {...journeyMapProps}
+          vehicles={displayed} userLocation={locationFresh ? fix : null}
+          selectedVehicle={currentSelected} isOffline={!isConnected} onSelectVehicle={selectVehicle} />
       </View>
-      <View style={styles.tools}>
+      <View pointerEvents="box-none" style={[styles.searchOverlay, wideMap && styles.searchOverlayWide]}>
+        <PassengerDestinationSearch key={user?.id} scope={searchScope} selectedName={place?.name || destination?.name || ''} online={isConnected} onSelect={choosePlace} />
+      </View>
+      <FormScrollView ref={scroll} style={[styles.statusSheet, wideMap && styles.statusSheetWide]} contentContainerStyle={styles.statusSheetContent}>
+        <View style={styles.sheetHandle} />
+        {!!waitingWarning && <View style={[styles.boardingStatusRow, styles.boardingStatusDanger]}>
+          <Ionicons aria-hidden name="warning" size={22} color={color.ember} />
+          <View style={{ flex: 1 }}>
+            <Text accessibilityRole="alert" style={[styles.rowTitle, { color: color.ember }]}>{boarding.title}</Text>
+            <Text style={styles.rowSubtitle}>{boarding.detail}</Text>
+            <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={() => setBoardingOpen(true)}>
+              <Text style={styles.mapLink}>{t('passenger.home.safeBoarding')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>}
+        <View style={styles.rideDetails}>{locationControl}{result}</View>
+        {mapKey}
+        <View style={styles.mapCaption}>
+          <Ionicons name="bus-outline" size={18} color={color.inkMuted} />
+          <Text style={[s.muted, { flex: 1 }]}>{vehicleError ? t('passenger.home.statuses.' + vehicleError, vehicleError)
+            : t(displayed.length ? 'passenger.home.tapForSpeed' : 'passenger.home.noLiveUnits')}</Text>
+          {displayed.length > 0 && <TouchableOpacity accessibilityRole="button" onPress={() => map.current?.fitPoints?.(displayed)}>
+            <Text style={styles.mapLink}>{t('passenger.home.showUnit', { total: displayed.length, unit: displayed.length === 1 ? 'e-jeep' : 'e-jeeps' })}</Text>
+          </TouchableOpacity>}
+        </View>
+        {trackingCard}
         {journeyControls}
         <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => setBoardingOpen(true)}>
-          <Ionicons name="shield-checkmark-outline" size={20} color={Colors.action} />
+          <Ionicons name="shield-checkmark-outline" size={20} color={color.action} />
           <Text style={[s.label, { flex: 1 }]}>{t('passenger.home.safeBoarding')}</Text>
-          <Ionicons name="chevron-forward" size={18} color={Colors.ink} />
+          <Ionicons name="chevron-forward" size={18} color={color.ink} />
         </TouchableOpacity>
-      </View>
-    </FormScrollView>
+      </FormScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  textButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
-  mapKey: { paddingHorizontal: 16, paddingVertical: 10, gap: 6, backgroundColor: Colors.paper },
+  textButton: { minHeight: tapTarget, justifyContent: 'center', alignSelf: 'flex-start' },
+  mapKey: { paddingHorizontal: 16, paddingVertical: 10, gap: 6, backgroundColor: 'transparent' },
   mapKeyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
   mapDirections: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
   mapDirection: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 28 },
   mapStroke: { width: 22, height: 5, borderRadius: 3 },
-  mapKeyText: { color: Colors.ink, fontSize: 13, fontWeight: '600' },
-  mapLink: { color: Colors.action, fontSize: 14, fontWeight: '700', paddingVertical: 5 },
-  pinDetail: { paddingTop: 8, gap: 4, borderTopWidth: 1, borderColor: Colors.border },
-  home: { flexGrow: 1, backgroundColor: Colors.canvas, paddingBottom: 28 },
-  layout: { width: '100%', maxWidth: 960, alignSelf: 'center', backgroundColor: Colors.paper },
+  mapKeyText: { color: color.ink, fontSize: 13, fontWeight: '600' },
+  mapLink: { color: color.action, fontSize: 14, fontWeight: '700', paddingVertical: 5 },
+  pinDetail: { paddingTop: 8, gap: 4, borderTopWidth: 1, borderColor: color.border },
+  home: { flexGrow: 1, backgroundColor: color.canvas, paddingBottom: 28 },
+  homeFill: { flex: 1, backgroundColor: color.canvas },
+  mapFill: { ...StyleSheet.absoluteFill },
+  searchOverlay: { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 3 },
+  searchOverlayWide: { right: 'auto', width: 420, maxWidth: '42%' },
+  statusSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '50%', zIndex: 2,
+    backgroundColor: color.paper, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+    borderWidth: 1, borderColor: color.border, ...elevation.sheet,
+  },
+  statusSheetWide: {
+    left: 'auto', right: 16, bottom: 16, width: 420, maxWidth: '42%', maxHeight: '72%',
+    borderRadius: radius.lg,
+  },
+  statusSheetContent: { paddingBottom: 20, gap: 0 },
+  layout: { width: '100%', maxWidth: 960, alignSelf: 'center', backgroundColor: color.paper },
   rideDetails: { paddingHorizontal: 16, paddingBottom: 8 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingVertical: 10, borderBottomWidth: 1, borderColor: Colors.border },
-  locationAction: { fontSize: 14, fontWeight: '700', color: Colors.action },
-  result: { gap: 8, marginTop: 4, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 14 },
-  resultHeading: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: Colors.midnight },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingVertical: 10, borderBottomWidth: 1, borderColor: color.border },
+  locationAction: { fontSize: 14, fontWeight: '700', color: color.action },
+  result: { gap: 8, marginTop: 4, borderTopWidth: 1, borderColor: color.border, paddingTop: 14 },
+  resultHeading: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: color.ink },
   itinerary: { gap: 12, paddingVertical: 4 },
   itineraryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   itineraryText: { flex: 1, gap: 2 },
-  fareLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.actionTint, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12 },
-  mapColumn: { backgroundColor: Colors.paper },
+  fareLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: color.actionTint, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12 },
+  mapColumn: { backgroundColor: color.paper },
   mapCaption: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
   tools: { width: '100%', maxWidth: 960, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8 },
   details: { gap: 8 },
   manual: { gap: 10, paddingBottom: 8 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 48, borderBottomWidth: 1, borderColor: Colors.border },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 48, borderBottomWidth: 1, borderColor: color.border },
   mapContainer: {
     height: 290,
     position: 'relative',
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   bottomSheetSurface: {
     flex: 1,
-    backgroundColor: Colors.paper,
+    backgroundColor: color.paper,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     marginTop: -12,
@@ -698,18 +712,18 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     gap: 12,
     borderTopWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   sheetHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.border,
+    backgroundColor: color.border,
     alignSelf: 'center',
     marginBottom: 4,
   },
   stopBadgePill: {
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: color.successBg,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
@@ -718,7 +732,7 @@ const styles = StyleSheet.create({
   stopBadgeText: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.brandGreen,
+    color: color.success,
   },
   dividerRow: {
     flexDirection: 'row',
@@ -727,24 +741,24 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   unitIconCircle: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: color.successBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   rowSubtitle: {
     fontSize: 13,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
     marginTop: 2,
   },
   sheetScreen: {
@@ -768,24 +782,24 @@ const styles = StyleSheet.create({
   subHeaderTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   mapFrameSmall: {
     height: 210,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
     position: 'relative',
   },
   loadingBayOverlay: {
     position: 'absolute',
     right: 12,
     top: 12,
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: color.successBg,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: Colors.brandGreen,
+    borderColor: color.success,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
@@ -793,7 +807,7 @@ const styles = StyleSheet.create({
   loadingBayOverlayText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.brandGreen,
+    color: color.success,
   },
   boardingStatusRow: {
     flexDirection: 'row',
@@ -801,10 +815,10 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: color.successBg,
   },
   boardingStatusDanger: {
-    backgroundColor: Colors.dangerBg,
+    backgroundColor: color.dangerBg,
   },
   stopSummaryRow: {
     flexDirection: 'row',
@@ -820,10 +834,10 @@ const styles = StyleSheet.create({
   unitCodeText: {
     fontSize: 17,
     fontWeight: '800',
-    color: Colors.ink,
+    color: color.ink,
   },
   seatBadge: {
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: color.successBg,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
@@ -831,7 +845,7 @@ const styles = StyleSheet.create({
   seatBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.brandGreen,
+    color: color.success,
   },
 
   rideHeaderBar: {
@@ -845,7 +859,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: Colors.paleGreen,
+    backgroundColor: color.successBg,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
@@ -853,16 +867,16 @@ const styles = StyleSheet.create({
   linkedPillText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.brandGreen,
+    color: color.success,
   },
   sheetHeading: {
     fontSize: 22,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   kvList: {
     borderTopWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   kvRow: {
     flexDirection: 'row',
@@ -870,16 +884,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: color.border,
   },
   kvLabel: {
     fontSize: 14,
-    color: Colors.subtleGray,
+    color: color.inkMuted,
   },
   kvValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.ink,
+    color: color.ink,
   },
   actionRowsGroup: {
     marginTop: 4,
@@ -892,6 +906,6 @@ const styles = StyleSheet.create({
   endRideText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.subtleGray,
+    color: color.inkMuted,
   },
 });

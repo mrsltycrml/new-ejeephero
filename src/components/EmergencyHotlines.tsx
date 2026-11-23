@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons';
 import { EMERGENCY_HOTLINES } from '../services/passengerSafety';
 import { passengerStyles as s } from './PassengerUI';
-import { Colors } from '../constants/theme';
+import { color } from '../constants/theme';
 
 export default function EmergencyHotlines() {
   const { t } = useTranslation();
@@ -22,21 +22,21 @@ export default function EmergencyHotlines() {
             <Text style={s.label}>{h.name}</Text>
             <Text style={styles.number}>{h.number}</Text>
           </View>
-          <Ionicons aria-hidden name="call-outline" size={21} color={Colors.action} />
+          <Ionicons aria-hidden name="call-outline" size={21} color={color.action} />
         </TouchableOpacity>
       ))}
       {!!error && <Text accessibilityRole="alert" style={s.body}>{error}</Text>}
       <TouchableOpacity accessibilityRole="link" onPress={() => Linking.openURL('https://barangaybelair.ph/emergency/')} style={styles.source}>
         <Text style={[s.link, { flexShrink: 1 }]}>{t('passenger.hotlines.directory')}</Text>
-        <Ionicons aria-hidden name="open-outline" size={16} color={Colors.action} />
+        <Ionicons aria-hidden name="open-outline" size={16} color={color.action} />
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingVertical: 10, borderBottomWidth: 1, borderColor: Colors.border },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingVertical: 10, borderBottomWidth: 1, borderColor: color.border },
   details: { flex: 1, gap: 2 },
-  number: { fontSize: 18, fontWeight: '700', color: Colors.action, fontVariant: ['tabular-nums'] },
+  number: { fontSize: 18, fontWeight: '700', color: color.action, fontVariant: ['tabular-nums'] },
   source: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48 },
 });

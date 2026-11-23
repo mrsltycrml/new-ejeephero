@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { ScreenSkeleton } from '../../components/AppUI';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/theme';
+import { color, radius } from '../../constants/theme';
 import { transitStyles } from '../../constants/transitStyles';
 
 const observed = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -100,7 +100,7 @@ export default function WeatherScreen() {
   if (!weather?.weather?.[0] || !weather?.main) {
     return (
       <View style={styles.center}>
-        <Ionicons name="cloud-offline-outline" size={32} color={Colors.subtleGray} />
+        <Ionicons name="cloud-offline-outline" size={32} color={color.inkMuted} />
         <Text accessibilityRole="alert" style={styles.detailValue}>{t('weather.couldNotLoad')}</Text>
       </View>
     );
@@ -108,9 +108,9 @@ export default function WeatherScreen() {
 
   const advisory = getWeatherAdvisory(weather);
   const advisoryColors = {
-    safe: { background: Colors.successBg, ink: Colors.success },
-    caution: { background: Colors.warningBg, ink: Colors.warning },
-    danger: { background: Colors.dangerBg, ink: Colors.primaryRed },
+    safe: { background: color.successBg, ink: color.success },
+    caution: { background: color.warningBg, ink: color.warning },
+    danger: { background: color.dangerBg, ink: color.ember },
   };
   const tone = advisory && advisoryColors[advisory.severity];
   const condition = weather.weather[0];
@@ -127,7 +127,7 @@ export default function WeatherScreen() {
               {new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}
             </Text>
           </View>
-          <Ionicons aria-hidden name={icon} size={38} color={Colors.signal} />
+          <Ionicons aria-hidden name={icon} size={38} color={color.signal} />
         </View>
         <View style={styles.observation}>
           <Text style={styles.temp}>{Math.round(weather.main.temp)}°C</Text>
@@ -167,21 +167,21 @@ export default function WeatherScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16, gap: 10, backgroundColor: Colors.canvas },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16, gap: 10, backgroundColor: color.canvas },
   page: transitStyles.page,
   container: transitStyles.content,
   masthead: { ...transitStyles.masthead, gap: 16 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { color: Colors.onDark, fontSize: 22, fontWeight: '700' },
-  date: { color: Colors.onDark, fontSize: 14, marginTop: 3 },
+  title: { color: color.onDark, fontSize: 22, fontWeight: '700' },
+  date: { color: color.onDark, fontSize: 14, marginTop: 3 },
   observation: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 14, rowGap: 4 },
-  temp: { fontVariant: ['tabular-nums'], fontSize: 44, color: Colors.onDark, fontWeight: '800', letterSpacing: -1.2 },
-  condition: { fontSize: 18, fontWeight: '600', color: Colors.onDark, textTransform: 'capitalize' },
-  advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 16, borderRadius: 8, borderLeftWidth: 4 },
+  temp: { fontVariant: ['tabular-nums'], fontSize: 44, color: color.onDark, fontWeight: '800', letterSpacing: -1.2 },
+  condition: { fontSize: 18, fontWeight: '600', color: color.onDark, textTransform: 'capitalize' },
+  advisoryCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 16, borderRadius: radius.md, borderLeftWidth: 4 },
   advisoryTitle: { fontSize: 14, fontWeight: '700' },
-  advisoryText: { color: Colors.ink, fontSize: 14, lineHeight: 20, marginTop: 4 },
-  measurements: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, backgroundColor: Colors.paper, overflow: 'hidden' },
-  readingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
-  detailLabel: { flexShrink: 1, fontSize: 14, color: Colors.subtleGray },
-  detailValue: { fontSize: 16, color: Colors.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  advisoryText: { color: color.ink, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  measurements: { borderWidth: 1, borderColor: color.border, borderRadius: radius.lg, backgroundColor: color.paper, overflow: 'hidden' },
+  readingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.border },
+  detailLabel: { flexShrink: 1, fontSize: 14, color: color.inkMuted },
+  detailValue: { fontSize: 16, color: color.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });

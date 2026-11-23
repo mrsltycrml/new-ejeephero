@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { passengerStyles as s } from '../../components/PassengerUI';
-import { Colors } from '../../constants/theme';
+import { color, radius, tapTarget } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 type Message = { role: 'user' | 'assistant'; content: string };
@@ -79,7 +79,7 @@ export default function HeroBotScreen() {
           );
         })}
         {loading && <View style={styles.status}>
-          <ActivityIndicator size="small" color={Colors.brandGreen} />
+          <ActivityIndicator size="small" color={color.action} />
           <Text accessibilityLiveRegion="polite" style={s.muted}>{t('passenger.assistant.waiting')}</Text>
         </View>}
         {showSuggestions && <View style={s.section}>
@@ -87,7 +87,7 @@ export default function HeroBotScreen() {
           {SUGGESTIONS.map(question => (
             <TouchableOpacity key={question} accessibilityRole="button" onPress={() => void sendMessage(question)} disabled={loading} style={styles.question}>
               <Text style={[s.link, { flex: 1 }]}>{question}</Text>
-              <Ionicons aria-hidden name="arrow-forward" size={18} color={Colors.brandGreen} />
+              <Ionicons aria-hidden name="arrow-forward" size={18} color={color.action} />
             </TouchableOpacity>
           ))}
         </View>}
@@ -98,13 +98,13 @@ export default function HeroBotScreen() {
           {messages.length > 1 && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.assistant.suggestions')}
             accessibilityState={{ expanded: showSuggestions, disabled: loading }} disabled={loading} style={styles.iconButton}
             onPress={() => { setShowSuggestions(!showSuggestions); if (!showSuggestions) requestAnimationFrame(() => chat.current?.scrollToEnd({ animated: false })); }}>
-            <Ionicons aria-hidden name="help-circle-outline" size={24} color={Colors.brandGreen} />
+            <Ionicons aria-hidden name="help-circle-outline" size={24} color={color.action} />
           </TouchableOpacity>}
-          <TextInput style={[s.input, { flex: 1, minWidth: 0 }]} value={input} onChangeText={setInput} placeholder={t('passenger.assistant.ask')} placeholderTextColor={Colors.subtleGray}
+          <TextInput style={[s.input, { flex: 1, minWidth: 0 }]} value={input} onChangeText={setInput} placeholder={t('passenger.assistant.ask')} placeholderTextColor={color.inkMuted}
             onSubmitEditing={() => void sendMessage()} returnKeyType="send" accessibilityLabel={t('passenger.assistant.message')} maxLength={2000} />
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.assistant.send')} accessibilityState={{ disabled: loading || !input.trim() }}
             style={[styles.iconButton, styles.send, (loading || !input.trim()) && { opacity: 0.5 }]} onPress={() => void sendMessage()} disabled={loading || !input.trim()}>
-            <Ionicons aria-hidden name="arrow-up" size={22} color={Colors.white} />
+            <Ionicons aria-hidden name="arrow-up" size={22} color={color.onDark} />
           </TouchableOpacity>
         </View>
       </View>
@@ -114,15 +114,15 @@ export default function HeroBotScreen() {
 
 const styles = StyleSheet.create({
   column: { maxWidth: 640, gap: 12 },
-  bubble: { gap: 6, padding: 14, maxWidth: '94%', borderRadius: 10 },
-  incoming: { alignSelf: 'flex-start', backgroundColor: Colors.paper, borderWidth: 1, borderColor: Colors.border },
-  outgoing: { alignSelf: 'flex-end', backgroundColor: Colors.midnight },
-  sender: { color: Colors.brandGreen },
-  light: { color: Colors.onDark },
+  bubble: { gap: 6, padding: 14, maxWidth: '94%', borderRadius: radius.lg },
+  incoming: { alignSelf: 'flex-start', backgroundColor: color.paper, borderWidth: 1, borderColor: color.border },
+  outgoing: { alignSelf: 'flex-end', backgroundColor: color.ink },
+  sender: { color: color.action },
+  light: { color: color.onDark },
   status: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  question: { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 48, paddingVertical: 8, borderTopWidth: 1, borderColor: Colors.border },
-  composer: { backgroundColor: Colors.paper, borderTopWidth: 1, borderColor: Colors.border, paddingTop: 12 },
+  question: { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: tapTarget, paddingVertical: 8, borderTopWidth: 1, borderColor: color.border },
+  composer: { backgroundColor: color.paper, borderTopWidth: 1, borderColor: color.border, paddingTop: 12 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', maxWidth: 640, paddingHorizontal: 16, alignSelf: 'center' },
-  iconButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  send: { backgroundColor: Colors.brandGreen, borderRadius: 10 },
+  iconButton: { width: tapTarget, height: tapTarget, alignItems: 'center', justifyContent: 'center' },
+  send: { backgroundColor: color.action, borderRadius: radius.md },
 });

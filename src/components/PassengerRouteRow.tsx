@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Colors } from '../constants/theme';
+import { color } from '../constants/theme';
 
 export default function PassengerRouteRow({ first, last, children }: {
   first: boolean;
@@ -22,8 +22,8 @@ export default function PassengerRouteRow({ first, last, children }: {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12 },
   axis: { width: 16, alignItems: 'center' },
-  line: { position: 'absolute', width: 3, backgroundColor: Colors.brandGreen },
-  dot: { marginTop: 12, height: 12, width: 12, borderRadius: 6, borderWidth: 2, borderColor: Colors.brandGreen, backgroundColor: Colors.paper },
-  terminus: { backgroundColor: Colors.signal, borderColor: Colors.ink },
+  line: { position: 'absolute', width: 3, backgroundColor: color.action },
+  dot: { marginTop: 12, height: 12, width: 12, borderRadius: 6, borderWidth: 2, borderColor: color.action, backgroundColor: color.paper },
+  terminus: { backgroundColor: color.signal, borderColor: color.ink },
   content: { flex: 1, minWidth: 0, gap: 3, paddingTop: 6, paddingBottom: 12 },
 });

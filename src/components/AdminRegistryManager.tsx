@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/theme';
+import { color, radius, tapTarget } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import {
   loadRegistry, saveRegistryRecord, setRegistryDeleted,
@@ -16,7 +16,7 @@ function FormField({ label, value, onChangeText, placeholder, keyboardType }: {
   label: string; value: string; onChangeText: (value: string) => void; placeholder?: string; keyboardType?: 'email-address' | 'default';
 }) {
   return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><TextInput
-    accessibilityLabel={label} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={Colors.subtleGray}
+    accessibilityLabel={label} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={color.inkMuted}
     keyboardType={keyboardType} autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'}
     style={styles.input}
   /></View>;
@@ -26,7 +26,7 @@ function Action({ label, onPress, icon, danger = false, primary = false, iconOnl
   label: string; onPress: () => void; icon?: keyof typeof Ionicons.glyphMap; danger?: boolean; primary?: boolean; iconOnly?: boolean;
 }) {
   return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={[styles.action, primary && styles.actionPrimary, danger && styles.actionDanger]}>
-    {icon && <Ionicons name={icon} size={15} color={primary ? Colors.onDark : danger ? Colors.ember : Colors.ink} />}
+    {icon && <Ionicons name={icon} size={15} color={primary ? color.onDark : danger ? color.ember : color.ink} />}
     {!iconOnly && <Text style={[styles.actionText, primary && styles.actionPrimaryText, danger && styles.actionDangerText]}>{label}</Text>}
   </TouchableOpacity>;
 }
@@ -151,7 +151,7 @@ export default function AdminRegistryManager({ kind, refreshToken = 0, onRowsCha
             accessibilityState={{ expanded: expandedId === row.id }}
             onPress={() => setExpandedId(expandedId === row.id ? null : row.id)} style={styles.action}>
             <Text style={styles.actionText}>Details</Text>
-            <Ionicons name={expandedId === row.id ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.action} />
+            <Ionicons name={expandedId === row.id ? 'chevron-up' : 'chevron-down'} size={16} color={color.action} />
           </TouchableOpacity>
         </View>
         {expandedId === row.id && <View style={styles.details}><Text style={styles.detailText}>{unit ? `Assigned driver: ${unit.assigned_driver || 'Not assigned'}` : `Assigned unit: ${driver?.assigned_unit || 'Not assigned'}`}</Text><Text style={styles.detailText}>Notes: {row.notes || 'None'}</Text><Text style={styles.detailText}>Updated: {new Date(row.updated_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</Text>{row.deleted_at && <Text style={styles.detailText}>Deleted: {new Date(row.deleted_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</Text>}</View>}
@@ -169,8 +169,8 @@ export default function AdminRegistryManager({ kind, refreshToken = 0, onRowsCha
 const styles = StyleSheet.create({
   shell: { gap: 10, paddingBottom: 12 },
   identity: { flex: 1, minWidth: 0 },
-  headingActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, action: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, borderColor: Colors.border, borderWidth: 1, backgroundColor: Colors.paper }, actionPrimary: { backgroundColor: Colors.action, borderColor: Colors.action }, actionDanger: { backgroundColor: Colors.dangerBg, borderColor: Colors.ember }, actionText: { color: Colors.ink, fontSize: 13, fontWeight: '600' }, actionPrimaryText: { color: Colors.onDark }, actionDangerText: { color: Colors.ember },
-  previewNote: { color: Colors.subtleGray, fontSize: 12, lineHeight: 16 }, error: { backgroundColor: Colors.dangerBg, color: Colors.ember, padding: 10, borderRadius: 7, fontSize: 12 },
-  form: { borderColor: Colors.border, borderWidth: 1, backgroundColor: Colors.paper, borderRadius: 8, padding: 16, gap: 12, alignItems: 'flex-start' }, formHeading: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, formTitle: { color: Colors.ink, fontSize: 16, fontWeight: '600' }, fields: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, field: { flexBasis: 205, flexGrow: 1, gap: 4 }, fieldLabel: { color: Colors.subtleGray, fontSize: 12, fontWeight: '600', textTransform: 'none', letterSpacing: 0.5 }, input: { minHeight: 46, borderRadius: 6, borderColor: Colors.border, borderWidth: 1, backgroundColor: Colors.paper, paddingHorizontal: 12, color: Colors.ink, fontSize: 14 },
-  empty: { color: Colors.subtleGray, fontSize: 12, paddingVertical: 13 }, row: { backgroundColor: Colors.paper, borderColor: Colors.border, borderWidth: 1, borderRadius: 8, padding: 12, gap: 8 }, rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }, rowTitle: { color: Colors.ink, fontSize: 16, fontWeight: '700' }, rowSub: { color: Colors.subtleGray, fontSize: 12, marginTop: 3 }, rowActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8 }, details: { backgroundColor: Colors.sand, borderRadius: 6, padding: 10, gap: 3 }, detailText: { color: Colors.ink, fontSize: 12 },
+  headingActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, action: { minHeight: tapTarget, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8, borderColor: color.border, borderWidth: 1, backgroundColor: color.paper }, actionPrimary: { backgroundColor: color.action, borderColor: color.action }, actionDanger: { backgroundColor: color.dangerBg, borderColor: color.ember }, actionText: { color: color.ink, fontSize: 13, fontWeight: '600' }, actionPrimaryText: { color: color.onDark }, actionDangerText: { color: color.ember },
+  previewNote: { color: color.inkMuted, fontSize: 12, lineHeight: 16 }, error: { backgroundColor: color.dangerBg, color: color.ember, padding: 10, borderRadius: radius.sm, fontSize: 12 },
+  form: { borderColor: color.border, borderWidth: 1, backgroundColor: color.paper, borderRadius: radius.md, padding: 16, gap: 12, alignItems: 'flex-start' }, formHeading: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, formTitle: { color: color.ink, fontSize: 16, fontWeight: '600' }, fields: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, field: { flexBasis: 205, flexGrow: 1, gap: 4 }, fieldLabel: { color: color.inkMuted, fontSize: 12, fontWeight: '600', textTransform: 'none', letterSpacing: 0.5 }, input: { minHeight: tapTarget, borderRadius: radius.sm, borderColor: color.border, borderWidth: 1, backgroundColor: color.paper, paddingHorizontal: 12, color: color.ink, fontSize: 14 },
+  empty: { color: color.inkMuted, fontSize: 12, paddingVertical: 13 }, row: { backgroundColor: color.paper, borderColor: color.border, borderWidth: 1, borderRadius: radius.md, padding: 12, gap: 8 }, rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }, rowTitle: { color: color.ink, fontSize: 16, fontWeight: '700' }, rowSub: { color: color.inkMuted, fontSize: 12, marginTop: 3 }, rowActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, borderTopWidth: 1, borderTopColor: color.border, paddingTop: 8 }, details: { backgroundColor: color.sand, borderRadius: radius.sm, padding: 10, gap: 3 }, detailText: { color: color.ink, fontSize: 12 },
 });

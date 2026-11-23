@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, Linking, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { passengerStyles as s, PassengerSelect } from './PassengerUI';
-import { Colors } from '../constants/theme';
+import { color } from '../constants/theme';
 import { BOARDING_EDUCATION, type BoardingStatus } from '../services/passengerSafety';
 import { stopLandmarks } from '../services/stopLandmarks';
 import { LANDMARK_REFERENCE } from '../constants/esakayOperations';
@@ -24,14 +24,14 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
   const stops = landmarks.filter(stop => confirmedPassengerUse(stop));
   const active = stops.find(stop => stop.id === selectedStop?.id) || null;
   const details = stopLandmarks(active);
-  const boardingColor = boarding.kind === 'prohibited' ? Colors.primaryRed : boarding.kind === 'allowed' ? Colors.success : Colors.warning;
+  const boardingColor = boarding.kind === 'prohibited' ? color.ember : boarding.kind === 'allowed' ? color.success : color.warning;
   return (
     <View style={s.section}>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('passenger.guide.title')} accessibilityState={{ expanded: open }}
         onPress={() => setOpen(!open)} style={styles.disclosure}>
-        <Ionicons aria-hidden name="location-outline" size={22} color={Colors.action} />
+        <Ionicons aria-hidden name="location-outline" size={22} color={color.action} />
         <Text style={[s.sectionTitle, styles.grow]}>{t('passenger.guide.title')}</Text>
-        <Ionicons aria-hidden name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.action} />
+        <Ionicons aria-hidden name={open ? 'chevron-up' : 'chevron-down'} size={18} color={color.action} />
       </TouchableOpacity>
       {open && <>
         <View style={[styles.boarding, { borderLeftColor: boardingColor }]}>
@@ -77,7 +77,7 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
         <View style={styles.grow}>
           <Text style={s.link}>{t('passenger.guide.reference')}</Text><Text style={s.muted}>{LANDMARK_REFERENCE.date}</Text>
         </View>
-        <Ionicons aria-hidden name={referenceOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.action} />
+        <Ionicons aria-hidden name={referenceOpen ? 'chevron-up' : 'chevron-down'} size={18} color={color.action} />
       </TouchableOpacity>
       {referenceOpen && <>
         <Text style={s.muted}>{t('passenger.guide.referenceNote')}</Text>
@@ -94,10 +94,10 @@ export default function PassengerStopGuide({ boarding, landmarks, selectedStop, 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   disclosure: { flexDirection: 'row', alignItems: 'center', minHeight: 48, gap: 10 },
-  boarding: { borderLeftWidth: 3, backgroundColor: Colors.canvas, padding: 12, gap: 4 },
-  photo: { width: '100%', height: 180, borderRadius: 8, backgroundColor: Colors.canvas },
+  boarding: { borderLeftWidth: 3, backgroundColor: color.canvas, padding: 12, gap: 4 },
+  photo: { width: '100%', height: 180, borderRadius: 8, backgroundColor: color.canvas },
   link: { minHeight: 48, justifyContent: 'center' },
-  detail: { gap: 3, paddingVertical: 8, borderTopWidth: 1, borderColor: Colors.border },
-  referenceRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderTopWidth: 1, borderColor: Colors.border },
-  km: { minWidth: 42, fontWeight: '700', color: Colors.subtleGray, fontVariant: ['tabular-nums'] },
+  detail: { gap: 3, paddingVertical: 8, borderTopWidth: 1, borderColor: color.border },
+  referenceRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderTopWidth: 1, borderColor: color.border },
+  km: { minWidth: 42, fontWeight: '700', color: color.inkMuted, fontVariant: ['tabular-nums'] },
 });
