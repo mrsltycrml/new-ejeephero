@@ -9,7 +9,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { chrome, Colors } from '../constants/theme';
+import { chrome, color, Colors, font, radius } from '../constants/theme';
 import { AuthAction, AuthLink, AuthNotice, AuthPage, authStyles } from '../screens/auth/AuthUI';
 import EJeepHeroLogo from '../components/EJeepHeroLogo';
 import AdminHeaderPopover, { type AdminPanel } from '../components/AdminHeaderPopover';
@@ -52,6 +52,18 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const tabInsets = Platform.OS === 'web' ? undefined : { bottom: 0 };
 
+function ChargeTabIcon({ focused, on, off }: {
+  focused: boolean;
+  on: React.ComponentProps<typeof Ionicons>['name'];
+  off: React.ComponentProps<typeof Ionicons>['name'];
+}) {
+  return (
+    <View style={[styles.tabBub, focused && styles.tabBubOn]}>
+      <Ionicons name={focused ? on : off} size={20} color={focused ? color.voltInk : color.inkMuted} />
+    </View>
+  );
+}
+
 function useTabOptions(): BottomTabNavigationOptions {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -60,14 +72,14 @@ function useTabOptions(): BottomTabNavigationOptions {
   return {
     headerTitleAlign: 'left',
     headerStatusBarHeight: Platform.OS === 'web' ? 0 : undefined,
-    headerStyle: { backgroundColor: Colors.midnight },
+    headerStyle: { backgroundColor: Colors.paper },
     headerShadowVisible: false,
-    headerTintColor: Colors.onDark,
+    headerTintColor: Colors.ink,
     tabBarPosition: rail ? 'left' : 'bottom',
     tabBarLabelPosition: rail ? 'beside-icon' : 'below-icon',
-    tabBarActiveTintColor: rail ? Colors.midnight : Platform.OS === 'web' ? Colors.onDark : Colors.action,
-    tabBarInactiveTintColor: rail ? Colors.onDarkMuted : Colors.subtleGray,
-    tabBarActiveBackgroundColor: rail ? Colors.signal : Platform.OS === 'web' ? Colors.action : Colors.actionTint,
+    tabBarActiveTintColor: color.actionPressed,
+    tabBarInactiveTintColor: color.inkMuted,
+    tabBarActiveBackgroundColor: 'transparent',
     tabBarStyle: rail ? styles.rail : [styles.bottomBar, { height: chrome.tabBar + bottom, paddingBottom: bottom }],
     tabBarItemStyle: rail ? styles.railItem : styles.bottomItem,
     tabBarLabelStyle: rail ? styles.railLabel : styles.bottomLabel,
@@ -77,17 +89,19 @@ function useTabOptions(): BottomTabNavigationOptions {
 }
 
 const styles = StyleSheet.create({
-  rail: { width: 160, minWidth: 160, maxWidth: 160, paddingTop: 20, backgroundColor: Colors.midnight, borderRightWidth: 0, elevation: 0 },
-  railItem: { minHeight: 52, borderRadius: 8, marginVertical: 3 },
-  railLabel: { fontSize: 14, fontWeight: '700' },
-  bottomBar: { backgroundColor: Colors.paper, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 2, paddingHorizontal: 4, elevation: 0 },
-  bottomItem: { marginHorizontal: 2, borderRadius: 8, overflow: 'hidden' },
-  bottomIcon: { height: 24, flexGrow: 0, flexShrink: 0 },
-  bottomLabel: { fontSize: 11, lineHeight: 14, minHeight: 14, flexShrink: 0, fontWeight: '700' },
+  rail: { width: 160, minWidth: 160, maxWidth: 160, paddingTop: 20, backgroundColor: Colors.canvas, borderRightWidth: 1, borderRightColor: Colors.border, elevation: 0 },
+  railItem: { minHeight: 52, borderRadius: radius.pill, marginVertical: 3 },
+  railLabel: { fontFamily: font.bold, fontSize: 14, fontWeight: '700' },
+  bottomBar: { backgroundColor: Colors.paper, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 4, paddingHorizontal: 4, elevation: 0 },
+  bottomItem: { marginHorizontal: 2, borderRadius: radius.pill, overflow: 'visible' },
+  bottomIcon: { height: 28, flexGrow: 0, flexShrink: 0 },
+  bottomLabel: { fontFamily: font.bold, fontSize: 11, lineHeight: 14, minHeight: 14, flexShrink: 0, fontWeight: '700' },
+  tabBub: { width: 48, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  tabBubOn: { backgroundColor: color.volt },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 12 },
   headerHome: Platform.OS === 'web' ? { minHeight: 44, justifyContent: 'center' } : {},
-  headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  headerButtonActive: { backgroundColor: Colors.signal },
+  headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
+  headerButtonActive: { backgroundColor: color.volt },
   count: { position: 'absolute', right: 0, top: 1, borderRadius: 9, minWidth: 18, minHeight: 18, paddingHorizontal: 3, backgroundColor: Colors.primaryRed, alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 10, fontWeight: '800', color: Colors.white },
 });
@@ -97,7 +111,7 @@ function HeaderButton({ label, icon, expanded, onPress, count = 0 }: {
 }) {
   return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ expanded }} onPress={onPress}
     style={[styles.headerButton, expanded && styles.headerButtonActive]}>
-    <Ionicons name={icon} size={23} color={expanded ? Colors.midnight : Colors.onDark} />
+    <Ionicons name={icon} size={23} color={expanded ? color.voltInk : color.ink} />
     {count > 0 && <View style={styles.count}><Text style={styles.countText}>{count > 99 ? '99+' : count}</Text></View>}
   </TouchableOpacity>;
 }
@@ -117,7 +131,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           ...tabOptions,
           headerTitle: () => (
             <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel={t('passenger.nav.goMap')} onPress={() => navigation.navigate('Map')}>
-              <EJeepHeroLogo compact roleLabel={width >= 395 ? t('passenger.nav.passenger') : undefined} color={Colors.onDark} />
+              <EJeepHeroLogo compact roleLabel={width >= 395 ? t('passenger.nav.passenger') : undefined} />
             </TouchableOpacity>
           ),
           headerRight: () => (
@@ -136,7 +150,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           component={PassengerHomeScreen}
           options={{
             title: t('passenger.nav.map'),
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'location' : 'location-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="location" off="location-outline" />
           }}
         />
         <Tab.Screen
@@ -144,7 +158,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           component={FareScreen}
           options={{
             title: t('passenger.nav.fare'),
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'ticket' : 'ticket-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="ticket" off="ticket-outline" />
           }}
         />
         <Tab.Screen
@@ -152,7 +166,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           component={SafetyScreen}
           options={{
             title: t('passenger.nav.safety'),
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="shield-checkmark" off="shield-checkmark-outline" />
           }}
         />
         <Tab.Screen
@@ -160,7 +174,7 @@ const PassengerTabs = ({ navigation: stackNavigation }: any) => {
           component={MoreScreen}
           options={{
             title: t('passenger.nav.more'),
-            tabBarIcon: ({ color }) => <Ionicons name="ellipsis-horizontal" size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="ellipsis-horizontal" off="ellipsis-horizontal" />
           }}
         />
       </Tab.Navigator>
@@ -190,7 +204,7 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
           ...tabOptions,
           headerTitle: () => (
             <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel="Go to dashboard" onPress={() => navigation.navigate('Dashboard')}>
-              <EJeepHeroLogo compact roleLabel="Driver" color={Colors.onDark} />
+              <EJeepHeroLogo compact roleLabel="Driver" />
             </TouchableOpacity>
           ),
           headerRight: () => (
@@ -205,7 +219,7 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
           component={DriverDashboardScreen}
           options={{
             title: 'Dashboard',
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'grid' : 'grid-outline'} size={20} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="grid" off="grid-outline" />
           }}
         />
         <Tab.Screen
@@ -213,7 +227,7 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
           component={NotificationsScreen}
           options={{
             title: 'Alerts',
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="notifications" off="notifications-outline" />
           }}
         />
         <Tab.Screen
@@ -221,7 +235,7 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
           component={DriverRecordsScreen}
           options={{
             title: 'Records',
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="document-text" off="document-text-outline" />
           }}
         />
       </Tab.Navigator>
@@ -232,11 +246,11 @@ const DriverTabs = ({ navigation: stackNavigation }: any) => {
 };
 
 const stackScreenOptions = {
-  headerStyle: { backgroundColor: Colors.midnight },
-  headerTintColor: Colors.onDark,
-  statusBarStyle: 'light' as const,
+  headerStyle: { backgroundColor: Colors.paper },
+  headerTintColor: Colors.ink,
+  statusBarStyle: 'dark' as const,
   headerShadowVisible: false,
-  headerTitleStyle: { fontWeight: '700' as const, fontSize: 18, color: Colors.onDark },
+  headerTitleStyle: { fontFamily: font.bold, fontWeight: '700' as const, fontSize: 18, color: Colors.ink },
 };
 
 const PassengerStack = () => {
@@ -348,7 +362,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
           ),
           headerTitle: () => (
             <TouchableOpacity style={styles.headerHome} accessibilityRole="button" accessibilityLabel="Go to Fleet" onPress={() => navigation.navigate('Fleet')}>
-              <EJeepHeroLogo compact roleLabel="Supervisor" color={Colors.onDark} />
+              <EJeepHeroLogo compact roleLabel="Supervisor" />
             </TouchableOpacity>
           ),
         })}
@@ -358,7 +372,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
           component={SupervisorDashboardScreen}
           options={{
             title: 'Fleet',
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'location' : 'location-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="location" off="location-outline" />
           }}
         />
         <Tab.Screen
@@ -366,7 +380,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
           component={AdminDriversScreen}
           options={{
             title: 'Drivers',
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'people' : 'people-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="people" off="people-outline" />
           }}
         />
         <Tab.Screen
@@ -374,7 +388,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
           component={AdminUnitsScreen}
           options={{
             title: 'Units',
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'bus' : 'bus-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="bus" off="bus-outline" />
           }}
         />
         <Tab.Screen
@@ -382,7 +396,7 @@ const AdminTabs = ({ navigation: stackNavigation }: any) => {
           component={AdminReportsScreen}
           options={{
             title: 'Reports',
-            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={21} color={color} />,
+            tabBarIcon: ({ focused }) => <ChargeTabIcon focused={focused} on="document-text" off="document-text-outline" />
           }}
         />
       </Tab.Navigator>

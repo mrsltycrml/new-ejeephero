@@ -13,6 +13,7 @@ const themeTokens = {
   space: new Proxy({}, { get: () => 8 }),
   tapTarget: 48,
   sheetSnap: { peek: 160, halfRatio: 0.42, expandedRatio: 0.88 },
+  font: new Proxy({}, { get: () => 'System' }),
 };
 
 // Exercise the actual TSX with isolated hook state and query responses.

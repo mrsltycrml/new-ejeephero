@@ -20,7 +20,7 @@ export default function RouteWarningBanner({ onOpen }: { onOpen: () => void }) {
         }}
       >
         <View style={styles.marker}>
-          <Ionicons name="warning-outline" size={22} color={Colors.midnight} />
+          <Ionicons name="warning-outline" size={22} color={Colors.warning} />
         </View>
         <View style={styles.message}>
           <Text style={styles.title}>Possible off-route movement</Text>
@@ -36,9 +36,9 @@ const styles = StyleSheet.create({
   placement: { position: 'absolute', bottom: 80, left: 12, right: 12, alignItems: 'center', zIndex: 20 },
   banner: {
     width: '100%', maxWidth: 480, minHeight: 60, paddingRight: 14, flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.warningBorder, backgroundColor: Colors.paper, elevation: 5,
+    borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: Colors.warningBorder, backgroundColor: Colors.paper, elevation: 5,
   },
-  marker: { alignSelf: 'stretch', width: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.signal },
+  marker: { alignSelf: 'stretch', width: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.warningBg },
   message: { flex: 1, paddingVertical: 10, gap: 3 },
   title: { color: Colors.ink, fontWeight: '700', fontSize: 15 },
   unit: { color: Colors.subtleGray, fontSize: 13 },

@@ -20,9 +20,9 @@ function RoleChoice({ option, checked, group, onPress }: {
   const content = (
     <>
       <Ionicons aria-hidden name={option === 'passenger' ? 'person-outline' : 'bus-outline'}
-        size={20} color={checked ? color.onDark : color.ink} />
+        size={20} color={checked ? color.voltInk : color.ink} />
       <Text aria-hidden style={[styles.choiceText, checked && styles.selectedText]}>{label}</Text>
-      {checked && <Ionicons aria-hidden name="checkmark" size={16} color={color.onDark} />}
+      {checked && <Ionicons aria-hidden name="checkmark" size={16} color={color.voltInk} />}
     </>
   );
 
@@ -322,11 +322,11 @@ const styles = StyleSheet.create({
   roles: { gap: 8 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   choice: { flexGrow: 1, flexBasis: 135, flexDirection: 'row', alignItems: 'center', gap: 8,
-    minHeight: tapTarget, paddingHorizontal: 12, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1.5, borderColor: color.inkMuted },
-  selected: { backgroundColor: color.ink, borderColor: color.ink },
+    minHeight: tapTarget, paddingHorizontal: 12, paddingVertical: 12, borderRadius: radius.pill, borderWidth: 1.5, borderColor: color.inkMuted },
+  selected: { backgroundColor: color.volt, borderColor: color.volt },
   choiceFocus: { outlineStyle: 'solid', outlineWidth: 2, outlineOffset: 2, outlineColor: color.action },
   choiceText: { flex: 1, fontSize: 15, fontWeight: '700', color: color.ink },
-  selectedText: { color: color.onDark },
+  selectedText: { color: color.voltInk },
   roleNote: { color: color.inkMuted, fontSize: 14, lineHeight: 20 },
   hint: { color: color.inkMuted, fontSize: 13, lineHeight: 19, marginTop: -10 },
   met: { color: color.success, fontWeight: '600' },

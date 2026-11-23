@@ -6,7 +6,7 @@ import { isSupabaseConfigured, supabaseAuth } from '../../lib/supabase';
 import { isClerkConfigured } from '../../lib/clerk';
 import { color } from '../../constants/theme';
 import AppDownloadModal from '../../components/AppDownloadModal';
-import { ListRow } from '../../components/ui';
+import { Button, ListRow } from '../../components/ui';
 import { AuthAction, AuthField, AuthLink, AuthNotice, AuthPage, authStyles } from './AuthUI';
 
 type CredentialsProps = {
@@ -239,7 +239,7 @@ export default function LoginScreen({ navigation }: any) {
       <View style={authStyles.footer}>
         <View style={authStyles.links}>
           <Text style={authStyles.body}>{t('passenger.authLogin.newHere')}</Text>
-          <AuthLink label={t('passenger.authLogin.create')} onPress={() => navigation.navigate('Register')} />
+          <Button variant="volt" label={t('passenger.authLogin.create')} onPress={() => navigation.navigate('Register')} style={{ flexGrow: 0, paddingHorizontal: 18 }} />
         </View>
         <ListRow
           label={t('passenger.authLogin.install')}

@@ -39,11 +39,10 @@ export function AuthPage({ title, subtitle, onBack, children }: AuthPageProps) {
       <View style={[styles.page, wide && styles.widePage, phoneWeb && styles.phonePage]}>
         <View style={[styles.masthead, wide && styles.wideMasthead]}>
           <View style={styles.mastheadTop}>
-            <EJeepHeroLogo compact width={wide ? 196 : 168} color={color.onDark} />
+            <EJeepHeroLogo compact width={wide ? 196 : 168} />
             <LanguageSwitch />
           </View>
           <ScreenHeader
-            inverted
             title={title}
             subtitle={subtitle}
             onBack={onBack}
@@ -118,22 +117,22 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: color.canvas },
   canvas: { flexGrow: 1, alignItems: 'center' },
   wideCanvas: { justifyContent: 'center' },
-  page: { width: '100%', maxWidth: 600, backgroundColor: color.paper },
+  page: { width: '100%', maxWidth: 600, backgroundColor: color.canvas },
   phonePage: { flexGrow: 1 },
   widePage: { flexDirection: 'row', maxWidth: 980, minHeight: 480, borderRadius: radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: color.border },
-  masthead: { backgroundColor: color.ink, paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.xl, gap: 8 },
+  masthead: { backgroundColor: color.canvas, paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.xl, gap: 8 },
   wideMasthead: { flex: 4, minWidth: 0, paddingHorizontal: space.xxl, paddingVertical: space.xxl, justifyContent: 'space-between' },
   mastheadTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   diagram: { height: 88, marginHorizontal: -32, overflow: 'hidden', marginTop: 8 },
-  secondaryTrack: { position: 'absolute', bottom: 6, left: 0, right: 0, height: 3, backgroundColor: color.onDark, opacity: 0.28 },
-  lowerTrack: { position: 'absolute', left: 0, width: '45%', bottom: 24, height: 4, backgroundColor: color.signal },
+  secondaryTrack: { position: 'absolute', bottom: 6, left: 0, right: 0, height: 3, backgroundColor: color.action, opacity: 0.22 },
+  lowerTrack: { position: 'absolute', left: 0, width: '45%', bottom: 24, height: 4, backgroundColor: color.action },
   turnUp: { position: 'absolute', left: '44%', bottom: 24, height: 34, width: 40, borderBottomWidth: 4,
-    borderRightWidth: 4, borderBottomRightRadius: 22, borderColor: color.signal },
+    borderRightWidth: 4, borderBottomRightRadius: 22, borderColor: color.action },
   upperTrack: { position: 'absolute', left: '44%', marginLeft: 36, right: 0, top: 9, height: 23,
-    borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 16, borderColor: color.signal },
+    borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 16, borderColor: color.action },
   stop: { position: 'absolute', width: 16, height: 16, borderRadius: 8, borderWidth: 4,
-    borderColor: color.signal, backgroundColor: color.ink },
+    borderColor: color.volt, backgroundColor: color.ink },
   firstStop: { left: '23%', bottom: 18 },
   lastStop: { right: '17%', top: 3 },
   panel: { paddingHorizontal: space.xl, paddingVertical: space.xl, minWidth: 0 },
