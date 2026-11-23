@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   heroIdentity: { minWidth: 0, flexBasis: 180, flexGrow: 1, flexShrink: 1, gap: 4 },
   nameHeader: { color: color.ink, fontSize: 26, letterSpacing: -0.6, fontWeight: '800' },
   emailHeader: { color: color.inkMuted, fontSize: 14, lineHeight: 20, ...(Platform.OS === 'web' ? { overflowWrap: 'anywhere' as const } : {}) },
-  editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, minHeight: tapTarget, borderRadius: radius.pill, backgroundColor: color.volt },
+  editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexShrink: 0, gap: 6, paddingHorizontal: 12, minHeight: tapTarget, borderRadius: radius.pill, backgroundColor: color.volt },
   editText: { fontWeight: '700', fontSize: 14, color: color.ink },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderTopWidth: 1, borderColor: color.border },
   secondaryText: { color: color.inkMuted, fontSize: 14, lineHeight: 20 },

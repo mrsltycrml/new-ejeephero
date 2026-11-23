@@ -220,7 +220,7 @@ export default function FareScreen({ navigation, route: screenRoute }: any) {
 
 const styles = StyleSheet.create({
   layout: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', maxWidth: 1024 },
-  ticket: { flexBasis: 300, flexGrow: 3, flexShrink: 1, minWidth: 0, gap: 12, backgroundColor: color.paper, padding: 20, borderRadius: radius.lg, borderWidth: 1, borderColor: color.border },
+  ticket: { flexBasis: 300, flexGrow: 3, flexShrink: 1, minWidth: 0, gap: 12, backgroundColor: color.paper, borderRadius: radius.lg, borderWidth: 1, borderColor: color.border },
   controls: { flexBasis: 360, flexGrow: 5, flexShrink: 1, minWidth: 0, gap: 16 },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   total: { gap: 2 },

@@ -5,7 +5,7 @@ export const transitStyles = StyleSheet.create({
   page: { flex: 1, backgroundColor: color.canvas },
   content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: space.md, paddingBottom: 36, gap: space.md },
   panel: { backgroundColor: color.paper, borderColor: color.border, borderWidth: 1, borderRadius: radius.lg },
-  masthead: { backgroundColor: 'transparent', borderRadius: 0, padding: 0, gap: space.xs },
+  masthead: { backgroundColor: 'transparent', borderRadius: 0, padding: space.lg, gap: space.xs },
   heading: { color: color.ink, ...type.display, fontSize: 36, lineHeight: 42 },
   description: { color: color.inkMuted, fontSize: 15, lineHeight: 22 },
   primaryButton: {
